@@ -12,8 +12,24 @@ spring:
     console:
       enabled: false
 
+  # Disable auto-configuration of OpenAI/Ollama when using GenAI from VCAP
+  ai:
+    openai:
+      enabled: false
+    ollama:
+      enabled: false
+
 management:
   endpoints:
     web:
       exposure:
         include: health,info
+
+app:
+  chat:
+    default-provider: genai
+
+logging:
+  level:
+    io.pivotal.cfenv: DEBUG
+    com.example.cfchat: DEBUG
