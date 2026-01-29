@@ -1,0 +1,203 @@
+package com.example.cfchat.auth;
+
+import com.example.cfchat.model.User;
+import jakarta.servlet.http.HttpServletRequest;
+import jakarta.servlet.http.HttpServletResponse;
+import lombok.extern.slf4j.Slf4j;
+import org.springframework.beans.factory.annotation.Value;
+import org.springframework.context.annotation.Bean;
+import org.springframework.context.annotation.Configuration;
+import org.springframework.core.env.Environment;
+import org.springframework.security.authentication.AuthenticationManager;
+import org.springframework.security.authentication.BadCredentialsException;
+import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
+import org.springframework.security.config.annotation.web.builders.HttpSecurity;
+import org.springframework.security.config.annotation.web.configuration.EnableWebSecurity;
+import org.springframework.security.core.Authentication;
+import org.springframework.security.core.authority.SimpleGrantedAuthority;
+import org.springframework.security.core.context.SecurityContextHolder;
+import org.springframework.security.oauth2.client.registration.ClientRegistration;
+import org.springframework.security.oauth2.client.registration.ClientRegistrationRepository;
+import org.springframework.security.oauth2.client.registration.InMemoryClientRegistrationRepository;
+import org.springframework.security.oauth2.core.AuthorizationGrantType;
+import org.springframework.security.oauth2.core.user.OAuth2User;
+import org.springframework.security.web.SecurityFilterChain;
+import org.springframework.security.web.authentication.AuthenticationSuccessHandler;
+import org.springframework.security.web.context.HttpSessionSecurityContextRepository;
+
+import java.io.IOException;
+import java.util.Collections;
+import java.util.List;
+
+@Configuration
+@EnableWebSecurity
+@Slf4j
+public class SecurityConfig {
+
+    @Value("${app.auth.secret:changeme}")
+    private String authSecret;
+
+    private final Environment environment;
+    private final UserService userService;
+
+    public SecurityConfig(Environment environment, UserService userService) {
+        this.environment = environment;
+        this.userService = userService;
+    }
+
+    @Bean
+    public SecurityFilterChain securityFilterChain(HttpSecurity http) throws Exception {
+        http
+            .csrf(csrf -> csrf
+                .ignoringRequestMatchers("/api/**", "/auth/**")
+            )
+            .authorizeHttpRequests(auth -> auth
+                .requestMatchers("/login.html", "/auth/provider", "/auth/login", "/actuator/health", "/css/**", "/js/**", "/error").permitAll()
+                .requestMatchers("/admin/**", "/api/admin/**").hasRole("ADMIN")
+                .anyRequest().authenticated()
+            )
+            .formLogin(form -> form
+                .loginPage("/login.html")
+                .loginProcessingUrl("/auth/login")
+                .successHandler(authenticationSuccessHandler())
+                .failureUrl("/login.html?error=true")
+                .permitAll()
+            )
+            .logout(logout -> logout
+                .logoutUrl("/logout")
+                .logoutSuccessUrl("/login.html?logout=true")
+                .invalidateHttpSession(true)
+                .deleteCookies("JSESSIONID")
+                .permitAll()
+            );
+
+        // Add OAuth2 login if SSO is configured
+        if (isSsoConfigured()) {
+            http.oauth2Login(oauth2 -> oauth2
+                .loginPage("/login.html")
+                .successHandler(oauth2AuthenticationSuccessHandler())
+                .failureUrl("/login.html?error=true")
+            );
+        }
+
+        return http.build();
+    }
+
+    @Bean
+    public AuthenticationManager authenticationManager() {
+        return authentication -> {
+            String username = authentication.getName();
+            String password = authentication.getCredentials().toString();
+
+            // Validate against the configured access code
+            if (!authSecret.equals(password)) {
+                throw new BadCredentialsException("Invalid access code");
+            }
+
+            // Get or create user
+            User user = userService.getOrCreateUser(username, null, null, User.AuthProvider.LOCAL);
+
+            List<SimpleGrantedAuthority> authorities = Collections.singletonList(
+                new SimpleGrantedAuthority("ROLE_" + user.getRole().name())
+            );
+
+            return new UsernamePasswordAuthenticationToken(username, null, authorities);
+        };
+    }
+
+    private AuthenticationSuccessHandler authenticationSuccessHandler() {
+        return (request, response, authentication) -> {
+            log.info("User {} logged in successfully", authentication.getName());
+            response.sendRedirect("/");
+        };
+    }
+
+    private AuthenticationSuccessHandler oauth2AuthenticationSuccessHandler() {
+        return (request, response, authentication) -> {
+            OAuth2User oauth2User = (OAuth2User) authentication.getPrincipal();
+
+            String username = oauth2User.getAttribute("preferred_username");
+            if (username == null) {
+                username = oauth2User.getAttribute("email");
+            }
+            if (username == null) {
+                username = oauth2User.getAttribute("sub");
+            }
+
+            String email = oauth2User.getAttribute("email");
+            String displayName = oauth2User.getAttribute("name");
+
+            // Get or create user from OAuth2 info
+            User user = userService.getOrCreateUser(username, email, displayName, User.AuthProvider.SSO);
+
+            // Update the authentication with proper roles
+            List<SimpleGrantedAuthority> authorities = Collections.singletonList(
+                new SimpleGrantedAuthority("ROLE_" + user.getRole().name())
+            );
+
+            Authentication newAuth = new UsernamePasswordAuthenticationToken(
+                authentication.getPrincipal(),
+                authentication.getCredentials(),
+                authorities
+            );
+
+            SecurityContextHolder.getContext().setAuthentication(newAuth);
+            request.getSession().setAttribute(
+                HttpSessionSecurityContextRepository.SPRING_SECURITY_CONTEXT_KEY,
+                SecurityContextHolder.getContext()
+            );
+
+            log.info("SSO User {} logged in successfully with role {}", username, user.getRole());
+            response.sendRedirect("/");
+        };
+    }
+
+    @Bean
+    public ClientRegistrationRepository clientRegistrationRepository() {
+        if (isSsoConfigured()) {
+            String clientId = environment.getProperty("sso.client-id", "");
+            String clientSecret = environment.getProperty("sso.client-secret", "");
+            String authUri = environment.getProperty("sso.auth-uri", "");
+            String tokenUri = environment.getProperty("sso.token-uri", "");
+            String userInfoUri = environment.getProperty("sso.user-info-uri", "");
+            String redirectUri = environment.getProperty("sso.redirect-uri", "{baseUrl}/login/oauth2/code/{registrationId}");
+
+            ClientRegistration clientRegistration = ClientRegistration.withRegistrationId("sso")
+                .clientId(clientId)
+                .clientSecret(clientSecret)
+                .authorizationGrantType(AuthorizationGrantType.AUTHORIZATION_CODE)
+                .redirectUri(redirectUri)
+                .scope("openid", "profile", "email")
+                .authorizationUri(authUri)
+                .tokenUri(tokenUri)
+                .userInfoUri(userInfoUri)
+                .userNameAttributeName("sub")
+                .clientName("SSO")
+                .build();
+
+            return new InMemoryClientRegistrationRepository(clientRegistration);
+        }
+
+        // Return a dummy registration when SSO is not configured
+        // This prevents startup errors while keeping the bean available
+        ClientRegistration dummyRegistration = ClientRegistration.withRegistrationId("none")
+            .clientId("none")
+            .clientSecret("none")
+            .authorizationGrantType(AuthorizationGrantType.AUTHORIZATION_CODE)
+            .redirectUri("{baseUrl}/login/oauth2/code/{registrationId}")
+            .authorizationUri("https://none/authorize")
+            .tokenUri("https://none/token")
+            .userInfoUri("https://none/userinfo")
+            .userNameAttributeName("sub")
+            .clientName("None")
+            .build();
+
+        return new InMemoryClientRegistrationRepository(dummyRegistration);
+    }
+
+    public boolean isSsoConfigured() {
+        String clientId = environment.getProperty("sso.client-id");
+        String authUri = environment.getProperty("sso.auth-uri");
+        return clientId != null && !clientId.isEmpty() && authUri != null && !authUri.isEmpty();
+    }
+}

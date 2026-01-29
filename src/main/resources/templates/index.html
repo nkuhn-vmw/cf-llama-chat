@@ -44,18 +44,8 @@
             </div>
 
             <div class="sidebar-footer">
-                <div class="model-selector">
-                    <label for="modelSelect">Model:</label>
-                    <select id="modelSelect">
-                        <optgroup th:each="provider : ${ {'openai', 'ollama'} }" th:label="${provider}">
-                            <option th:each="model : ${models}"
-                                    th:if="${model.provider == provider}"
-                                    th:value="${model.provider + ':' + model.id}"
-                                    th:text="${model.name}"
-                                    th:title="${model.description}">
-                            </option>
-                        </optgroup>
-                    </select>
+                <div class="powered-by" style="text-align: center; font-size: 0.8rem; color: var(--text-muted);">
+                    Powered by Spring AI
                 </div>
             </div>
         </aside>
@@ -71,6 +61,110 @@
 
         <!-- Main Chat Area -->
         <main class="chat-main">
+            <!-- Header with model selector and user menu -->
+            <header class="chat-header">
+                <div class="header-left">
+                    <div class="header-model-selector">
+                        <span class="model-label">Model:</span>
+                        <select id="modelSelect">
+                            <optgroup th:each="provider : ${ {'openai', 'ollama', 'genai'} }" th:label="${provider}">
+                                <option th:each="model : ${models}"
+                                        th:if="${model.provider == provider}"
+                                        th:value="${model.provider + ':' + model.id}"
+                                        th:text="${model.name}"
+                                        th:title="${model.description}">
+                                </option>
+                            </optgroup>
+                        </select>
+                    </div>
+                </div>
+
+                <div class="header-right">
+                    <!-- Nav Links -->
+                    <div class="nav-links">
+                        <a href="/metrics" class="nav-link">
+                            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                <path d="M18 20V10"></path>
+                                <path d="M12 20V4"></path>
+                                <path d="M6 20v-6"></path>
+                            </svg>
+                            Metrics
+                        </a>
+                        <a th:if="${currentUser != null && currentUser.role.name() == 'ADMIN'}" href="/admin" class="nav-link">
+                            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                <circle cx="12" cy="12" r="3"></circle>
+                                <path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1 0 2.83 2 2 0 0 1-2.83 0l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-2 2 2 2 0 0 1-2-2v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83 0 2 2 0 0 1 0-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1-2-2 2 2 0 0 1 2-2h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 0-2.83 2 2 0 0 1 2.83 0l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 2-2 2 2 0 0 1 2 2v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 0 2 2 0 0 1 0 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 2 2 2 2 0 0 1-2 2h-.09a1.65 1.65 0 0 0-1.51 1z"></path>
+                            </svg>
+                            Admin
+                        </a>
+                    </div>
+
+                    <!-- Theme Toggle -->
+                    <button class="theme-toggle" id="themeToggle" title="Toggle theme">
+                        <svg class="sun-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                            <circle cx="12" cy="12" r="5"></circle>
+                            <line x1="12" y1="1" x2="12" y2="3"></line>
+                            <line x1="12" y1="21" x2="12" y2="23"></line>
+                            <line x1="4.22" y1="4.22" x2="5.64" y2="5.64"></line>
+                            <line x1="18.36" y1="18.36" x2="19.78" y2="19.78"></line>
+                            <line x1="1" y1="12" x2="3" y2="12"></line>
+                            <line x1="21" y1="12" x2="23" y2="12"></line>
+                            <line x1="4.22" y1="19.78" x2="5.64" y2="18.36"></line>
+                            <line x1="18.36" y1="5.64" x2="19.78" y2="4.22"></line>
+                        </svg>
+                        <svg class="moon-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                            <path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z"></path>
+                        </svg>
+                    </button>
+
+                    <!-- User Menu -->
+                    <div class="user-menu" id="userMenu" th:if="${currentUser != null}">
+                        <button class="user-menu-btn" id="userMenuBtn">
+                            <div class="user-avatar" th:text="${currentUser.displayName != null ? currentUser.displayName.substring(0, 1).toUpperCase() : 'U'}">U</div>
+                            <span class="user-name" th:text="${currentUser.displayName != null ? currentUser.displayName : currentUser.username}">User</span>
+                            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="width: 16px; height: 16px;">
+                                <polyline points="6 9 12 15 18 9"></polyline>
+                            </svg>
+                        </button>
+                        <div class="user-menu-dropdown" id="userMenuDropdown">
+                            <div class="user-menu-header">
+                                <div class="display-name" th:text="${currentUser.displayName != null ? currentUser.displayName : currentUser.username}">User</div>
+                                <div class="user-role" th:text="${currentUser.role}">USER</div>
+                            </div>
+                            <div class="user-menu-items">
+                                <a href="/metrics" class="user-menu-item">
+                                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                        <path d="M18 20V10"></path>
+                                        <path d="M12 20V4"></path>
+                                        <path d="M6 20v-6"></path>
+                                    </svg>
+                                    Usage Metrics
+                                </a>
+                                <a th:if="${currentUser.role.name() == 'ADMIN'}" href="/admin" class="user-menu-item">
+                                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                        <path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"></path>
+                                        <circle cx="9" cy="7" r="4"></circle>
+                                        <path d="M23 21v-2a4 4 0 0 0-3-3.87"></path>
+                                        <path d="M16 3.13a4 4 0 0 1 0 7.75"></path>
+                                    </svg>
+                                    Admin Portal
+                                </a>
+                                <form action="/logout" method="post" style="margin: 0;">
+                                    <button type="submit" class="user-menu-item logout">
+                                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                            <path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"></path>
+                                            <polyline points="16 17 21 12 16 7"></polyline>
+                                            <line x1="21" y1="12" x2="9" y2="12"></line>
+                                        </svg>
+                                        Logout
+                                    </button>
+                                </form>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </header>
+
             <div class="chat-container">
                 <!-- Messages -->
                 <div class="messages-container" id="messagesContainer">
@@ -85,19 +179,19 @@
                         <p>Start a new conversation or select one from the sidebar.</p>
                         <div class="quick-actions">
                             <button class="quick-action" data-prompt="Explain how Cloud Foundry works">
-                                <span class="action-icon">☁️</span>
+                                <span class="action-icon">&#9729;</span>
                                 Explain Cloud Foundry
                             </button>
                             <button class="quick-action" data-prompt="Write a Spring Boot REST controller example">
-                                <span class="action-icon">🍃</span>
+                                <span class="action-icon">&#127807;</span>
                                 Spring Boot Example
                             </button>
                             <button class="quick-action" data-prompt="What are the benefits of using Spring AI?">
-                                <span class="action-icon">🤖</span>
+                                <span class="action-icon">&#129302;</span>
                                 About Spring AI
                             </button>
                             <button class="quick-action" data-prompt="Help me write a Java function that...">
-                                <span class="action-icon">☕</span>
+                                <span class="action-icon">&#9749;</span>
                                 Java Coding Help
                             </button>
                         </div>
@@ -138,7 +232,7 @@
                             </button>
                         </div>
                         <div class="input-footer">
-                            <span class="powered-by">Powered by Spring AI</span>
+                            <span class="powered-by">Press Enter to send, Shift+Enter for new line</span>
                             <label class="stream-toggle">
                                 <input type="checkbox" id="streamToggle" checked>
                                 <span>Stream responses</span>
@@ -154,7 +248,8 @@
     <script th:inline="javascript">
         window.APP_DATA = {
             conversationId: [[${conversationId}]],
-            models: [[${models}]]
+            models: [[${models}]],
+            currentUser: [[${currentUser}]]
         };
     </script>
 
