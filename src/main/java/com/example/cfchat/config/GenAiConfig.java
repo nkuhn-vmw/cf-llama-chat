@@ -1,42 +1,117 @@
 package com.example.cfchat.config;
 
-import io.pivotal.cfenv.boot.genai.GenaiLocator;
+import io.pivotal.cfenv.core.CfCredentials;
+import io.pivotal.cfenv.core.CfEnv;
+import io.pivotal.cfenv.core.CfService;
+import lombok.Getter;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.ai.chat.client.ChatClient;
 import org.springframework.ai.chat.model.ChatModel;
+import org.springframework.ai.openai.OpenAiChatModel;
+import org.springframework.ai.openai.OpenAiChatOptions;
+import org.springframework.ai.openai.api.OpenAiApi;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.context.annotation.Primary;
 import org.springframework.context.annotation.Profile;
 
-import java.util.List;
+import java.util.*;
 
 /**
  * Configuration for Tanzu GenAI services via VCAP_SERVICES.
- * When running on Cloud Foundry with a bound GenAI service, this configuration
- * will automatically provide a ChatModel from the GenaiLocator.
+ * Supports both single-model and multi-model binding formats.
+ * Creates OpenAI-compatible ChatModel beans from GenAI service bindings.
  */
 @Configuration
 @Profile("cloud")
 @Slf4j
 public class GenAiConfig {
 
-    private final List<GenaiLocator> genaiLocators;
+    @Getter
+    private final Map<String, ChatModel> chatModels = new LinkedHashMap<>();
 
-    public GenAiConfig(List<GenaiLocator> genaiLocators) {
-        this.genaiLocators = genaiLocators != null ? genaiLocators : List.of();
-        log.info("GenAiConfig initialized with {} GenaiLocator(s)", this.genaiLocators.size());
+    @Getter
+    private final Map<String, ModelMetadata> modelMetadata = new LinkedHashMap<>();
 
-        if (!this.genaiLocators.isEmpty()) {
-            for (GenaiLocator locator : this.genaiLocators) {
+    public GenAiConfig() {
+        log.info("GenAiConfig initializing - parsing VCAP_SERVICES for GenAI services");
+        initializeModelsFromVcap();
+    }
+
+    private void initializeModelsFromVcap() {
+        try {
+            CfEnv cfEnv = new CfEnv();
+            List<CfService> genaiServices = cfEnv.findServicesByLabel("genai");
+
+            log.info("Found {} GenAI service(s) in VCAP_SERVICES", genaiServices.size());
+
+            for (CfService service : genaiServices) {
                 try {
-                    List<String> chatModels = locator.getModelNamesByCapability("CHAT");
-                    log.info("Available CHAT models from GenaiLocator: {}", chatModels);
+                    String serviceName = service.getName();
+                    CfCredentials credentials = service.getCredentials();
+
+                    // Get the API URL and key from credentials
+                    String apiUrl = credentials.getString("api_base");
+                    String apiKey = credentials.getString("api_key");
+                    String modelName = credentials.getString("model_name");
+
+                    // Fallbacks for different credential formats
+                    if (apiUrl == null) {
+                        apiUrl = credentials.getString("uri");
+                    }
+                    if (apiUrl == null) {
+                        apiUrl = credentials.getString("url");
+                    }
+                    if (modelName == null) {
+                        modelName = credentials.getString("model");
+                    }
+                    if (modelName == null) {
+                        // Use service instance name as model name if not specified
+                        modelName = serviceName;
+                    }
+
+                    log.info("Processing GenAI service: {} (model: {}, url: {})",
+                            serviceName, modelName, apiUrl != null ? apiUrl : "not set");
+
+                    if (apiUrl != null && apiKey != null) {
+                        // Create OpenAI API client pointing to the GenAI service
+                        OpenAiApi openAiApi = OpenAiApi.builder()
+                                .baseUrl(apiUrl)
+                                .apiKey(apiKey)
+                                .build();
+
+                        // Create ChatModel with default options
+                        OpenAiChatOptions options = OpenAiChatOptions.builder()
+                                .model(modelName)
+                                .build();
+
+                        OpenAiChatModel chatModel = OpenAiChatModel.builder()
+                                .openAiApi(openAiApi)
+                                .defaultOptions(options)
+                                .build();
+
+                        chatModels.put(modelName, chatModel);
+                        modelMetadata.put(modelName, new ModelMetadata(
+                                modelName,
+                                serviceName,
+                                "OpenAiChatModel"
+                        ));
+
+                        log.info("Registered ChatModel: {} (service: {})", modelName, serviceName);
+                    } else {
+                        log.warn("GenAI service {} missing required credentials (api_base: {}, api_key: {})",
+                                serviceName, apiUrl != null, apiKey != null);
+                    }
                 } catch (Exception e) {
-                    log.debug("Could not retrieve model names from locator: {}", e.getMessage());
+                    log.warn("Failed to configure GenAI service {}: {}", service.getName(), e.getMessage());
                 }
             }
+
+            log.info("Total ChatModels registered: {}", chatModels.size());
+
+        } catch (Exception e) {
+            log.warn("Could not parse VCAP_SERVICES for GenAI services: {}", e.getMessage());
         }
     }
 
@@ -44,48 +119,80 @@ public class GenAiConfig {
     @Primary
     @ConditionalOnProperty(name = "spring.profiles.active", havingValue = "cloud")
     public ChatModel genaiChatModel() {
-        for (GenaiLocator locator : genaiLocators) {
-            try {
-                ChatModel chatModel = locator.getFirstAvailableChatModel();
-                if (chatModel != null) {
-                    log.info("Using ChatModel from GenaiLocator: {}", chatModel.getClass().getSimpleName());
-                    return chatModel;
-                }
-            } catch (Exception e) {
-                log.warn("Failed to get ChatModel from GenaiLocator: {}", e.getMessage());
-            }
+        if (!chatModels.isEmpty()) {
+            String firstModelName = chatModels.keySet().iterator().next();
+            ChatModel model = chatModels.get(firstModelName);
+            log.info("Primary ChatModel set to: {}", firstModelName);
+            return model;
         }
-        throw new IllegalStateException("No ChatModel available from any GenaiLocator. " +
-                "Ensure a GenAI service is bound to the application.");
+
+        log.warn("No GenAI ChatModel available - chat features will be disabled");
+        return null;
     }
 
     @Bean
     @Primary
     @ConditionalOnProperty(name = "spring.profiles.active", havingValue = "cloud")
-    public ChatClient genaiChatClient(ChatModel genaiChatModel) {
-        log.info("Creating primary ChatClient with GenAI ChatModel");
-        return ChatClient.builder(genaiChatModel).build();
+    public ChatClient genaiChatClient() {
+        ChatModel model = genaiChatModel();
+        if (model != null) {
+            log.info("Creating primary ChatClient with GenAI ChatModel");
+            return ChatClient.builder(model).build();
+        }
+        log.warn("No ChatModel available - ChatClient will not be created");
+        return null;
+    }
+
+    /**
+     * Get a ChatModel by its model name.
+     */
+    public ChatModel getChatModelByName(String modelName) {
+        ChatModel model = chatModels.get(modelName);
+        if (model == null) {
+            log.warn("ChatModel not found for name: {}, using default", modelName);
+            return chatModels.isEmpty() ? null : chatModels.values().iterator().next();
+        }
+        return model;
+    }
+
+    /**
+     * Get a ChatClient for a specific model.
+     */
+    public ChatClient getChatClientForModel(String modelName) {
+        ChatModel model = getChatModelByName(modelName);
+        if (model != null) {
+            return ChatClient.builder(model).build();
+        }
+        return null;
     }
 
     /**
      * Returns true if any GenAI models are available via VCAP_SERVICES.
      */
     public boolean hasGenAiModels() {
-        return !genaiLocators.isEmpty();
+        return !chatModels.isEmpty();
     }
 
     /**
-     * Returns the list of available model names from all locators.
+     * Returns the list of available model names.
      */
     public List<String> getAvailableModelNames() {
-        return genaiLocators.stream()
-                .flatMap(locator -> {
-                    try {
-                        return locator.getModelNamesByCapability("CHAT").stream();
-                    } catch (Exception e) {
-                        return java.util.stream.Stream.empty();
-                    }
-                })
-                .toList();
+        return new ArrayList<>(chatModels.keySet());
     }
+
+    /**
+     * Returns the number of configured models.
+     */
+    public int getModelCount() {
+        return chatModels.size();
+    }
+
+    /**
+     * Metadata about a configured model.
+     */
+    public record ModelMetadata(
+            String modelName,
+            String serviceName,
+            String modelType
+    ) {}
 }

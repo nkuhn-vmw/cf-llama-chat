@@ -106,8 +106,8 @@ public class ChatService {
         // Build prompt with conversation history
         List<org.springframework.ai.chat.messages.Message> messages = buildMessageHistory(conversation, request.getMessage());
 
-        // Get AI response
-        ChatClient chatClient = getChatClient(provider);
+        // Get AI response - pass model name for GenAI multi-model support
+        ChatClient chatClient = getChatClient(provider, model);
         if (chatClient == null) {
             throw new IllegalStateException("No chat client available for provider: " + provider);
         }
@@ -195,40 +195,27 @@ public class ChatService {
 
         Flux<ChatResponse> responseFlux;
 
-        // Use Ollama for ollama provider, otherwise use primary (OpenAI or GenAI)
-        if ("ollama".equalsIgnoreCase(provider) && ollamaChatModel != null) {
-            responseFlux = ollamaChatModel.stream(prompt)
-                    .map(chatResponse -> {
-                        String content = chatResponse.getResult() != null ?
-                                chatResponse.getResult().getOutput().getText() : "";
-                        if (content != null) {
-                            fullResponse.append(content);
-                        }
-                        return ChatResponse.builder()
-                                .conversationId(finalConversationId)
-                                .content(content != null ? content : "")
-                                .streaming(true)
-                                .complete(false)
-                                .build();
-                    });
-        } else if (primaryChatModel != null) {
-            responseFlux = primaryChatModel.stream(prompt)
-                    .map(chatResponse -> {
-                        String content = chatResponse.getResult() != null ?
-                                chatResponse.getResult().getOutput().getText() : "";
-                        if (content != null) {
-                            fullResponse.append(content);
-                        }
-                        return ChatResponse.builder()
-                                .conversationId(finalConversationId)
-                                .content(content != null ? content : "")
-                                .streaming(true)
-                                .complete(false)
-                                .build();
-                    });
-        } else {
+        // Get the appropriate ChatModel for streaming
+        ChatModel streamingModel = getStreamingModel(provider, model);
+
+        if (streamingModel == null) {
             return Flux.error(new IllegalStateException("No chat model available for provider: " + provider));
         }
+
+        responseFlux = streamingModel.stream(prompt)
+                .map(chatResponse -> {
+                    String content = chatResponse.getResult() != null ?
+                            chatResponse.getResult().getOutput().getText() : "";
+                    if (content != null) {
+                        fullResponse.append(content);
+                    }
+                    return ChatResponse.builder()
+                            .conversationId(finalConversationId)
+                            .content(content != null ? content : "")
+                            .streaming(true)
+                            .complete(false)
+                            .build();
+                });
 
         return responseFlux.concatWith(Flux.defer(() -> {
             // Save complete response
@@ -350,11 +337,43 @@ public class ChatService {
     }
 
     private ChatClient getChatClient(String provider) {
+        return getChatClient(provider, null);
+    }
+
+    private ChatClient getChatClient(String provider, String modelName) {
         if ("ollama".equalsIgnoreCase(provider)) {
             return ollamaChatClient;
         }
-        // Use primary client for openai, genai, or any other provider
+
+        // For GenAI, try to get the specific model if provided
+        if ("genai".equalsIgnoreCase(provider) && modelName != null && genAiConfig != null) {
+            ChatClient modelClient = genAiConfig.getChatClientForModel(modelName);
+            if (modelClient != null) {
+                log.debug("Using GenAI model: {}", modelName);
+                return modelClient;
+            }
+        }
+
+        // Use primary client for openai, genai (default), or any other provider
         return primaryChatClient;
+    }
+
+    private ChatModel getStreamingModel(String provider, String modelName) {
+        if ("ollama".equalsIgnoreCase(provider)) {
+            return ollamaChatModel;
+        }
+
+        // For GenAI, try to get the specific model if provided
+        if ("genai".equalsIgnoreCase(provider) && modelName != null && genAiConfig != null) {
+            ChatModel model = genAiConfig.getChatModelByName(modelName);
+            if (model != null) {
+                log.debug("Using GenAI streaming model: {}", modelName);
+                return model;
+            }
+        }
+
+        // Use primary model for openai, genai (default), or any other provider
+        return primaryChatModel;
     }
 
     private List<org.springframework.ai.chat.messages.Message> buildMessageHistory(

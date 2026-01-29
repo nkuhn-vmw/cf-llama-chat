@@ -13,5 +13,6 @@ applications:
     services:
       - chat-db
       - chat-llm
+      - gpt-oss-120b
     routes:
       - route: cf-llama-chat.apps.internal

@@ -284,7 +284,101 @@
                 <div class="stat-value" th:text="${totalAdmins}">0</div>
                 <div class="stat-label">Administrators</div>
             </div>
+            <div class="stat-card">
+                <div class="stat-value" th:text="${modelCount}">0</div>
+                <div class="stat-label">Available Models</div>
+            </div>
+            <div class="stat-card" th:if="${isCloudProfile}">
+                <div class="stat-value" th:text="${genAiModelCount}">0</div>
+                <div class="stat-label">GenAI Services</div>
+            </div>
         </div>
+
+        <!-- Models Section -->
+        <section class="models-section" style="margin-bottom: 32px;">
+            <h2 style="font-size: 1.3rem; margin-bottom: 16px;">Configured Models</h2>
+            <div class="users-table">
+                <table>
+                    <thead>
+                        <tr>
+                            <th>Model Name</th>
+                            <th>Provider</th>
+                            <th>Description</th>
+                            <th>Status</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        <tr th:each="model : ${models}">
+                            <td>
+                                <div style="font-weight: 500;" th:text="${model.name}">Model Name</div>
+                                <div style="font-size: 0.8rem; color: var(--text-muted);" th:text="${model.id}">model-id</div>
+                            </td>
+                            <td>
+                                <span class="provider-badge" th:text="${model.provider}">provider</span>
+                            </td>
+                            <td style="font-size: 0.9rem; color: var(--text-secondary);" th:text="${model.description}">Description</td>
+                            <td>
+                                <span th:if="${model.available}" style="color: var(--accent-color);">
+                                    <svg style="width: 16px; height: 16px; vertical-align: middle;" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                        <path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"></path>
+                                        <polyline points="22 4 12 14.01 9 11.01"></polyline>
+                                    </svg>
+                                    Available
+                                </span>
+                                <span th:unless="${model.available}" style="color: var(--error-color);">
+                                    <svg style="width: 16px; height: 16px; vertical-align: middle;" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                        <circle cx="12" cy="12" r="10"></circle>
+                                        <line x1="15" y1="9" x2="9" y2="15"></line>
+                                        <line x1="9" y1="9" x2="15" y2="15"></line>
+                                    </svg>
+                                    Unavailable
+                                </span>
+                            </td>
+                        </tr>
+                        <tr th:if="${#lists.isEmpty(models)}">
+                            <td colspan="4" style="text-align: center; padding: 40px; color: var(--text-muted);">
+                                No models configured
+                            </td>
+                        </tr>
+                    </tbody>
+                </table>
+            </div>
+
+            <!-- GenAI Service Details (Cloud only) -->
+            <div th:if="${isCloudProfile && genAiModelCount > 0}" style="margin-top: 24px;">
+                <h3 style="font-size: 1.1rem; margin-bottom: 12px; color: var(--text-secondary);">
+                    <svg style="width: 18px; height: 18px; vertical-align: middle; margin-right: 6px;" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                        <path d="M21 16V8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16z"></path>
+                        <polyline points="3.27 6.96 12 12.01 20.73 6.96"></polyline>
+                        <line x1="12" y1="22.08" x2="12" y2="12"></line>
+                    </svg>
+                    Tanzu GenAI Service Bindings
+                </h3>
+                <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(300px, 1fr)); gap: 16px;">
+                    <div th:each="entry : ${genAiModelMetadata}"
+                         style="background-color: var(--bg-secondary); border: 1px solid var(--border-color); border-radius: 12px; padding: 16px;">
+                        <div style="font-weight: 600; margin-bottom: 8px; word-break: break-all;" th:text="${entry.value.modelName()}">Model Name</div>
+                        <div style="display: flex; flex-direction: column; gap: 4px; font-size: 0.85rem; color: var(--text-secondary);">
+                            <span>
+                                <strong>Service:</strong>
+                                <span th:text="${entry.value.serviceName()}">service</span>
+                            </span>
+                            <span>
+                                <strong>Type:</strong>
+                                <span th:text="${entry.value.modelType()}">OpenAiChatModel</span>
+                            </span>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Environment Info -->
+            <div style="margin-top: 24px; padding: 16px; background-color: var(--bg-tertiary); border-radius: 8px; font-size: 0.85rem;">
+                <strong>Environment:</strong>
+                <span th:if="${isCloudProfile}" style="color: var(--accent-color);">Cloud Foundry (Tanzu GenAI)</span>
+                <span th:unless="${isCloudProfile}" style="color: var(--text-secondary);">Local Development</span>
+            </div>
+        </section>
 
         <section class="users-section">
             <h2>Users</h2>
