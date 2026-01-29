@@ -58,3 +58,5 @@ app:
       You are a helpful, harmless, and honest AI assistant. You provide clear,
       accurate, and thoughtful responses. When you don't know something, you
       say so. You format your responses using Markdown when appropriate.
+  auth:
+    secret: ${APP_AUTH_SECRET:changeme}

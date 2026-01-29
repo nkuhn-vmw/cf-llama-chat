@@ -23,6 +23,9 @@ public class Conversation {
     @GeneratedValue(strategy = GenerationType.UUID)
     private UUID id;
 
+    @Column(name = "user_id")
+    private UUID userId;
+
     @Column(nullable = false)
     private String title;
 

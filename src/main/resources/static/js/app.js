@@ -4,12 +4,14 @@ class ChatApp {
     constructor() {
         this.conversationId = window.APP_DATA?.conversationId || null;
         this.models = window.APP_DATA?.models || [];
+        this.currentUser = window.APP_DATA?.currentUser || null;
         this.isStreaming = true;
         this.isWaiting = false;
 
         this.initElements();
         this.initEventListeners();
         this.initMarkdown();
+        this.initTheme();
         this.scrollToBottom();
     }
 
@@ -26,6 +28,9 @@ class ChatApp {
         this.newChatBtn = document.getElementById('newChatBtn');
         this.modelSelect = document.getElementById('modelSelect');
         this.streamToggle = document.getElementById('streamToggle');
+        this.themeToggle = document.getElementById('themeToggle');
+        this.userMenuBtn = document.getElementById('userMenuBtn');
+        this.userMenuDropdown = document.getElementById('userMenuDropdown');
     }
 
     initEventListeners() {
@@ -95,6 +100,39 @@ class ChatApp {
                 }
             }
         });
+
+        // Theme toggle
+        if (this.themeToggle) {
+            this.themeToggle.addEventListener('click', () => {
+                this.toggleTheme();
+            });
+        }
+
+        // User menu toggle
+        if (this.userMenuBtn && this.userMenuDropdown) {
+            this.userMenuBtn.addEventListener('click', (e) => {
+                e.stopPropagation();
+                this.userMenuDropdown.classList.toggle('open');
+            });
+
+            document.addEventListener('click', (e) => {
+                if (!this.userMenuDropdown.contains(e.target) && !this.userMenuBtn.contains(e.target)) {
+                    this.userMenuDropdown.classList.remove('open');
+                }
+            });
+        }
+    }
+
+    initTheme() {
+        const savedTheme = localStorage.getItem('theme') || 'dark';
+        document.body.setAttribute('data-theme', savedTheme);
+    }
+
+    toggleTheme() {
+        const currentTheme = document.body.getAttribute('data-theme') || 'dark';
+        const newTheme = currentTheme === 'dark' ? 'light' : 'dark';
+        document.body.setAttribute('data-theme', newTheme);
+        localStorage.setItem('theme', newTheme);
     }
 
     initMarkdown() {
@@ -321,7 +359,10 @@ class ChatApp {
 
     scrollToBottom() {
         if (this.messagesContainer) {
-            this.messagesContainer.scrollTop = this.messagesContainer.scrollHeight;
+            // Use requestAnimationFrame to ensure DOM has updated
+            requestAnimationFrame(() => {
+                this.messagesContainer.scrollTop = this.messagesContainer.scrollHeight;
+            });
         }
     }
 

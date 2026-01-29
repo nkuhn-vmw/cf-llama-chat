@@ -1,0 +1,444 @@
+<!DOCTYPE html>
+<html lang="en" xmlns:th="http://www.thymeleaf.org">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Usage Metrics - CF Llama Chat</title>
+    <link rel="stylesheet" th:href="@{/css/style.css}">
+    <style>
+        .metrics-container {
+            max-width: 1200px;
+            margin: 0 auto;
+            padding: 24px;
+        }
+
+        .metrics-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 32px;
+        }
+
+        .metrics-header h1 {
+            font-size: 1.8rem;
+            font-weight: 600;
+        }
+
+        .back-link {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            color: var(--accent-color);
+            text-decoration: none;
+            font-size: 0.95rem;
+        }
+
+        .back-link:hover {
+            text-decoration: underline;
+        }
+
+        .back-link svg {
+            width: 18px;
+            height: 18px;
+        }
+
+        .section-title {
+            font-size: 1.3rem;
+            margin-bottom: 16px;
+            display: flex;
+            align-items: center;
+            gap: 10px;
+        }
+
+        .section-title svg {
+            width: 24px;
+            height: 24px;
+            color: var(--accent-color);
+        }
+
+        .stats-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+            gap: 16px;
+            margin-bottom: 32px;
+        }
+
+        .stat-card {
+            background-color: var(--bg-secondary);
+            border: 1px solid var(--border-color);
+            border-radius: 12px;
+            padding: 20px;
+        }
+
+        .stat-card .stat-value {
+            font-size: 1.8rem;
+            font-weight: 700;
+            color: var(--accent-color);
+        }
+
+        .stat-card .stat-label {
+            font-size: 0.85rem;
+            color: var(--text-secondary);
+            margin-top: 4px;
+        }
+
+        .stat-card.highlight {
+            border-color: var(--accent-color);
+            background: linear-gradient(135deg, rgba(16, 163, 127, 0.1) 0%, transparent 100%);
+        }
+
+        .charts-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(350px, 1fr));
+            gap: 24px;
+            margin-bottom: 32px;
+        }
+
+        .chart-card {
+            background-color: var(--bg-secondary);
+            border: 1px solid var(--border-color);
+            border-radius: 12px;
+            padding: 24px;
+        }
+
+        .chart-card h3 {
+            font-size: 1rem;
+            margin-bottom: 20px;
+            color: var(--text-primary);
+        }
+
+        .bar-chart {
+            display: flex;
+            flex-direction: column;
+            gap: 12px;
+        }
+
+        .bar-item {
+            display: flex;
+            align-items: center;
+            gap: 12px;
+        }
+
+        .bar-label {
+            width: 120px;
+            font-size: 0.85rem;
+            color: var(--text-secondary);
+            flex-shrink: 0;
+        }
+
+        .bar-container {
+            flex: 1;
+            height: 24px;
+            background-color: var(--bg-tertiary);
+            border-radius: 4px;
+            overflow: hidden;
+        }
+
+        .bar-fill {
+            height: 100%;
+            background-color: var(--accent-color);
+            border-radius: 4px;
+            transition: width 0.5s ease;
+        }
+
+        .bar-value {
+            width: 80px;
+            text-align: right;
+            font-size: 0.85rem;
+            font-weight: 500;
+        }
+
+        .user-usage-table {
+            width: 100%;
+            margin-top: 24px;
+        }
+
+        .user-usage-table table {
+            width: 100%;
+            border-collapse: collapse;
+        }
+
+        .user-usage-table th,
+        .user-usage-table td {
+            padding: 12px 16px;
+            text-align: left;
+            border-bottom: 1px solid var(--border-color);
+        }
+
+        .user-usage-table th {
+            background-color: var(--bg-tertiary);
+            font-weight: 600;
+            font-size: 0.8rem;
+            text-transform: uppercase;
+            color: var(--text-secondary);
+        }
+
+        .user-usage-table tr:last-child td {
+            border-bottom: none;
+        }
+
+        .section-divider {
+            height: 1px;
+            background-color: var(--border-color);
+            margin: 40px 0;
+        }
+
+        .admin-section {
+            margin-top: 40px;
+            padding-top: 20px;
+            border-top: 2px solid var(--accent-color);
+        }
+
+        .admin-badge {
+            display: inline-block;
+            padding: 4px 10px;
+            background-color: rgba(239, 68, 68, 0.2);
+            color: #ef4444;
+            border-radius: 20px;
+            font-size: 0.75rem;
+            font-weight: 600;
+            text-transform: uppercase;
+        }
+
+        .empty-state {
+            text-align: center;
+            padding: 40px;
+            color: var(--text-muted);
+        }
+
+        .empty-state svg {
+            width: 48px;
+            height: 48px;
+            margin-bottom: 16px;
+            opacity: 0.5;
+        }
+
+        @media (max-width: 768px) {
+            .stats-grid {
+                grid-template-columns: repeat(2, 1fr);
+            }
+
+            .charts-grid {
+                grid-template-columns: 1fr;
+            }
+        }
+    </style>
+</head>
+<body>
+    <div class="metrics-container">
+        <header class="metrics-header">
+            <h1>Usage Metrics</h1>
+            <a href="/" class="back-link">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                    <line x1="19" y1="12" x2="5" y2="12"></line>
+                    <polyline points="12 19 5 12 12 5"></polyline>
+                </svg>
+                Back to Chat
+            </a>
+        </header>
+
+        <!-- User's Personal Metrics -->
+        <section>
+            <h2 class="section-title">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                    <path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"></path>
+                    <circle cx="12" cy="7" r="4"></circle>
+                </svg>
+                Your Usage
+            </h2>
+
+            <div class="stats-grid">
+                <div class="stat-card highlight">
+                    <div class="stat-value" th:text="${userSummary.totalTokens}">0</div>
+                    <div class="stat-label">Total Tokens</div>
+                </div>
+                <div class="stat-card">
+                    <div class="stat-value" th:text="${userSummary.todayTokens}">0</div>
+                    <div class="stat-label">Today</div>
+                </div>
+                <div class="stat-card">
+                    <div class="stat-value" th:text="${userSummary.weekTokens}">0</div>
+                    <div class="stat-label">This Week</div>
+                </div>
+                <div class="stat-card">
+                    <div class="stat-value" th:text="${userSummary.monthTokens}">0</div>
+                    <div class="stat-label">This Month</div>
+                </div>
+                <div class="stat-card">
+                    <div class="stat-value" th:text="${userSummary.totalRequests}">0</div>
+                    <div class="stat-label">Total Requests</div>
+                </div>
+            </div>
+
+            <div class="charts-grid">
+                <div class="chart-card">
+                    <h3>Tokens by Model</h3>
+                    <div th:if="${userSummary.tokensByModel.isEmpty()}" class="empty-state">
+                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                            <path d="M18 20V10"></path>
+                            <path d="M12 20V4"></path>
+                            <path d="M6 20v-6"></path>
+                        </svg>
+                        <p>No usage data yet</p>
+                    </div>
+                    <div th:unless="${userSummary.tokensByModel.isEmpty()}" class="bar-chart" id="userTokensChart">
+                        <div th:each="entry : ${userSummary.tokensByModel}" class="bar-item">
+                            <span class="bar-label" th:text="${entry.key}">Model</span>
+                            <div class="bar-container">
+                                <div class="bar-fill" th:data-value="${entry.value}" style="width: 0%"></div>
+                            </div>
+                            <span class="bar-value" th:text="${#numbers.formatInteger(entry.value, 1, 'COMMA')}">0</span>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="chart-card">
+                    <h3>Average Response Time (ms)</h3>
+                    <div th:if="${userSummary.avgResponseTimeByModel.isEmpty()}" class="empty-state">
+                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                            <circle cx="12" cy="12" r="10"></circle>
+                            <polyline points="12 6 12 12 16 14"></polyline>
+                        </svg>
+                        <p>No timing data yet</p>
+                    </div>
+                    <div th:unless="${userSummary.avgResponseTimeByModel.isEmpty()}" class="bar-chart" id="userResponseTimeChart">
+                        <div th:each="entry : ${userSummary.avgResponseTimeByModel}" class="bar-item">
+                            <span class="bar-label" th:text="${entry.key}">Model</span>
+                            <div class="bar-container">
+                                <div class="bar-fill" th:data-value="${entry.value}" style="width: 0%"></div>
+                            </div>
+                            <span class="bar-value" th:text="${#numbers.formatDecimal(entry.value, 1, 0, 'COMMA')}">0</span>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </section>
+
+        <!-- Admin Global Metrics -->
+        <section th:if="${isAdmin}" class="admin-section">
+            <h2 class="section-title">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                    <path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"></path>
+                    <circle cx="9" cy="7" r="4"></circle>
+                    <path d="M23 21v-2a4 4 0 0 0-3-3.87"></path>
+                    <path d="M16 3.13a4 4 0 0 1 0 7.75"></path>
+                </svg>
+                Global Usage
+                <span class="admin-badge">Admin</span>
+            </h2>
+
+            <div class="stats-grid">
+                <div class="stat-card highlight">
+                    <div class="stat-value" th:text="${globalSummary.todayTokens}">0</div>
+                    <div class="stat-label">Today (All Users)</div>
+                </div>
+                <div class="stat-card">
+                    <div class="stat-value" th:text="${globalSummary.weekTokens}">0</div>
+                    <div class="stat-label">This Week</div>
+                </div>
+                <div class="stat-card">
+                    <div class="stat-value" th:text="${globalSummary.monthTokens}">0</div>
+                    <div class="stat-label">This Month</div>
+                </div>
+                <div class="stat-card">
+                    <div class="stat-value" th:text="${globalSummary.totalRequests}">0</div>
+                    <div class="stat-label">Total Requests</div>
+                </div>
+            </div>
+
+            <div class="charts-grid">
+                <div class="chart-card">
+                    <h3>Global Tokens by Model</h3>
+                    <div th:if="${globalSummary.tokensByModel.isEmpty()}" class="empty-state">
+                        <p>No usage data yet</p>
+                    </div>
+                    <div th:unless="${globalSummary.tokensByModel.isEmpty()}" class="bar-chart" id="globalTokensChart">
+                        <div th:each="entry : ${globalSummary.tokensByModel}" class="bar-item">
+                            <span class="bar-label" th:text="${entry.key}">Model</span>
+                            <div class="bar-container">
+                                <div class="bar-fill" th:data-value="${entry.value}" style="width: 0%"></div>
+                            </div>
+                            <span class="bar-value" th:text="${#numbers.formatInteger(entry.value, 1, 'COMMA')}">0</span>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="chart-card">
+                    <h3>Model Performance (Avg Response Time)</h3>
+                    <div th:if="${globalSummary.avgResponseTimeByModel.isEmpty()}" class="empty-state">
+                        <p>No timing data yet</p>
+                    </div>
+                    <div th:unless="${globalSummary.avgResponseTimeByModel.isEmpty()}" class="bar-chart" id="globalResponseTimeChart">
+                        <div th:each="entry : ${globalSummary.avgResponseTimeByModel}" class="bar-item">
+                            <span class="bar-label" th:text="${entry.key}">Model</span>
+                            <div class="bar-container">
+                                <div class="bar-fill" th:data-value="${entry.value}" style="width: 0%"></div>
+                            </div>
+                            <span class="bar-value" th:text="${#numbers.formatDecimal(entry.value, 1, 0, 'COMMA')} + ' ms'">0 ms</span>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- User Usage Table -->
+            <div class="chart-card" th:if="${!globalSummary.usageByUser.isEmpty()}">
+                <h3>Usage by User</h3>
+                <div class="user-usage-table">
+                    <table>
+                        <thead>
+                            <tr>
+                                <th>User</th>
+                                <th>Total Tokens</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            <tr th:each="userData : ${globalSummary.usageByUser}">
+                                <td th:text="${userData.displayName != null ? userData.displayName : userData.username}">User</td>
+                                <td th:text="${#numbers.formatInteger(userData.totalTokens, 1, 'COMMA')}">0</td>
+                            </tr>
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        </section>
+    </div>
+
+    <script>
+        // Apply saved theme
+        const savedTheme = localStorage.getItem('theme') || 'dark';
+        document.body.setAttribute('data-theme', savedTheme);
+
+        // Animate bar charts
+        function animateBars(containerId) {
+            const container = document.getElementById(containerId);
+            if (!container) return;
+
+            const bars = container.querySelectorAll('.bar-fill');
+            let maxValue = 0;
+
+            bars.forEach(bar => {
+                const value = parseFloat(bar.dataset.value) || 0;
+                if (value > maxValue) maxValue = value;
+            });
+
+            if (maxValue === 0) return;
+
+            bars.forEach(bar => {
+                const value = parseFloat(bar.dataset.value) || 0;
+                const percentage = (value / maxValue) * 100;
+                setTimeout(() => {
+                    bar.style.width = percentage + '%';
+                }, 100);
+            });
+        }
+
+        // Animate all charts on page load
+        document.addEventListener('DOMContentLoaded', () => {
+            animateBars('userTokensChart');
+            animateBars('userResponseTimeChart');
+            animateBars('globalTokensChart');
+            animateBars('globalResponseTimeChart');
+        });
+    </script>
+</body>
+</html>

@@ -1,11 +1,13 @@
 package com.example.cfchat.service;
 
+import com.example.cfchat.auth.UserService;
 import com.example.cfchat.config.ChatConfig;
 import com.example.cfchat.dto.ChatRequest;
 import com.example.cfchat.dto.ChatResponse;
 import com.example.cfchat.model.Conversation;
 import com.example.cfchat.model.Message;
 import com.example.cfchat.model.ModelInfo;
+import com.example.cfchat.model.User;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.ai.chat.client.ChatClient;
 import org.springframework.ai.chat.messages.AssistantMessage;
@@ -21,9 +23,12 @@ import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
 import reactor.core.publisher.Flux;
 
+import com.example.cfchat.config.GenAiConfig;
+
 import java.util.ArrayList;
 import java.util.List;
 import java.util.UUID;
+import java.util.concurrent.atomic.AtomicLong;
 
 @Service
 @Slf4j
@@ -36,6 +41,9 @@ public class ChatService {
     private final ConversationService conversationService;
     private final MarkdownService markdownService;
     private final ChatConfig chatConfig;
+    private final UserService userService;
+    private final MetricsService metricsService;
+    private final GenAiConfig genAiConfig;
 
     @Value("${spring.profiles.active:default}")
     private String activeProfile;
@@ -47,7 +55,10 @@ public class ChatService {
             @Autowired(required = false) OllamaChatModel ollamaChatModel,
             ConversationService conversationService,
             MarkdownService markdownService,
-            ChatConfig chatConfig) {
+            ChatConfig chatConfig,
+            UserService userService,
+            MetricsService metricsService,
+            @Autowired(required = false) GenAiConfig genAiConfig) {
         this.primaryChatClient = primaryChatClient;
         // Use OpenAI model as primary for streaming
         this.primaryChatModel = openAiChatModel;
@@ -56,6 +67,9 @@ public class ChatService {
         this.conversationService = conversationService;
         this.markdownService = markdownService;
         this.chatConfig = chatConfig;
+        this.userService = userService;
+        this.metricsService = metricsService;
+        this.genAiConfig = genAiConfig;
 
         log.info("ChatService initialized - primaryChatClient: {}, ollamaChatClient: {}, primaryChatModel: {}",
                 primaryChatClient != null, ollamaChatClient != null,
@@ -66,16 +80,24 @@ public class ChatService {
         String provider = request.getProvider() != null ? request.getProvider() : chatConfig.getDefaultProvider();
         String model = request.getModel();
 
+        // Get current user ID
+        UUID userId = userService.getCurrentUser().map(User::getId).orElse(null);
+
         // Create or get conversation
         UUID conversationId = request.getConversationId();
         Conversation conversation;
 
         if (conversationId == null) {
-            conversation = conversationService.createConversation(null, provider, model);
+            conversation = conversationService.createConversation(null, provider, model, userId);
             conversationId = conversation.getId();
         } else {
-            conversation = conversationService.getConversationEntity(conversationId)
-                    .orElseThrow(() -> new IllegalArgumentException("Conversation not found"));
+            if (userId != null) {
+                conversation = conversationService.getConversationEntityForUser(conversationId, userId)
+                        .orElseThrow(() -> new IllegalArgumentException("Conversation not found"));
+            } else {
+                conversation = conversationService.getConversationEntity(conversationId)
+                        .orElseThrow(() -> new IllegalArgumentException("Conversation not found"));
+            }
         }
 
         // Save user message
@@ -90,13 +112,22 @@ public class ChatService {
             throw new IllegalStateException("No chat client available for provider: " + provider);
         }
 
+        long startTime = System.currentTimeMillis();
+
         String response = chatClient.prompt()
                 .messages(messages)
                 .call()
                 .content();
 
+        long responseTime = System.currentTimeMillis() - startTime;
+
         // Save assistant message
         Message savedMessage = conversationService.addMessage(conversationId, Message.MessageRole.ASSISTANT, response, model);
+
+        // Record metrics (estimate tokens based on content length)
+        int promptTokens = estimateTokens(request.getMessage());
+        int completionTokens = estimateTokens(response);
+        metricsService.recordUsage(userId, conversationId, model, provider, promptTokens, completionTokens, responseTime);
 
         // Update conversation title if this is the first exchange
         if (conversation.getMessages().size() <= 2) {
@@ -114,23 +145,42 @@ public class ChatService {
                 .build();
     }
 
+    private int estimateTokens(String text) {
+        if (text == null || text.isEmpty()) {
+            return 0;
+        }
+        // Rough estimation: ~4 characters per token on average
+        return (int) Math.ceil(text.length() / 4.0);
+    }
+
     public Flux<ChatResponse> chatStream(ChatRequest request) {
         String provider = request.getProvider() != null ? request.getProvider() : chatConfig.getDefaultProvider();
         String model = request.getModel();
+
+        // Get current user ID
+        UUID userId = userService.getCurrentUser().map(User::getId).orElse(null);
 
         // Create or get conversation
         UUID conversationId = request.getConversationId();
         Conversation conversation;
 
         if (conversationId == null) {
-            conversation = conversationService.createConversation(null, provider, model);
+            conversation = conversationService.createConversation(null, provider, model, userId);
             conversationId = conversation.getId();
         } else {
-            conversation = conversationService.getConversationEntity(conversationId)
-                    .orElseThrow(() -> new IllegalArgumentException("Conversation not found"));
+            if (userId != null) {
+                conversation = conversationService.getConversationEntityForUser(conversationId, userId)
+                        .orElseThrow(() -> new IllegalArgumentException("Conversation not found"));
+            } else {
+                conversation = conversationService.getConversationEntity(conversationId)
+                        .orElseThrow(() -> new IllegalArgumentException("Conversation not found"));
+            }
         }
 
         final UUID finalConversationId = conversationId;
+        final UUID finalUserId = userId;
+        final String finalProvider = provider;
+        final String userMessage = request.getMessage();
 
         // Save user message
         conversationService.addMessage(conversationId, Message.MessageRole.USER, request.getMessage(), null);
@@ -141,6 +191,7 @@ public class ChatService {
 
         // Stream AI response
         StringBuilder fullResponse = new StringBuilder();
+        AtomicLong startTime = new AtomicLong(System.currentTimeMillis());
 
         Flux<ChatResponse> responseFlux;
 
@@ -189,10 +240,16 @@ public class ChatService {
                     model
             );
 
+            // Record metrics
+            long responseTime = System.currentTimeMillis() - startTime.get();
+            int promptTokens = estimateTokens(userMessage);
+            int completionTokens = estimateTokens(completeResponse);
+            metricsService.recordUsage(finalUserId, finalConversationId, model, finalProvider, promptTokens, completionTokens, responseTime);
+
             // Update conversation title if first exchange
             Conversation conv = conversationService.getConversationEntity(finalConversationId).orElse(null);
             if (conv != null && conv.getMessages().size() <= 2) {
-                String title = generateTitle(request.getMessage());
+                String title = generateTitle(userMessage);
                 conversationService.updateConversationTitle(finalConversationId, title);
             }
 
@@ -215,14 +272,29 @@ public class ChatService {
         boolean isCloudProfile = activeProfile != null && activeProfile.contains("cloud");
 
         if (isCloudProfile && primaryChatClient != null) {
-            // Running on Tanzu with GenAI service
-            models.add(ModelInfo.builder()
-                    .id("genai")
-                    .name("Tanzu GenAI")
-                    .provider("genai")
-                    .description("Model provided by Tanzu GenAI service")
-                    .available(true)
-                    .build());
+            // Running on Tanzu with GenAI service - get actual model names
+            List<String> genAiModelNames = genAiConfig != null ? genAiConfig.getAvailableModelNames() : List.of();
+
+            if (!genAiModelNames.isEmpty()) {
+                for (String modelName : genAiModelNames) {
+                    models.add(ModelInfo.builder()
+                            .id(modelName)
+                            .name(modelName)
+                            .provider("genai")
+                            .description("Tanzu GenAI: " + modelName)
+                            .available(true)
+                            .build());
+                }
+            } else {
+                // Fallback if we can't get the model names
+                models.add(ModelInfo.builder()
+                        .id("genai")
+                        .name("Tanzu GenAI")
+                        .provider("genai")
+                        .description("Model provided by Tanzu GenAI service")
+                        .available(true)
+                        .build());
+            }
         } else {
             // Local development with OpenAI/Ollama
             if (primaryChatClient != null) {

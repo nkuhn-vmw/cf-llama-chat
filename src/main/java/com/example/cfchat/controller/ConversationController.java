@@ -1,7 +1,9 @@
 package com.example.cfchat.controller;
 
+import com.example.cfchat.auth.UserService;
 import com.example.cfchat.dto.ConversationDto;
 import com.example.cfchat.dto.MessageDto;
+import com.example.cfchat.model.User;
 import com.example.cfchat.service.ConversationService;
 import com.example.cfchat.service.MarkdownService;
 import lombok.RequiredArgsConstructor;
@@ -11,6 +13,7 @@ import org.springframework.web.bind.annotation.*;
 
 import java.util.List;
 import java.util.Map;
+import java.util.Optional;
 import java.util.UUID;
 
 @RestController
@@ -21,17 +24,30 @@ public class ConversationController {
 
     private final ConversationService conversationService;
     private final MarkdownService markdownService;
+    private final UserService userService;
 
     @GetMapping
     public ResponseEntity<List<ConversationDto>> getAllConversations() {
+        Optional<User> currentUser = userService.getCurrentUser();
+        if (currentUser.isPresent()) {
+            return ResponseEntity.ok(conversationService.getConversationsForUser(currentUser.get().getId()));
+        }
         return ResponseEntity.ok(conversationService.getAllConversations());
     }
 
     @GetMapping("/{id}")
     public ResponseEntity<ConversationDto> getConversation(@PathVariable UUID id) {
-        return conversationService.getConversation(id)
+        Optional<User> currentUser = userService.getCurrentUser();
+        Optional<ConversationDto> conversation;
+
+        if (currentUser.isPresent()) {
+            conversation = conversationService.getConversationForUser(id, currentUser.get().getId());
+        } else {
+            conversation = conversationService.getConversation(id);
+        }
+
+        return conversation
                 .map(conv -> {
-                    // Add HTML content to messages
                     if (conv.getMessages() != null) {
                         conv.getMessages().forEach(msg ->
                                 msg.setHtmlContent(markdownService.toHtml(msg.getContent())));
@@ -47,7 +63,8 @@ public class ConversationController {
         String provider = body != null ? body.get("provider") : null;
         String model = body != null ? body.get("model") : null;
 
-        var conversation = conversationService.createConversation(title, provider, model);
+        UUID userId = userService.getCurrentUser().map(User::getId).orElse(null);
+        var conversation = conversationService.createConversation(title, provider, model, userId);
         return ResponseEntity.ok(ConversationDto.fromEntity(conversation, false));
     }
 

@@ -23,18 +23,32 @@ public class ConversationService {
     private final MessageRepository messageRepository;
 
     @Transactional
-    public Conversation createConversation(String title, String provider, String model) {
+    public Conversation createConversation(String title, String provider, String model, UUID userId) {
         Conversation conversation = Conversation.builder()
                 .title(title != null ? title : "New Conversation")
                 .modelProvider(provider)
                 .modelName(model)
+                .userId(userId)
                 .build();
         return conversationRepository.save(conversation);
+    }
+
+    @Transactional
+    public Conversation createConversation(String title, String provider, String model) {
+        return createConversation(title, provider, model, null);
     }
 
     @Transactional(readOnly = true)
     public List<ConversationDto> getAllConversations() {
         return conversationRepository.findAllByOrderByUpdatedAtDesc()
+                .stream()
+                .map(c -> ConversationDto.fromEntity(c, false))
+                .toList();
+    }
+
+    @Transactional(readOnly = true)
+    public List<ConversationDto> getConversationsForUser(UUID userId) {
+        return conversationRepository.findByUserIdOrderByUpdatedAtDesc(userId)
                 .stream()
                 .map(c -> ConversationDto.fromEntity(c, false))
                 .toList();
@@ -47,8 +61,24 @@ public class ConversationService {
     }
 
     @Transactional(readOnly = true)
+    public Optional<ConversationDto> getConversationForUser(UUID id, UUID userId) {
+        return conversationRepository.findByIdAndUserIdWithMessages(id, userId)
+                .map(c -> ConversationDto.fromEntity(c, true));
+    }
+
+    @Transactional(readOnly = true)
     public Optional<Conversation> getConversationEntity(UUID id) {
         return conversationRepository.findByIdWithMessages(id);
+    }
+
+    @Transactional(readOnly = true)
+    public Optional<Conversation> getConversationEntityForUser(UUID id, UUID userId) {
+        return conversationRepository.findByIdAndUserIdWithMessages(id, userId);
+    }
+
+    @Transactional(readOnly = true)
+    public long getConversationCountForUser(UUID userId) {
+        return conversationRepository.countByUserId(userId);
     }
 
     @Transactional
