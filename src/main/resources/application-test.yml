@@ -1,0 +1,10 @@
+spring:
+  ai:
+    openai:
+      api-key: test-key
+    ollama:
+      enabled: false
+
+  autoconfigure:
+    exclude:
+      - org.springframework.ai.autoconfigure.ollama.OllamaAutoConfiguration

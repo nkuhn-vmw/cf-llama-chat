@@ -1,0 +1,19 @@
+spring:
+  datasource:
+    url: ${vcap.services.chat-db.credentials.uri:jdbc:postgresql://localhost:5432/chatdb}
+    driver-class-name: org.postgresql.Driver
+
+  jpa:
+    database-platform: org.hibernate.dialect.PostgreSQLDialect
+    hibernate:
+      ddl-auto: update
+
+  h2:
+    console:
+      enabled: false
+
+management:
+  endpoints:
+    web:
+      exposure:
+        include: health,info

@@ -1,0 +1,165 @@
+<!DOCTYPE html>
+<html lang="en" xmlns:th="http://www.thymeleaf.org">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>CF Llama Chat</title>
+    <link rel="stylesheet" th:href="@{/css/style.css}">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.9.0/styles/github-dark.min.css">
+</head>
+<body>
+    <div class="app-container">
+        <!-- Sidebar -->
+        <aside class="sidebar" id="sidebar">
+            <div class="sidebar-header">
+                <h1 class="logo">
+                    <svg class="logo-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                        <path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"></path>
+                    </svg>
+                    CF Llama Chat
+                </h1>
+                <button class="new-chat-btn" id="newChatBtn">
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                        <line x1="12" y1="5" x2="12" y2="19"></line>
+                        <line x1="5" y1="12" x2="19" y2="12"></line>
+                    </svg>
+                    New Chat
+                </button>
+            </div>
+
+            <div class="conversations-list" id="conversationsList">
+                <div th:each="conv : ${conversations}" class="conversation-item"
+                     th:data-id="${conv.id}" th:classappend="${conversationId != null && conv.id.equals(conversationId)} ? 'active' : ''">
+                    <div class="conversation-title" th:text="${conv.title}">Conversation</div>
+                    <div class="conversation-meta">
+                        <span th:text="${conv.messageCount} + ' messages'">0 messages</span>
+                    </div>
+                    <button class="delete-btn" th:data-id="${conv.id}">
+                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                            <polyline points="3 6 5 6 21 6"></polyline>
+                            <path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"></path>
+                        </svg>
+                    </button>
+                </div>
+            </div>
+
+            <div class="sidebar-footer">
+                <div class="model-selector">
+                    <label for="modelSelect">Model:</label>
+                    <select id="modelSelect">
+                        <optgroup th:each="provider : ${ {'openai', 'ollama'} }" th:label="${provider}">
+                            <option th:each="model : ${models}"
+                                    th:if="${model.provider == provider}"
+                                    th:value="${model.provider + ':' + model.id}"
+                                    th:text="${model.name}"
+                                    th:title="${model.description}">
+                            </option>
+                        </optgroup>
+                    </select>
+                </div>
+            </div>
+        </aside>
+
+        <!-- Mobile sidebar toggle -->
+        <button class="sidebar-toggle" id="sidebarToggle">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                <line x1="3" y1="12" x2="21" y2="12"></line>
+                <line x1="3" y1="6" x2="21" y2="6"></line>
+                <line x1="3" y1="18" x2="21" y2="18"></line>
+            </svg>
+        </button>
+
+        <!-- Main Chat Area -->
+        <main class="chat-main">
+            <div class="chat-container">
+                <!-- Messages -->
+                <div class="messages-container" id="messagesContainer">
+                    <!-- Welcome screen when no conversation -->
+                    <div class="welcome-screen" id="welcomeScreen" th:if="${currentConversation == null}">
+                        <div class="welcome-icon">
+                            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5">
+                                <path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"></path>
+                            </svg>
+                        </div>
+                        <h2>Welcome to CF Llama Chat</h2>
+                        <p>Start a new conversation or select one from the sidebar.</p>
+                        <div class="quick-actions">
+                            <button class="quick-action" data-prompt="Explain how Cloud Foundry works">
+                                <span class="action-icon">☁️</span>
+                                Explain Cloud Foundry
+                            </button>
+                            <button class="quick-action" data-prompt="Write a Spring Boot REST controller example">
+                                <span class="action-icon">🍃</span>
+                                Spring Boot Example
+                            </button>
+                            <button class="quick-action" data-prompt="What are the benefits of using Spring AI?">
+                                <span class="action-icon">🤖</span>
+                                About Spring AI
+                            </button>
+                            <button class="quick-action" data-prompt="Help me write a Java function that...">
+                                <span class="action-icon">☕</span>
+                                Java Coding Help
+                            </button>
+                        </div>
+                    </div>
+
+                    <!-- Messages display -->
+                    <div class="messages" id="messages" th:if="${currentConversation != null}">
+                        <div th:each="msg : ${currentConversation.messages}"
+                             th:class="'message ' + ${msg.role}">
+                            <div class="message-avatar">
+                                <span th:if="${msg.role == 'user'}">U</span>
+                                <span th:if="${msg.role == 'assistant'}">AI</span>
+                            </div>
+                            <div class="message-content">
+                                <div class="message-text" th:utext="${msg.htmlContent != null ? msg.htmlContent : msg.content}"></div>
+                                <div class="message-meta">
+                                    <span th:if="${msg.modelUsed}" th:text="${msg.modelUsed}"></span>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Input Area -->
+                <div class="input-container">
+                    <form id="chatForm" class="chat-form">
+                        <div class="input-wrapper">
+                            <textarea
+                                id="messageInput"
+                                placeholder="Send a message..."
+                                rows="1"
+                                autofocus></textarea>
+                            <button type="submit" id="sendBtn" class="send-btn">
+                                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                    <line x1="22" y1="2" x2="11" y2="13"></line>
+                                    <polygon points="22 2 15 22 11 13 2 9 22 2"></polygon>
+                                </svg>
+                            </button>
+                        </div>
+                        <div class="input-footer">
+                            <span class="powered-by">Powered by Spring AI</span>
+                            <label class="stream-toggle">
+                                <input type="checkbox" id="streamToggle" checked>
+                                <span>Stream responses</span>
+                            </label>
+                        </div>
+                    </form>
+                </div>
+            </div>
+        </main>
+    </div>
+
+    <!-- Hidden data for JavaScript -->
+    <script th:inline="javascript">
+        window.APP_DATA = {
+            conversationId: [[${conversationId}]],
+            models: [[${models}]]
+        };
+    </script>
+
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.9.0/highlight.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/marked/12.0.0/marked.min.js"></script>
+    <script th:src="@{/js/app.js}"></script>
+</body>
+</html>
