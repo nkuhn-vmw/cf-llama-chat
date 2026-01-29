@@ -11,11 +11,13 @@ import org.springframework.ai.chat.client.ChatClient;
 import org.springframework.ai.chat.messages.AssistantMessage;
 import org.springframework.ai.chat.messages.SystemMessage;
 import org.springframework.ai.chat.messages.UserMessage;
+import org.springframework.ai.chat.model.ChatModel;
 import org.springframework.ai.chat.prompt.Prompt;
 import org.springframework.ai.ollama.OllamaChatModel;
 import org.springframework.ai.openai.OpenAiChatModel;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.annotation.Qualifier;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
 import reactor.core.publisher.Flux;
 
@@ -27,29 +29,37 @@ import java.util.UUID;
 @Slf4j
 public class ChatService {
 
-    private final ChatClient openAiChatClient;
+    private final ChatClient primaryChatClient;
+    private final ChatModel primaryChatModel;
     private final ChatClient ollamaChatClient;
-    private final OpenAiChatModel openAiChatModel;
     private final OllamaChatModel ollamaChatModel;
     private final ConversationService conversationService;
     private final MarkdownService markdownService;
     private final ChatConfig chatConfig;
 
+    @Value("${spring.profiles.active:default}")
+    private String activeProfile;
+
     public ChatService(
-            @Autowired(required = false) @Qualifier("openAiChatClient") ChatClient openAiChatClient,
-            @Autowired(required = false) @Qualifier("ollamaChatClient") ChatClient ollamaChatClient,
+            @Autowired(required = false) ChatClient primaryChatClient,
             @Autowired(required = false) OpenAiChatModel openAiChatModel,
+            @Autowired(required = false) @Qualifier("ollamaChatClient") ChatClient ollamaChatClient,
             @Autowired(required = false) OllamaChatModel ollamaChatModel,
             ConversationService conversationService,
             MarkdownService markdownService,
             ChatConfig chatConfig) {
-        this.openAiChatClient = openAiChatClient;
+        this.primaryChatClient = primaryChatClient;
+        // Use OpenAI model as primary for streaming
+        this.primaryChatModel = openAiChatModel;
         this.ollamaChatClient = ollamaChatClient;
-        this.openAiChatModel = openAiChatModel;
         this.ollamaChatModel = ollamaChatModel;
         this.conversationService = conversationService;
         this.markdownService = markdownService;
         this.chatConfig = chatConfig;
+
+        log.info("ChatService initialized - primaryChatClient: {}, ollamaChatClient: {}, primaryChatModel: {}",
+                primaryChatClient != null, ollamaChatClient != null,
+                openAiChatModel != null ? openAiChatModel.getClass().getSimpleName() : "null");
     }
 
     public ChatResponse chat(ChatRequest request) {
@@ -134,6 +144,7 @@ public class ChatService {
 
         Flux<ChatResponse> responseFlux;
 
+        // Use Ollama for ollama provider, otherwise use primary (OpenAI or GenAI)
         if ("ollama".equalsIgnoreCase(provider) && ollamaChatModel != null) {
             responseFlux = ollamaChatModel.stream(prompt)
                     .map(chatResponse -> {
@@ -149,8 +160,8 @@ public class ChatService {
                                 .complete(false)
                                 .build();
                     });
-        } else if (openAiChatModel != null) {
-            responseFlux = openAiChatModel.stream(prompt)
+        } else if (primaryChatModel != null) {
+            responseFlux = primaryChatModel.stream(prompt)
                     .map(chatResponse -> {
                         String content = chatResponse.getResult() != null ?
                                 chatResponse.getResult().getOutput().getText() : "";
@@ -200,28 +211,43 @@ public class ChatService {
     public List<ModelInfo> getAvailableModels() {
         List<ModelInfo> models = new ArrayList<>();
 
-        if (openAiChatClient != null) {
+        // Check if running in cloud profile with GenAI
+        boolean isCloudProfile = activeProfile != null && activeProfile.contains("cloud");
+
+        if (isCloudProfile && primaryChatClient != null) {
+            // Running on Tanzu with GenAI service
             models.add(ModelInfo.builder()
-                    .id("gpt-4o-mini")
-                    .name("GPT-4o Mini")
-                    .provider("openai")
-                    .description("Fast and efficient model for most tasks")
+                    .id("genai")
+                    .name("Tanzu GenAI")
+                    .provider("genai")
+                    .description("Model provided by Tanzu GenAI service")
                     .available(true)
                     .build());
-            models.add(ModelInfo.builder()
-                    .id("gpt-4o")
-                    .name("GPT-4o")
-                    .provider("openai")
-                    .description("Most capable OpenAI model")
-                    .available(true)
-                    .build());
-            models.add(ModelInfo.builder()
-                    .id("gpt-4-turbo")
-                    .name("GPT-4 Turbo")
-                    .provider("openai")
-                    .description("Powerful model with vision capabilities")
-                    .available(true)
-                    .build());
+        } else {
+            // Local development with OpenAI/Ollama
+            if (primaryChatClient != null) {
+                models.add(ModelInfo.builder()
+                        .id("gpt-4o-mini")
+                        .name("GPT-4o Mini")
+                        .provider("openai")
+                        .description("Fast and efficient model for most tasks")
+                        .available(true)
+                        .build());
+                models.add(ModelInfo.builder()
+                        .id("gpt-4o")
+                        .name("GPT-4o")
+                        .provider("openai")
+                        .description("Most capable OpenAI model")
+                        .available(true)
+                        .build());
+                models.add(ModelInfo.builder()
+                        .id("gpt-4-turbo")
+                        .name("GPT-4 Turbo")
+                        .provider("openai")
+                        .description("Powerful model with vision capabilities")
+                        .available(true)
+                        .build());
+            }
         }
 
         if (ollamaChatClient != null) {
@@ -255,7 +281,8 @@ public class ChatService {
         if ("ollama".equalsIgnoreCase(provider)) {
             return ollamaChatClient;
         }
-        return openAiChatClient;
+        // Use primary client for openai, genai, or any other provider
+        return primaryChatClient;
     }
 
     private List<org.springframework.ai.chat.messages.Message> buildMessageHistory(

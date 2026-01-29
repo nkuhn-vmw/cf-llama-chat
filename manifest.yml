@@ -9,8 +9,8 @@ applications:
     env:
       JBP_CONFIG_OPEN_JDK_JRE: '{ jre: { version: 21.+ } }'
       SPRING_PROFILES_ACTIVE: cloud
-      CHAT_PROVIDER: openai
     services:
       - chat-db
+      - chat-llm
     routes:
       - route: cf-llama-chat.apps.internal

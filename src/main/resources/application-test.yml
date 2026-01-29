@@ -2,9 +2,12 @@ spring:
   ai:
     openai:
       api-key: test-key
+      chat:
+        options:
+          model: gpt-4o-mini
     ollama:
       enabled: false
 
   autoconfigure:
     exclude:
-      - org.springframework.ai.autoconfigure.ollama.OllamaAutoConfiguration
+      - org.springframework.ai.ollama.autoconfigure.OllamaAutoConfiguration
