@@ -49,6 +49,15 @@ public class User {
     @Column(name = "last_login_at")
     private LocalDateTime lastLoginAt;
 
+    @ManyToOne(fetch = FetchType.LAZY)
+    @JoinColumn(name = "organization_id")
+    private Organization organization;
+
+    @Enumerated(EnumType.STRING)
+    @Column(name = "organization_role")
+    @Builder.Default
+    private OrganizationRole organizationRole = OrganizationRole.MEMBER;
+
     @PrePersist
     protected void onCreate() {
         createdAt = LocalDateTime.now();
@@ -63,5 +72,11 @@ public class User {
     public enum AuthProvider {
         LOCAL,
         SSO
+    }
+
+    public enum OrganizationRole {
+        MEMBER,
+        ADMIN,
+        OWNER
     }
 }

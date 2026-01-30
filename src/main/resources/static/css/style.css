@@ -865,3 +865,133 @@ body {
 .messages-container {
     scroll-behavior: smooth;
 }
+
+/* Organization Theme Variables */
+:root {
+    --org-primary: var(--accent-color);
+    --org-accent: var(--accent-color);
+    --org-bg-primary: var(--bg-primary);
+    --org-bg-secondary: var(--bg-secondary);
+    --org-sidebar-bg: var(--bg-secondary);
+    --org-text-primary: var(--text-primary);
+    --org-font-family: inherit;
+    --org-border-radius: 12px;
+}
+
+/* Organization Logo in Sidebar */
+.org-logo {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    margin-bottom: 16px;
+}
+
+.org-logo-img {
+    width: 40px;
+    height: 40px;
+    border-radius: 8px;
+    object-fit: contain;
+    display: none;
+}
+
+.org-logo-img.visible {
+    display: block;
+}
+
+.org-logo-text {
+    font-size: 1.1rem;
+    font-weight: 600;
+    color: var(--text-primary);
+}
+
+/* Organization branded sidebar */
+.sidebar.org-themed {
+    background-color: var(--org-sidebar-bg);
+}
+
+/* Organization branded header */
+.chat-header.org-themed {
+    border-bottom-color: var(--org-primary);
+}
+
+.chat-header-title {
+    font-size: 1.1rem;
+    font-weight: 600;
+    color: var(--text-primary);
+}
+
+/* Organization branded buttons */
+.org-themed .new-chat-btn,
+.org-themed .send-btn {
+    background-color: var(--org-primary);
+}
+
+.org-themed .new-chat-btn:hover,
+.org-themed .send-btn:hover:not(:disabled) {
+    background-color: var(--org-accent);
+}
+
+/* Organization branded accents */
+.org-themed .message.assistant .message-avatar {
+    background-color: var(--org-primary);
+}
+
+.org-themed .input-wrapper:focus-within {
+    border-color: var(--org-primary);
+}
+
+.org-themed .conversation-item.active {
+    border-left: 3px solid var(--org-primary);
+}
+
+/* Welcome message customization */
+.welcome-message {
+    max-width: 600px;
+    margin: 0 auto 24px;
+    padding: 16px 24px;
+    background-color: var(--bg-secondary);
+    border: 1px solid var(--border-color);
+    border-radius: var(--org-border-radius);
+    color: var(--text-secondary);
+    font-size: 0.95rem;
+    line-height: 1.6;
+    text-align: center;
+}
+
+/* Organization info badge */
+.org-badge {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    padding: 4px 10px;
+    background-color: var(--bg-tertiary);
+    border-radius: 20px;
+    font-size: 0.75rem;
+    color: var(--text-secondary);
+}
+
+.org-badge-dot {
+    width: 8px;
+    height: 8px;
+    border-radius: 50%;
+    background-color: var(--org-primary);
+}
+
+/* Organization header branding */
+.org-header-brand {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+}
+
+.org-header-logo {
+    width: 32px;
+    height: 32px;
+    border-radius: 6px;
+    object-fit: contain;
+}
+
+.org-header-name {
+    font-weight: 600;
+    font-size: 1rem;
+}

@@ -126,6 +126,115 @@ class ChatApp {
     initTheme() {
         const savedTheme = localStorage.getItem('theme') || 'dark';
         document.body.setAttribute('data-theme', savedTheme);
+
+        // Load organization theme if user is part of an organization
+        this.loadOrganizationTheme();
+    }
+
+    async loadOrganizationTheme() {
+        try {
+            const response = await fetch('/api/theme');
+            if (!response.ok) return;
+
+            const theme = await response.json();
+
+            // Apply organization theme via CSS variables
+            this.applyOrganizationTheme(theme);
+
+            // Store organization info for reference
+            this.organizationTheme = theme;
+
+            // Apply organization's default theme preference if user hasn't set one
+            if (!localStorage.getItem('theme') && theme.defaultTheme) {
+                document.body.setAttribute('data-theme', theme.defaultTheme.toLowerCase());
+            }
+        } catch (error) {
+            console.warn('Failed to load organization theme:', error);
+        }
+    }
+
+    applyOrganizationTheme(theme) {
+        if (!theme) return;
+
+        const root = document.documentElement;
+
+        // Apply colors if provided
+        if (theme.primaryColor) {
+            root.style.setProperty('--org-primary', theme.primaryColor);
+            root.style.setProperty('--accent-color', theme.primaryColor);
+        }
+        if (theme.accentColor) {
+            root.style.setProperty('--org-accent', theme.accentColor);
+            // Calculate hover color (slightly darker)
+            root.style.setProperty('--accent-hover', this.adjustColor(theme.accentColor, -20));
+        }
+        if (theme.backgroundColor) {
+            root.style.setProperty('--org-bg-primary', theme.backgroundColor);
+        }
+        if (theme.secondaryColor) {
+            root.style.setProperty('--org-bg-secondary', theme.secondaryColor);
+        }
+        if (theme.sidebarColor) {
+            root.style.setProperty('--org-sidebar-bg', theme.sidebarColor);
+        }
+        if (theme.textColor) {
+            root.style.setProperty('--org-text-primary', theme.textColor);
+        }
+        if (theme.fontFamily) {
+            root.style.setProperty('--org-font-family', theme.fontFamily);
+        }
+        if (theme.borderRadius) {
+            root.style.setProperty('--org-border-radius', theme.borderRadius);
+        }
+
+        // Update header text if provided
+        if (theme.headerText) {
+            const headerTitle = document.querySelector('.chat-header-title');
+            if (headerTitle) {
+                headerTitle.textContent = theme.headerText;
+            }
+        }
+
+        // Update logo if provided
+        if (theme.logoUrl) {
+            const logoImg = document.querySelector('.org-logo-img');
+            if (logoImg) {
+                logoImg.src = theme.logoUrl;
+                logoImg.style.display = 'block';
+            }
+        }
+
+        // Update favicon if provided
+        if (theme.faviconUrl) {
+            let favicon = document.querySelector('link[rel="icon"]');
+            if (!favicon) {
+                favicon = document.createElement('link');
+                favicon.rel = 'icon';
+                document.head.appendChild(favicon);
+            }
+            favicon.href = theme.faviconUrl;
+        }
+
+        // Apply custom CSS if provided
+        if (theme.customCss) {
+            let customStyleEl = document.getElementById('org-custom-css');
+            if (!customStyleEl) {
+                customStyleEl = document.createElement('style');
+                customStyleEl.id = 'org-custom-css';
+                document.head.appendChild(customStyleEl);
+            }
+            customStyleEl.textContent = theme.customCss;
+        }
+    }
+
+    adjustColor(color, amount) {
+        // Simple color adjustment for hover states
+        const hex = color.replace('#', '');
+        const num = parseInt(hex, 16);
+        const r = Math.max(0, Math.min(255, (num >> 16) + amount));
+        const g = Math.max(0, Math.min(255, ((num >> 8) & 0x00FF) + amount));
+        const b = Math.max(0, Math.min(255, (num & 0x0000FF) + amount));
+        return '#' + (b | (g << 8) | (r << 16)).toString(16).padStart(6, '0');
     }
 
     toggleTheme() {

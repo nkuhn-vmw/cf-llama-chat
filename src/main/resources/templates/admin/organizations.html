@@ -1,0 +1,972 @@
+<!DOCTYPE html>
+<html lang="en" xmlns:th="http://www.thymeleaf.org">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Organizations - Admin Portal</title>
+    <link rel="stylesheet" th:href="@{/css/style.css}">
+    <style>
+        .admin-container {
+            max-width: 1200px;
+            margin: 0 auto;
+            padding: 24px;
+        }
+
+        .admin-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 32px;
+        }
+
+        .admin-header h1 {
+            font-size: 1.8rem;
+            font-weight: 600;
+        }
+
+        .header-nav {
+            display: flex;
+            align-items: center;
+            gap: 24px;
+        }
+
+        .back-link {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            color: var(--accent-color);
+            text-decoration: none;
+            font-size: 0.95rem;
+        }
+
+        .back-link:hover {
+            text-decoration: underline;
+        }
+
+        .back-link svg {
+            width: 18px;
+            height: 18px;
+        }
+
+        .section-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 20px;
+        }
+
+        .section-header h2 {
+            font-size: 1.3rem;
+        }
+
+        .btn-primary {
+            padding: 10px 20px;
+            background-color: var(--accent-color);
+            color: white;
+            border: none;
+            border-radius: 8px;
+            cursor: pointer;
+            font-size: 0.95rem;
+            font-weight: 500;
+            transition: background-color 0.2s;
+        }
+
+        .btn-primary:hover {
+            background-color: var(--accent-hover);
+        }
+
+        .org-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fill, minmax(320px, 1fr));
+            gap: 20px;
+        }
+
+        .org-card {
+            background-color: var(--bg-secondary);
+            border: 1px solid var(--border-color);
+            border-radius: 16px;
+            padding: 20px;
+            position: relative;
+        }
+
+        .org-card.inactive {
+            opacity: 0.6;
+        }
+
+        .org-header {
+            display: flex;
+            align-items: center;
+            gap: 12px;
+            margin-bottom: 16px;
+        }
+
+        .org-logo {
+            width: 48px;
+            height: 48px;
+            border-radius: 10px;
+            object-fit: cover;
+            background-color: var(--bg-tertiary);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 1.5rem;
+            font-weight: 700;
+        }
+
+        .org-logo img {
+            width: 100%;
+            height: 100%;
+            object-fit: cover;
+            border-radius: 10px;
+        }
+
+        .org-info h3 {
+            font-size: 1.1rem;
+            font-weight: 600;
+            margin-bottom: 4px;
+        }
+
+        .org-info .slug {
+            font-size: 0.85rem;
+            color: var(--text-muted);
+        }
+
+        .org-colors {
+            display: flex;
+            gap: 8px;
+            margin-bottom: 16px;
+        }
+
+        .color-swatch {
+            width: 24px;
+            height: 24px;
+            border-radius: 6px;
+            border: 2px solid var(--border-color);
+        }
+
+        .org-stats {
+            display: flex;
+            gap: 16px;
+            padding: 12px 0;
+            border-top: 1px solid var(--border-color);
+            border-bottom: 1px solid var(--border-color);
+            margin-bottom: 16px;
+        }
+
+        .org-stat {
+            font-size: 0.85rem;
+        }
+
+        .org-stat strong {
+            color: var(--accent-color);
+        }
+
+        .org-actions {
+            display: flex;
+            gap: 8px;
+        }
+
+        .action-btn {
+            padding: 8px 14px;
+            border: 1px solid var(--border-color);
+            border-radius: 6px;
+            background: none;
+            color: var(--text-primary);
+            cursor: pointer;
+            font-size: 0.85rem;
+            transition: background-color 0.2s, border-color 0.2s;
+        }
+
+        .action-btn:hover {
+            background-color: var(--bg-hover);
+            border-color: var(--accent-color);
+        }
+
+        .action-btn.danger {
+            color: var(--error-color);
+            border-color: var(--error-color);
+        }
+
+        .action-btn.danger:hover {
+            background-color: rgba(239, 68, 68, 0.1);
+        }
+
+        .status-badge {
+            position: absolute;
+            top: 16px;
+            right: 16px;
+            padding: 4px 8px;
+            border-radius: 4px;
+            font-size: 0.7rem;
+            font-weight: 600;
+            text-transform: uppercase;
+        }
+
+        .status-badge.active {
+            background-color: rgba(16, 163, 127, 0.2);
+            color: var(--accent-color);
+        }
+
+        .status-badge.inactive {
+            background-color: rgba(239, 68, 68, 0.2);
+            color: #ef4444;
+        }
+
+        /* Modal Styles */
+        .modal-overlay {
+            display: none;
+            position: fixed;
+            top: 0;
+            left: 0;
+            right: 0;
+            bottom: 0;
+            background-color: rgba(0, 0, 0, 0.5);
+            z-index: 1000;
+            align-items: flex-start;
+            justify-content: center;
+            padding: 40px 20px;
+            overflow-y: auto;
+        }
+
+        .modal-overlay.open {
+            display: flex;
+        }
+
+        .modal {
+            background-color: var(--bg-secondary);
+            border: 1px solid var(--border-color);
+            border-radius: 16px;
+            padding: 24px;
+            max-width: 600px;
+            width: 100%;
+            margin: auto;
+        }
+
+        .modal h3 {
+            margin-bottom: 20px;
+            font-size: 1.3rem;
+        }
+
+        .form-section {
+            margin-bottom: 24px;
+        }
+
+        .form-section h4 {
+            font-size: 0.95rem;
+            font-weight: 600;
+            margin-bottom: 12px;
+            color: var(--text-secondary);
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+        }
+
+        .form-row {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 12px;
+        }
+
+        .form-group {
+            margin-bottom: 16px;
+        }
+
+        .form-group.full-width {
+            grid-column: 1 / -1;
+        }
+
+        .form-group label {
+            display: block;
+            margin-bottom: 6px;
+            font-size: 0.9rem;
+            color: var(--text-secondary);
+        }
+
+        .form-group input,
+        .form-group textarea,
+        .form-group select {
+            width: 100%;
+            padding: 10px 12px;
+            background-color: var(--bg-tertiary);
+            border: 1px solid var(--border-color);
+            border-radius: 8px;
+            color: var(--text-primary);
+            font-size: 0.95rem;
+        }
+
+        .form-group input:focus,
+        .form-group textarea:focus,
+        .form-group select:focus {
+            outline: none;
+            border-color: var(--accent-color);
+        }
+
+        .form-group textarea {
+            min-height: 80px;
+            resize: vertical;
+        }
+
+        .form-group input[type="color"] {
+            width: 60px;
+            height: 36px;
+            padding: 2px;
+            cursor: pointer;
+        }
+
+        .color-input-group {
+            display: flex;
+            gap: 8px;
+            align-items: center;
+        }
+
+        .color-input-group input[type="text"] {
+            flex: 1;
+        }
+
+        .modal-actions {
+            display: flex;
+            gap: 12px;
+            justify-content: flex-end;
+            margin-top: 24px;
+            padding-top: 20px;
+            border-top: 1px solid var(--border-color);
+        }
+
+        .modal-btn {
+            padding: 10px 20px;
+            border-radius: 8px;
+            border: none;
+            cursor: pointer;
+            font-size: 0.95rem;
+            font-weight: 500;
+        }
+
+        .modal-btn.cancel {
+            background-color: var(--bg-tertiary);
+            color: var(--text-primary);
+        }
+
+        .modal-btn.confirm {
+            background-color: var(--accent-color);
+            color: white;
+        }
+
+        .modal-btn.danger {
+            background-color: var(--error-color);
+            color: white;
+        }
+
+        .empty-state {
+            text-align: center;
+            padding: 60px 20px;
+            background-color: var(--bg-secondary);
+            border: 1px solid var(--border-color);
+            border-radius: 16px;
+        }
+
+        .empty-state svg {
+            width: 64px;
+            height: 64px;
+            color: var(--text-muted);
+            margin-bottom: 16px;
+        }
+
+        .empty-state h3 {
+            font-size: 1.2rem;
+            margin-bottom: 8px;
+        }
+
+        .empty-state p {
+            color: var(--text-secondary);
+            margin-bottom: 20px;
+        }
+
+        .preview-box {
+            background-color: var(--bg-tertiary);
+            border: 1px solid var(--border-color);
+            border-radius: 8px;
+            padding: 16px;
+            margin-top: 16px;
+        }
+
+        .preview-box h5 {
+            font-size: 0.85rem;
+            color: var(--text-muted);
+            margin-bottom: 8px;
+        }
+
+        .preview-header {
+            display: flex;
+            align-items: center;
+            gap: 12px;
+            padding: 12px;
+            border-radius: 8px;
+        }
+
+        .preview-logo {
+            width: 40px;
+            height: 40px;
+            border-radius: 8px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-weight: 700;
+        }
+    </style>
+</head>
+<body>
+    <div class="admin-container">
+        <header class="admin-header">
+            <h1>Organizations</h1>
+            <div class="header-nav">
+                <a href="/admin" class="back-link">
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                        <line x1="19" y1="12" x2="5" y2="12"></line>
+                        <polyline points="12 19 5 12 12 5"></polyline>
+                    </svg>
+                    Back to Admin
+                </a>
+                <a href="/" class="back-link">
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                        <path d="M3 9l9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"></path>
+                        <polyline points="9 22 9 12 15 12 15 22"></polyline>
+                    </svg>
+                    Chat
+                </a>
+            </div>
+        </header>
+
+        <div class="section-header">
+            <h2>All Organizations</h2>
+            <button class="btn-primary" onclick="openCreateModal()">
+                + Create Organization
+            </button>
+        </div>
+
+        <div th:if="${#lists.isEmpty(organizations)}" class="empty-state">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                <path d="M3 9l9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"></path>
+                <path d="M9 22V12h6v10"></path>
+            </svg>
+            <h3>No Organizations Yet</h3>
+            <p>Create your first organization to customize the UI for different teams or clients.</p>
+            <button class="btn-primary" onclick="openCreateModal()">Create Organization</button>
+        </div>
+
+        <div th:unless="${#lists.isEmpty(organizations)}" class="org-grid">
+            <div th:each="org : ${organizations}" class="org-card" th:classappend="${!org.active} ? 'inactive' : ''">
+                <span class="status-badge" th:classappend="${org.active} ? 'active' : 'inactive'"
+                      th:text="${org.active} ? 'Active' : 'Inactive'">Active</span>
+
+                <div class="org-header">
+                    <div class="org-logo" th:style="'background-color: ' + ${org.primaryColor}">
+                        <img th:if="${org.logoUrl != null and !org.logoUrl.isEmpty()}"
+                             th:src="${org.logoUrl}" alt="Logo">
+                        <span th:unless="${org.logoUrl != null and !org.logoUrl.isEmpty()}"
+                              th:text="${#strings.substring(org.name, 0, 1)}">O</span>
+                    </div>
+                    <div class="org-info">
+                        <h3 th:text="${org.name}">Organization Name</h3>
+                        <div class="slug" th:text="'/' + ${org.slug}">slug</div>
+                    </div>
+                </div>
+
+                <div class="org-colors">
+                    <div class="color-swatch" th:style="'background-color: ' + ${org.primaryColor}"
+                         th:title="'Primary: ' + ${org.primaryColor}"></div>
+                    <div class="color-swatch" th:style="'background-color: ' + ${org.accentColor}"
+                         th:title="'Accent: ' + ${org.accentColor}"></div>
+                    <div class="color-swatch" th:style="'background-color: ' + ${org.backgroundColor}"
+                         th:title="'Background: ' + ${org.backgroundColor}"></div>
+                    <div class="color-swatch" th:style="'background-color: ' + ${org.sidebarColor}"
+                         th:title="'Sidebar: ' + ${org.sidebarColor}"></div>
+                </div>
+
+                <div class="org-stats">
+                    <div class="org-stat">
+                        <strong th:text="${org.memberCount != null ? org.memberCount : 0}">0</strong> members
+                    </div>
+                    <div class="org-stat">
+                        Theme: <strong th:text="${org.defaultTheme}">DARK</strong>
+                    </div>
+                </div>
+
+                <div class="org-actions">
+                    <button class="action-btn" th:data-org-id="${org.id}" onclick="openEditModal(this)">Edit</button>
+                    <button class="action-btn" th:data-org-id="${org.id}" onclick="openMembersModal(this)">Members</button>
+                    <button class="action-btn danger" th:data-org-id="${org.id}" th:data-org-name="${org.name}"
+                            onclick="confirmDelete(this)">Delete</button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Create/Edit Organization Modal -->
+    <div class="modal-overlay" id="orgModal">
+        <div class="modal">
+            <h3 id="modalTitle">Create Organization</h3>
+            <form id="orgForm">
+                <input type="hidden" id="orgId" name="id">
+
+                <div class="form-section">
+                    <h4>Basic Information</h4>
+                    <div class="form-row">
+                        <div class="form-group">
+                            <label for="orgName">Organization Name *</label>
+                            <input type="text" id="orgName" name="name" required>
+                        </div>
+                        <div class="form-group">
+                            <label for="orgSlug">URL Slug</label>
+                            <input type="text" id="orgSlug" name="slug" placeholder="auto-generated">
+                        </div>
+                    </div>
+                    <div class="form-group full-width">
+                        <label for="orgWelcome">Welcome Message</label>
+                        <textarea id="orgWelcome" name="welcomeMessage"
+                                  placeholder="Custom welcome message for this organization..."></textarea>
+                    </div>
+                    <div class="form-row">
+                        <div class="form-group">
+                            <label for="orgHeaderText">Header Text</label>
+                            <input type="text" id="orgHeaderText" name="headerText" value="Chat">
+                        </div>
+                        <div class="form-group">
+                            <label for="orgActive">Status</label>
+                            <select id="orgActive" name="active">
+                                <option value="true">Active</option>
+                                <option value="false">Inactive</option>
+                            </select>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="form-section">
+                    <h4>Branding</h4>
+                    <div class="form-row">
+                        <div class="form-group">
+                            <label for="orgLogo">Logo URL</label>
+                            <input type="url" id="orgLogo" name="logoUrl" placeholder="https://...">
+                        </div>
+                        <div class="form-group">
+                            <label for="orgFavicon">Favicon URL</label>
+                            <input type="url" id="orgFavicon" name="faviconUrl" placeholder="https://...">
+                        </div>
+                    </div>
+                </div>
+
+                <div class="form-section">
+                    <h4>Theme Colors</h4>
+                    <div class="form-row">
+                        <div class="form-group">
+                            <label for="orgPrimary">Primary Color</label>
+                            <div class="color-input-group">
+                                <input type="color" id="orgPrimaryPicker" value="#10a37f"
+                                       onchange="document.getElementById('orgPrimary').value = this.value">
+                                <input type="text" id="orgPrimary" name="primaryColor" value="#10a37f"
+                                       onchange="document.getElementById('orgPrimaryPicker').value = this.value">
+                            </div>
+                        </div>
+                        <div class="form-group">
+                            <label for="orgAccent">Accent Color</label>
+                            <div class="color-input-group">
+                                <input type="color" id="orgAccentPicker" value="#10a37f"
+                                       onchange="document.getElementById('orgAccent').value = this.value">
+                                <input type="text" id="orgAccent" name="accentColor" value="#10a37f"
+                                       onchange="document.getElementById('orgAccentPicker').value = this.value">
+                            </div>
+                        </div>
+                    </div>
+                    <div class="form-row">
+                        <div class="form-group">
+                            <label for="orgBackground">Background Color</label>
+                            <div class="color-input-group">
+                                <input type="color" id="orgBackgroundPicker" value="#0f0f0f"
+                                       onchange="document.getElementById('orgBackground').value = this.value">
+                                <input type="text" id="orgBackground" name="backgroundColor" value="#0f0f0f"
+                                       onchange="document.getElementById('orgBackgroundPicker').value = this.value">
+                            </div>
+                        </div>
+                        <div class="form-group">
+                            <label for="orgSidebar">Sidebar Color</label>
+                            <div class="color-input-group">
+                                <input type="color" id="orgSidebarPicker" value="#0f0f0f"
+                                       onchange="document.getElementById('orgSidebar').value = this.value">
+                                <input type="text" id="orgSidebar" name="sidebarColor" value="#0f0f0f"
+                                       onchange="document.getElementById('orgSidebarPicker').value = this.value">
+                            </div>
+                        </div>
+                    </div>
+                    <div class="form-row">
+                        <div class="form-group">
+                            <label for="orgSecondary">Secondary Color</label>
+                            <div class="color-input-group">
+                                <input type="color" id="orgSecondaryPicker" value="#1a1a1a"
+                                       onchange="document.getElementById('orgSecondary').value = this.value">
+                                <input type="text" id="orgSecondary" name="secondaryColor" value="#1a1a1a"
+                                       onchange="document.getElementById('orgSecondaryPicker').value = this.value">
+                            </div>
+                        </div>
+                        <div class="form-group">
+                            <label for="orgText">Text Color</label>
+                            <div class="color-input-group">
+                                <input type="color" id="orgTextPicker" value="#ffffff"
+                                       onchange="document.getElementById('orgText').value = this.value">
+                                <input type="text" id="orgText" name="textColor" value="#ffffff"
+                                       onchange="document.getElementById('orgTextPicker').value = this.value">
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="form-section">
+                    <h4>Appearance</h4>
+                    <div class="form-row">
+                        <div class="form-group">
+                            <label for="orgTheme">Default Theme</label>
+                            <select id="orgTheme" name="defaultTheme">
+                                <option value="DARK">Dark</option>
+                                <option value="LIGHT">Light</option>
+                            </select>
+                        </div>
+                        <div class="form-group">
+                            <label for="orgBorderRadius">Border Radius</label>
+                            <input type="text" id="orgBorderRadius" name="borderRadius" value="12px">
+                        </div>
+                    </div>
+                    <div class="form-group full-width">
+                        <label for="orgFont">Font Family</label>
+                        <input type="text" id="orgFont" name="fontFamily"
+                               value="-apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif">
+                    </div>
+                    <div class="form-group full-width">
+                        <label for="orgCustomCss">Custom CSS</label>
+                        <textarea id="orgCustomCss" name="customCss"
+                                  placeholder="/* Additional custom styles */"></textarea>
+                    </div>
+                </div>
+
+                <div class="modal-actions">
+                    <button type="button" class="modal-btn cancel" onclick="closeModal()">Cancel</button>
+                    <button type="submit" class="modal-btn confirm" id="submitBtn">Create</button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <!-- Delete Confirmation Modal -->
+    <div class="modal-overlay" id="deleteModal">
+        <div class="modal" style="max-width: 400px;">
+            <h3>Delete Organization</h3>
+            <p>Are you sure you want to delete <strong id="deleteOrgName"></strong>?</p>
+            <p style="color: var(--text-muted); font-size: 0.9rem;">
+                This will remove all organization settings and unassign all members.
+            </p>
+            <div class="modal-actions">
+                <button class="modal-btn cancel" onclick="closeDeleteModal()">Cancel</button>
+                <button class="modal-btn danger" id="confirmDeleteBtn">Delete</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Members Modal -->
+    <div class="modal-overlay" id="membersModal">
+        <div class="modal">
+            <h3>Organization Members</h3>
+            <div id="membersList" style="margin-bottom: 20px;">
+                <!-- Members will be loaded here -->
+            </div>
+            <div class="form-section">
+                <h4>Add Member</h4>
+                <div class="form-row">
+                    <div class="form-group">
+                        <label for="addMemberUser">User</label>
+                        <select id="addMemberUser">
+                            <option value="">Select a user...</option>
+                            <option th:each="user : ${users}" th:value="${user.id}"
+                                    th:text="${user.displayName != null ? user.displayName : user.username}">User</option>
+                        </select>
+                    </div>
+                    <div class="form-group">
+                        <label for="addMemberRole">Role</label>
+                        <select id="addMemberRole">
+                            <option value="MEMBER">Member</option>
+                            <option value="ADMIN">Admin</option>
+                            <option value="OWNER">Owner</option>
+                        </select>
+                    </div>
+                </div>
+                <button class="btn-primary" onclick="addMember()" style="width: 100%;">Add Member</button>
+            </div>
+            <div class="modal-actions">
+                <button class="modal-btn cancel" onclick="closeMembersModal()">Close</button>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        // Apply saved theme
+        const savedTheme = localStorage.getItem('theme') || 'dark';
+        document.body.setAttribute('data-theme', savedTheme);
+
+        let currentOrgId = null;
+        let deleteOrgId = null;
+        let membersOrgId = null;
+
+        // Open create modal
+        function openCreateModal() {
+            document.getElementById('modalTitle').textContent = 'Create Organization';
+            document.getElementById('submitBtn').textContent = 'Create';
+            document.getElementById('orgForm').reset();
+            document.getElementById('orgId').value = '';
+
+            // Reset color pickers
+            document.getElementById('orgPrimaryPicker').value = '#10a37f';
+            document.getElementById('orgAccentPicker').value = '#10a37f';
+            document.getElementById('orgBackgroundPicker').value = '#0f0f0f';
+            document.getElementById('orgSidebarPicker').value = '#0f0f0f';
+            document.getElementById('orgSecondaryPicker').value = '#1a1a1a';
+            document.getElementById('orgTextPicker').value = '#ffffff';
+
+            document.getElementById('orgModal').classList.add('open');
+        }
+
+        // Open edit modal
+        async function openEditModal(btn) {
+            const orgId = btn.dataset.orgId;
+
+            try {
+                const response = await fetch(`/api/admin/organizations/${orgId}`);
+                if (!response.ok) throw new Error('Failed to fetch organization');
+
+                const org = await response.json();
+
+                document.getElementById('modalTitle').textContent = 'Edit Organization';
+                document.getElementById('submitBtn').textContent = 'Save Changes';
+                document.getElementById('orgId').value = org.id;
+                document.getElementById('orgName').value = org.name || '';
+                document.getElementById('orgSlug').value = org.slug || '';
+                document.getElementById('orgWelcome').value = org.welcomeMessage || '';
+                document.getElementById('orgHeaderText').value = org.headerText || 'Chat';
+                document.getElementById('orgActive').value = org.active ? 'true' : 'false';
+                document.getElementById('orgLogo').value = org.logoUrl || '';
+                document.getElementById('orgFavicon').value = org.faviconUrl || '';
+
+                // Set colors
+                setColorField('orgPrimary', org.primaryColor || '#10a37f');
+                setColorField('orgAccent', org.accentColor || '#10a37f');
+                setColorField('orgBackground', org.backgroundColor || '#0f0f0f');
+                setColorField('orgSidebar', org.sidebarColor || '#0f0f0f');
+                setColorField('orgSecondary', org.secondaryColor || '#1a1a1a');
+                setColorField('orgText', org.textColor || '#ffffff');
+
+                document.getElementById('orgTheme').value = org.defaultTheme || 'DARK';
+                document.getElementById('orgBorderRadius').value = org.borderRadius || '12px';
+                document.getElementById('orgFont').value = org.fontFamily || '';
+                document.getElementById('orgCustomCss').value = org.customCss || '';
+
+                document.getElementById('orgModal').classList.add('open');
+            } catch (error) {
+                console.error('Error:', error);
+                alert('Failed to load organization details');
+            }
+        }
+
+        function setColorField(fieldId, value) {
+            document.getElementById(fieldId).value = value;
+            document.getElementById(fieldId + 'Picker').value = value;
+        }
+
+        function closeModal() {
+            document.getElementById('orgModal').classList.remove('open');
+        }
+
+        // Form submission
+        document.getElementById('orgForm').addEventListener('submit', async function(e) {
+            e.preventDefault();
+
+            const formData = new FormData(this);
+            const orgId = formData.get('id');
+            const isEdit = orgId && orgId.length > 0;
+
+            const data = {
+                name: formData.get('name'),
+                slug: formData.get('slug') || null,
+                welcomeMessage: formData.get('welcomeMessage') || null,
+                headerText: formData.get('headerText') || 'Chat',
+                active: formData.get('active') === 'true',
+                logoUrl: formData.get('logoUrl') || null,
+                faviconUrl: formData.get('faviconUrl') || null,
+                primaryColor: formData.get('primaryColor'),
+                accentColor: formData.get('accentColor'),
+                backgroundColor: formData.get('backgroundColor'),
+                sidebarColor: formData.get('sidebarColor'),
+                secondaryColor: formData.get('secondaryColor'),
+                textColor: formData.get('textColor'),
+                defaultTheme: formData.get('defaultTheme'),
+                borderRadius: formData.get('borderRadius'),
+                fontFamily: formData.get('fontFamily') || null,
+                customCss: formData.get('customCss') || null
+            };
+
+            try {
+                const url = isEdit ? `/api/admin/organizations/${orgId}` : '/api/admin/organizations';
+                const method = isEdit ? 'PUT' : 'POST';
+
+                const response = await fetch(url, {
+                    method: method,
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify(data)
+                });
+
+                const result = await response.json();
+
+                if (result.error) {
+                    alert(result.error);
+                } else {
+                    location.reload();
+                }
+            } catch (error) {
+                console.error('Error:', error);
+                alert('Failed to save organization');
+            }
+        });
+
+        // Delete confirmation
+        function confirmDelete(btn) {
+            deleteOrgId = btn.dataset.orgId;
+            document.getElementById('deleteOrgName').textContent = btn.dataset.orgName;
+            document.getElementById('deleteModal').classList.add('open');
+        }
+
+        function closeDeleteModal() {
+            document.getElementById('deleteModal').classList.remove('open');
+            deleteOrgId = null;
+        }
+
+        document.getElementById('confirmDeleteBtn').addEventListener('click', async function() {
+            if (!deleteOrgId) return;
+
+            try {
+                const response = await fetch(`/api/admin/organizations/${deleteOrgId}`, {
+                    method: 'DELETE'
+                });
+
+                const result = await response.json();
+
+                if (result.error) {
+                    alert(result.error);
+                } else {
+                    location.reload();
+                }
+            } catch (error) {
+                console.error('Error:', error);
+                alert('Failed to delete organization');
+            }
+
+            closeDeleteModal();
+        });
+
+        // Members modal
+        async function openMembersModal(btn) {
+            membersOrgId = btn.dataset.orgId;
+            await loadMembers();
+            document.getElementById('membersModal').classList.add('open');
+        }
+
+        function closeMembersModal() {
+            document.getElementById('membersModal').classList.remove('open');
+            membersOrgId = null;
+        }
+
+        async function loadMembers() {
+            if (!membersOrgId) return;
+
+            try {
+                const response = await fetch(`/api/admin/organizations/${membersOrgId}/members`);
+                const members = await response.json();
+
+                const container = document.getElementById('membersList');
+
+                if (members.length === 0) {
+                    container.innerHTML = '<p style="color: var(--text-muted); text-align: center;">No members yet</p>';
+                    return;
+                }
+
+                container.innerHTML = members.map(member => `
+                    <div style="display: flex; justify-content: space-between; align-items: center; padding: 12px; background: var(--bg-tertiary); border-radius: 8px; margin-bottom: 8px;">
+                        <div>
+                            <div style="font-weight: 500;">${member.displayName || member.username}</div>
+                            <div style="font-size: 0.85rem; color: var(--text-muted);">${member.email || ''}</div>
+                        </div>
+                        <div style="display: flex; align-items: center; gap: 12px;">
+                            <span class="status-badge active">${member.organizationRole}</span>
+                            <button class="action-btn danger" onclick="removeMember('${member.id}')" style="padding: 4px 8px;">Remove</button>
+                        </div>
+                    </div>
+                `).join('');
+            } catch (error) {
+                console.error('Error:', error);
+            }
+        }
+
+        async function addMember() {
+            const userId = document.getElementById('addMemberUser').value;
+            const role = document.getElementById('addMemberRole').value;
+
+            if (!userId || !membersOrgId) {
+                alert('Please select a user');
+                return;
+            }
+
+            try {
+                const response = await fetch(`/api/admin/organizations/${membersOrgId}/members/${userId}`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ role: role })
+                });
+
+                const result = await response.json();
+
+                if (result.error) {
+                    alert(result.error);
+                } else {
+                    document.getElementById('addMemberUser').value = '';
+                    await loadMembers();
+                }
+            } catch (error) {
+                console.error('Error:', error);
+                alert('Failed to add member');
+            }
+        }
+
+        async function removeMember(userId) {
+            if (!membersOrgId) return;
+
+            try {
+                const response = await fetch(`/api/admin/organizations/${membersOrgId}/members/${userId}`, {
+                    method: 'DELETE'
+                });
+
+                const result = await response.json();
+
+                if (result.error) {
+                    alert(result.error);
+                } else {
+                    await loadMembers();
+                }
+            } catch (error) {
+                console.error('Error:', error);
+                alert('Failed to remove member');
+            }
+        }
+
+        // Close modals on overlay click
+        document.querySelectorAll('.modal-overlay').forEach(overlay => {
+            overlay.addEventListener('click', function(e) {
+                if (e.target === this) {
+                    this.classList.remove('open');
+                }
+            });
+        });
+    </script>
+</body>
+</html>
