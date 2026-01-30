@@ -279,8 +279,12 @@ class ChatApp {
                             }
                             this.highlightCode(textEl);
 
-                            // Add performance metrics if available
-                            if (data.timeToFirstTokenMs || data.tokensPerSecond) {
+                            // Add performance metrics if available (check for existence, not truthiness)
+                            const hasMetrics = data.timeToFirstTokenMs != null ||
+                                               data.tokensPerSecond != null ||
+                                               data.totalResponseTimeMs != null;
+
+                            if (hasMetrics) {
                                 const metaEl = messageEl.querySelector('.message-meta') ||
                                     (() => {
                                         const meta = document.createElement('div');
@@ -291,10 +295,18 @@ class ChatApp {
 
                                 let metricsText = [];
                                 if (data.model) metricsText.push(data.model);
-                                if (data.tokensPerSecond) metricsText.push(`${data.tokensPerSecond.toFixed(1)} t/s`);
-                                if (data.timeToFirstTokenMs) metricsText.push(`TTFT: ${data.timeToFirstTokenMs}ms`);
-                                if (data.totalResponseTimeMs) metricsText.push(`Total: ${(data.totalResponseTimeMs / 1000).toFixed(1)}s`);
-                                metaEl.textContent = metricsText.join(' | ');
+                                if (data.tokensPerSecond != null && data.tokensPerSecond > 0) {
+                                    metricsText.push(`${data.tokensPerSecond.toFixed(1)} t/s`);
+                                }
+                                if (data.timeToFirstTokenMs != null) {
+                                    metricsText.push(`TTFT: ${data.timeToFirstTokenMs}ms`);
+                                }
+                                if (data.totalResponseTimeMs != null) {
+                                    metricsText.push(`Total: ${(data.totalResponseTimeMs / 1000).toFixed(1)}s`);
+                                }
+                                if (metricsText.length > 0) {
+                                    metaEl.textContent = metricsText.join(' | ');
+                                }
                             }
 
                             this.refreshConversationsList();

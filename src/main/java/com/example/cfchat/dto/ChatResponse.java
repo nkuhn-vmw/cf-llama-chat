@@ -1,5 +1,6 @@
 package com.example.cfchat.dto;
 
+import com.fasterxml.jackson.annotation.JsonInclude;
 import lombok.AllArgsConstructor;
 import lombok.Builder;
 import lombok.Data;
@@ -11,6 +12,7 @@ import java.util.UUID;
 @NoArgsConstructor
 @AllArgsConstructor
 @Builder
+@JsonInclude(JsonInclude.Include.ALWAYS)
 public class ChatResponse {
     private UUID conversationId;
     private UUID messageId;
