@@ -254,25 +254,33 @@ class ChatApp {
 
         const reader = response.body.getReader();
         const decoder = new TextDecoder();
+        let buffer = '';  // Buffer for incomplete SSE events
 
         while (true) {
             const { value, done } = await reader.read();
             if (done) break;
 
-            const chunk = decoder.decode(value, { stream: true });
-            const lines = chunk.split('\n');
+            buffer += decoder.decode(value, { stream: true });
+            const lines = buffer.split('\n');
+
+            // Keep the last line in buffer if it's incomplete (doesn't end with newline)
+            buffer = lines.pop() || '';
 
             for (const line of lines) {
                 if (line.startsWith('data:')) {
                     try {
-                        const data = JSON.parse(line.slice(5));
+                        const jsonStr = line.slice(5).trim();
+                        if (!jsonStr) continue;
+                        const data = JSON.parse(jsonStr);
 
                         if (!this.conversationId && data.conversationId) {
                             this.conversationId = data.conversationId;
                             this.updateURL(data.conversationId);
                         }
 
+                        // Debug: log final response to see metrics
                         if (data.complete) {
+                            console.log('Final streaming response:', JSON.stringify(data, null, 2));
                             // Final message with full HTML content
                             if (data.htmlContent) {
                                 textEl.innerHTML = data.htmlContent;
@@ -316,7 +324,7 @@ class ChatApp {
                             this.scrollToBottom();
                         }
                     } catch (e) {
-                        // Ignore parse errors for incomplete chunks
+                        console.warn('SSE parse error:', e.message, 'Line:', line);
                     }
                 }
             }

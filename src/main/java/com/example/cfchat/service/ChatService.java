@@ -266,6 +266,9 @@ public class ChatService {
             Double tokensPerSecond = responseTime > 0 ?
                     (completionTokens / (responseTime / 1000.0)) : 0.0;
 
+            log.info("Streaming metrics - TTFT: {}ms, TPS: {}, Total: {}ms, Model: {}",
+                    timeToFirstToken, String.format("%.1f", tokensPerSecond), responseTime, model);
+
             metricsService.recordUsage(finalUserId, finalConversationId, model, finalProvider,
                     promptTokens, completionTokens, responseTime, timeToFirstToken, tokensPerSecond);
 
@@ -276,7 +279,7 @@ public class ChatService {
                 conversationService.updateConversationTitle(finalConversationId, title);
             }
 
-            return Flux.just(ChatResponse.builder()
+            ChatResponse finalResponse = ChatResponse.builder()
                     .conversationId(finalConversationId)
                     .messageId(savedMessage.getId())
                     .content("")
@@ -287,7 +290,14 @@ public class ChatService {
                     .timeToFirstTokenMs(timeToFirstToken)
                     .tokensPerSecond(tokensPerSecond)
                     .totalResponseTimeMs(responseTime)
-                    .build());
+                    .build();
+
+            log.info("Sending final response with metrics - TTFT: {}, TPS: {}, Total: {}",
+                    finalResponse.getTimeToFirstTokenMs(),
+                    finalResponse.getTokensPerSecond(),
+                    finalResponse.getTotalResponseTimeMs());
+
+            return Flux.just(finalResponse);
         }));
     }
 
