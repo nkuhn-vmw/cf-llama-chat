@@ -161,6 +161,12 @@ public class OrganizationService {
                 .orElse(OrganizationThemeDto.getDefaultTheme());
     }
 
+    @Transactional(readOnly = true)
+    public Optional<OrganizationThemeDto> getThemeBySlugOptional(String slug) {
+        return organizationRepository.findBySlugAndActiveTrue(slug)
+                .map(OrganizationThemeDto::fromEntity);
+    }
+
     @Transactional
     public void addUserToOrganization(UUID userId, UUID organizationId, User.OrganizationRole role) {
         User user = userRepository.findById(userId)
