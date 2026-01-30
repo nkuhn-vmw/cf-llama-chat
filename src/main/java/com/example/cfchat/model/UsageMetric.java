@@ -48,6 +48,12 @@ public class UsageMetric {
     @Column(name = "response_time_ms")
     private Long responseTimeMs;
 
+    @Column(name = "time_to_first_token_ms")
+    private Long timeToFirstTokenMs;
+
+    @Column(name = "tokens_per_second")
+    private Double tokensPerSecond;
+
     @Column(name = "timestamp", nullable = false)
     private LocalDateTime timestamp;
 

@@ -28,6 +28,8 @@ import com.example.cfchat.config.GenAiConfig;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.UUID;
+import java.util.concurrent.atomic.AtomicBoolean;
+import java.util.concurrent.atomic.AtomicInteger;
 import java.util.concurrent.atomic.AtomicLong;
 
 @Service
@@ -127,7 +129,16 @@ public class ChatService {
         // Record metrics (estimate tokens based on content length)
         int promptTokens = estimateTokens(request.getMessage());
         int completionTokens = estimateTokens(response);
-        metricsService.recordUsage(userId, conversationId, model, provider, promptTokens, completionTokens, responseTime);
+
+        // For non-streaming, TTFT equals response time (all tokens arrive at once)
+        Long timeToFirstToken = responseTime;
+
+        // Calculate tokens per second
+        Double tokensPerSecond = responseTime > 0 ?
+                (completionTokens / (responseTime / 1000.0)) : 0.0;
+
+        metricsService.recordUsage(userId, conversationId, model, provider, promptTokens, completionTokens,
+                responseTime, timeToFirstToken, tokensPerSecond);
 
         // Update conversation title if this is the first exchange
         if (conversation.getMessages().size() <= 2) {
@@ -142,6 +153,9 @@ public class ChatService {
                 .htmlContent(markdownService.toHtml(response))
                 .model(model)
                 .complete(true)
+                .timeToFirstTokenMs(timeToFirstToken)
+                .tokensPerSecond(tokensPerSecond)
+                .totalResponseTimeMs(responseTime)
                 .build();
     }
 
@@ -192,6 +206,9 @@ public class ChatService {
         // Stream AI response
         StringBuilder fullResponse = new StringBuilder();
         AtomicLong startTime = new AtomicLong(System.currentTimeMillis());
+        AtomicLong firstTokenTime = new AtomicLong(0);
+        AtomicBoolean firstTokenReceived = new AtomicBoolean(false);
+        AtomicInteger tokenCount = new AtomicInteger(0);
 
         Flux<ChatResponse> responseFlux;
 
@@ -206,9 +223,17 @@ public class ChatService {
                 .map(chatResponse -> {
                     String content = chatResponse.getResult() != null ?
                             chatResponse.getResult().getOutput().getText() : "";
+
+                    // Track time to first token
+                    if (content != null && !content.isEmpty() && firstTokenReceived.compareAndSet(false, true)) {
+                        firstTokenTime.set(System.currentTimeMillis());
+                    }
+
                     if (content != null) {
                         fullResponse.append(content);
+                        tokenCount.incrementAndGet(); // Count streaming chunks as approximate tokens
                     }
+
                     return ChatResponse.builder()
                             .conversationId(finalConversationId)
                             .content(content != null ? content : "")
@@ -227,11 +252,22 @@ public class ChatService {
                     model
             );
 
-            // Record metrics
-            long responseTime = System.currentTimeMillis() - startTime.get();
+            // Calculate metrics
+            long endTime = System.currentTimeMillis();
+            long responseTime = endTime - startTime.get();
             int promptTokens = estimateTokens(userMessage);
             int completionTokens = estimateTokens(completeResponse);
-            metricsService.recordUsage(finalUserId, finalConversationId, model, finalProvider, promptTokens, completionTokens, responseTime);
+
+            // Time to first token
+            Long timeToFirstToken = firstTokenTime.get() > 0 ?
+                    firstTokenTime.get() - startTime.get() : responseTime;
+
+            // Tokens per second (using estimated completion tokens)
+            Double tokensPerSecond = responseTime > 0 ?
+                    (completionTokens / (responseTime / 1000.0)) : 0.0;
+
+            metricsService.recordUsage(finalUserId, finalConversationId, model, finalProvider,
+                    promptTokens, completionTokens, responseTime, timeToFirstToken, tokensPerSecond);
 
             // Update conversation title if first exchange
             Conversation conv = conversationService.getConversationEntity(finalConversationId).orElse(null);
@@ -248,6 +284,9 @@ public class ChatService {
                     .model(model)
                     .streaming(false)
                     .complete(true)
+                    .timeToFirstTokenMs(timeToFirstToken)
+                    .tokensPerSecond(tokensPerSecond)
+                    .totalResponseTimeMs(responseTime)
                     .build());
         }));
     }

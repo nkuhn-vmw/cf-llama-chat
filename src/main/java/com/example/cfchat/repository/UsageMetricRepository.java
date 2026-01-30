@@ -47,4 +47,40 @@ public interface UsageMetricRepository extends JpaRepository<UsageMetric, UUID> 
     long countByTimestampAfter(LocalDateTime after);
 
     long countByUserIdAndTimestampAfter(UUID userId, LocalDateTime after);
+
+    // Average tokens per second
+    @Query("SELECT AVG(m.tokensPerSecond) FROM UsageMetric m WHERE m.tokensPerSecond IS NOT NULL")
+    Double avgTokensPerSecond();
+
+    @Query("SELECT AVG(m.tokensPerSecond) FROM UsageMetric m WHERE m.userId = :userId AND m.tokensPerSecond IS NOT NULL")
+    Double avgTokensPerSecondByUserId(UUID userId);
+
+    @Query("SELECT m.model, AVG(m.tokensPerSecond) FROM UsageMetric m WHERE m.tokensPerSecond IS NOT NULL GROUP BY m.model")
+    List<Object[]> avgTokensPerSecondByModel();
+
+    @Query("SELECT m.model, AVG(m.tokensPerSecond) FROM UsageMetric m WHERE m.userId = :userId AND m.tokensPerSecond IS NOT NULL GROUP BY m.model")
+    List<Object[]> avgTokensPerSecondByModelForUser(UUID userId);
+
+    // Average time to first token
+    @Query("SELECT AVG(m.timeToFirstTokenMs) FROM UsageMetric m WHERE m.timeToFirstTokenMs IS NOT NULL")
+    Double avgTimeToFirstToken();
+
+    @Query("SELECT m.model, AVG(m.timeToFirstTokenMs) FROM UsageMetric m WHERE m.timeToFirstTokenMs IS NOT NULL GROUP BY m.model")
+    List<Object[]> avgTimeToFirstTokenByModel();
+
+    // Tokens by model with time filtering
+    @Query("SELECT m.model, SUM(m.totalTokens) FROM UsageMetric m WHERE m.timestamp >= :after GROUP BY m.model")
+    List<Object[]> sumTokensByModelAfter(LocalDateTime after);
+
+    @Query("SELECT m.model, SUM(m.totalTokens) FROM UsageMetric m WHERE m.userId = :userId AND m.timestamp >= :after GROUP BY m.model")
+    List<Object[]> sumTokensByModelForUserAfter(UUID userId, LocalDateTime after);
+
+    // Request count by model
+    @Query("SELECT m.model, COUNT(m) FROM UsageMetric m GROUP BY m.model")
+    List<Object[]> countRequestsByModel();
+
+    // Delete all (for admin clear)
+    @Query("DELETE FROM UsageMetric m")
+    @org.springframework.data.jpa.repository.Modifying
+    void deleteAllMetrics();
 }

@@ -278,6 +278,25 @@ class ChatApp {
                                 textEl.innerHTML = data.htmlContent;
                             }
                             this.highlightCode(textEl);
+
+                            // Add performance metrics if available
+                            if (data.timeToFirstTokenMs || data.tokensPerSecond) {
+                                const metaEl = messageEl.querySelector('.message-meta') ||
+                                    (() => {
+                                        const meta = document.createElement('div');
+                                        meta.className = 'message-meta';
+                                        messageEl.querySelector('.message-content').appendChild(meta);
+                                        return meta;
+                                    })();
+
+                                let metricsText = [];
+                                if (data.model) metricsText.push(data.model);
+                                if (data.tokensPerSecond) metricsText.push(`${data.tokensPerSecond.toFixed(1)} t/s`);
+                                if (data.timeToFirstTokenMs) metricsText.push(`TTFT: ${data.timeToFirstTokenMs}ms`);
+                                if (data.totalResponseTimeMs) metricsText.push(`Total: ${(data.totalResponseTimeMs / 1000).toFixed(1)}s`);
+                                metaEl.textContent = metricsText.join(' | ');
+                            }
+
                             this.refreshConversationsList();
                         } else if (data.content) {
                             fullContent += data.content;

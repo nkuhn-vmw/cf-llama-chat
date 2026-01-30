@@ -19,4 +19,9 @@ public class ChatResponse {
     private String model;
     private boolean streaming;
     private boolean complete;
+
+    // Performance metrics
+    private Long timeToFirstTokenMs;
+    private Double tokensPerSecond;
+    private Long totalResponseTimeMs;
 }

@@ -8,6 +8,7 @@ import lombok.extern.slf4j.Slf4j;
 import org.springframework.http.ResponseEntity;
 import org.springframework.stereotype.Controller;
 import org.springframework.ui.Model;
+import org.springframework.web.bind.annotation.DeleteMapping;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.ResponseBody;
 
@@ -86,5 +87,28 @@ public class MetricsController {
 
         Map<String, Object> stats = metricsService.getModelPerformanceStats();
         return ResponseEntity.ok(stats);
+    }
+
+    @DeleteMapping("/api/admin/metrics")
+    @ResponseBody
+    public ResponseEntity<Map<String, Object>> clearAllMetrics() {
+        Optional<User> currentUser = userService.getCurrentUser();
+        if (currentUser.isEmpty()) {
+            return ResponseEntity.status(401).build();
+        }
+
+        if (currentUser.get().getRole() != User.UserRole.ADMIN) {
+            return ResponseEntity.status(403).body(Map.of("error", "Admin access required"));
+        }
+
+        long countBefore = metricsService.getTotalMetricsCount();
+        metricsService.clearAllMetrics();
+        log.info("Admin {} cleared all metrics ({} records)", currentUser.get().getUsername(), countBefore);
+
+        return ResponseEntity.ok(Map.of(
+                "success", true,
+                "message", "All metrics cleared",
+                "recordsDeleted", countBefore
+        ));
     }
 }

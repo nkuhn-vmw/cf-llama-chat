@@ -24,6 +24,12 @@
             font-weight: 600;
         }
 
+        .header-actions {
+            display: flex;
+            gap: 16px;
+            align-items: center;
+        }
+
         .back-link {
             display: flex;
             align-items: center;
@@ -120,10 +126,13 @@
         }
 
         .bar-label {
-            width: 120px;
+            width: 150px;
             font-size: 0.85rem;
             color: var(--text-secondary);
             flex-shrink: 0;
+            overflow: hidden;
+            text-overflow: ellipsis;
+            white-space: nowrap;
         }
 
         .bar-container {
@@ -141,8 +150,16 @@
             transition: width 0.5s ease;
         }
 
+        .bar-fill.secondary {
+            background-color: #6366f1;
+        }
+
+        .bar-fill.warning {
+            background-color: #f59e0b;
+        }
+
         .bar-value {
-            width: 80px;
+            width: 100px;
             text-align: right;
             font-size: 0.85rem;
             font-weight: 500;
@@ -213,6 +230,87 @@
             opacity: 0.5;
         }
 
+        .danger-btn {
+            background-color: #ef4444;
+            color: white;
+            border: none;
+            padding: 10px 20px;
+            border-radius: 8px;
+            cursor: pointer;
+            font-size: 0.9rem;
+            font-weight: 500;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            transition: background-color 0.2s;
+        }
+
+        .danger-btn:hover {
+            background-color: #dc2626;
+        }
+
+        .danger-btn:disabled {
+            background-color: #9ca3af;
+            cursor: not-allowed;
+        }
+
+        .danger-btn svg {
+            width: 18px;
+            height: 18px;
+        }
+
+        .time-period-tabs {
+            display: flex;
+            gap: 8px;
+            margin-bottom: 16px;
+        }
+
+        .time-period-tab {
+            padding: 6px 12px;
+            border-radius: 6px;
+            background-color: var(--bg-tertiary);
+            border: 1px solid var(--border-color);
+            cursor: pointer;
+            font-size: 0.8rem;
+            color: var(--text-secondary);
+            transition: all 0.2s;
+        }
+
+        .time-period-tab:hover {
+            background-color: var(--bg-secondary);
+        }
+
+        .time-period-tab.active {
+            background-color: var(--accent-color);
+            color: white;
+            border-color: var(--accent-color);
+        }
+
+        .model-performance-table {
+            width: 100%;
+            border-collapse: collapse;
+        }
+
+        .model-performance-table th,
+        .model-performance-table td {
+            padding: 12px 16px;
+            text-align: left;
+            border-bottom: 1px solid var(--border-color);
+        }
+
+        .model-performance-table th {
+            background-color: var(--bg-tertiary);
+            font-weight: 600;
+            font-size: 0.8rem;
+            text-transform: uppercase;
+            color: var(--text-secondary);
+        }
+
+        .model-performance-table td.number {
+            text-align: right;
+            font-family: monospace;
+        }
+
         @media (max-width: 768px) {
             .stats-grid {
                 grid-template-columns: repeat(2, 1fr);
@@ -221,6 +319,11 @@
             .charts-grid {
                 grid-template-columns: 1fr;
             }
+
+            .header-actions {
+                flex-direction: column;
+                gap: 12px;
+            }
         }
     </style>
 </head>
@@ -228,13 +331,15 @@
     <div class="metrics-container">
         <header class="metrics-header">
             <h1>Usage Metrics</h1>
-            <a href="/" class="back-link">
-                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                    <line x1="19" y1="12" x2="5" y2="12"></line>
-                    <polyline points="12 19 5 12 12 5"></polyline>
-                </svg>
-                Back to Chat
-            </a>
+            <div class="header-actions">
+                <a href="/" class="back-link">
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                        <line x1="19" y1="12" x2="5" y2="12"></line>
+                        <polyline points="12 19 5 12 12 5"></polyline>
+                    </svg>
+                    Back to Chat
+                </a>
+            </div>
         </header>
 
         <!-- User's Personal Metrics -->
@@ -268,11 +373,15 @@
                     <div class="stat-value" th:text="${userSummary.totalRequests}">0</div>
                     <div class="stat-label">Total Requests</div>
                 </div>
+                <div class="stat-card">
+                    <div class="stat-value" th:text="${#numbers.formatDecimal(userSummary.avgTokensPerSecond, 1, 1)}">0</div>
+                    <div class="stat-label">Avg Tokens/Sec</div>
+                </div>
             </div>
 
             <div class="charts-grid">
                 <div class="chart-card">
-                    <h3>Tokens by Model</h3>
+                    <h3>Tokens by Model (All Time)</h3>
                     <div th:if="${userSummary.tokensByModel.isEmpty()}" class="empty-state">
                         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
                             <path d="M18 20V10"></path>
@@ -283,7 +392,7 @@
                     </div>
                     <div th:unless="${userSummary.tokensByModel.isEmpty()}" class="bar-chart" id="userTokensChart">
                         <div th:each="entry : ${userSummary.tokensByModel}" class="bar-item">
-                            <span class="bar-label" th:text="${entry.key}">Model</span>
+                            <span class="bar-label" th:text="${entry.key}" th:title="${entry.key}">Model</span>
                             <div class="bar-container">
                                 <div class="bar-fill" th:data-value="${entry.value}" style="width: 0%"></div>
                             </div>
@@ -293,7 +402,7 @@
                 </div>
 
                 <div class="chart-card">
-                    <h3>Average Response Time (ms)</h3>
+                    <h3>Avg Response Time per Request (ms)</h3>
                     <div th:if="${userSummary.avgResponseTimeByModel.isEmpty()}" class="empty-state">
                         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
                             <circle cx="12" cy="12" r="10"></circle>
@@ -303,11 +412,30 @@
                     </div>
                     <div th:unless="${userSummary.avgResponseTimeByModel.isEmpty()}" class="bar-chart" id="userResponseTimeChart">
                         <div th:each="entry : ${userSummary.avgResponseTimeByModel}" class="bar-item">
-                            <span class="bar-label" th:text="${entry.key}">Model</span>
+                            <span class="bar-label" th:text="${entry.key}" th:title="${entry.key}">Model</span>
                             <div class="bar-container">
-                                <div class="bar-fill" th:data-value="${entry.value}" style="width: 0%"></div>
+                                <div class="bar-fill secondary" th:data-value="${entry.value}" style="width: 0%"></div>
                             </div>
-                            <span class="bar-value" th:text="${#numbers.formatDecimal(entry.value, 1, 0, 'COMMA')}">0</span>
+                            <span class="bar-value" th:text="${#numbers.formatDecimal(entry.value, 1, 0, 'COMMA')} + ' ms'">0 ms</span>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="chart-card">
+                    <h3>Avg Tokens/Second by Model</h3>
+                    <div th:if="${userSummary.avgTokensPerSecondByModel.isEmpty()}" class="empty-state">
+                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                            <polyline points="22 12 18 12 15 21 9 3 6 12 2 12"></polyline>
+                        </svg>
+                        <p>No performance data yet</p>
+                    </div>
+                    <div th:unless="${userSummary.avgTokensPerSecondByModel.isEmpty()}" class="bar-chart" id="userTpsChart">
+                        <div th:each="entry : ${userSummary.avgTokensPerSecondByModel}" class="bar-item">
+                            <span class="bar-label" th:text="${entry.key}" th:title="${entry.key}">Model</span>
+                            <div class="bar-container">
+                                <div class="bar-fill warning" th:data-value="${entry.value}" style="width: 0%"></div>
+                            </div>
+                            <span class="bar-value" th:text="${#numbers.formatDecimal(entry.value, 1, 1)} + ' t/s'">0 t/s</span>
                         </div>
                     </div>
                 </div>
@@ -316,16 +444,25 @@
 
         <!-- Admin Global Metrics -->
         <section th:if="${isAdmin}" class="admin-section">
-            <h2 class="section-title">
-                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                    <path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"></path>
-                    <circle cx="9" cy="7" r="4"></circle>
-                    <path d="M23 21v-2a4 4 0 0 0-3-3.87"></path>
-                    <path d="M16 3.13a4 4 0 0 1 0 7.75"></path>
-                </svg>
-                Global Usage
-                <span class="admin-badge">Admin</span>
-            </h2>
+            <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 24px;">
+                <h2 class="section-title" style="margin-bottom: 0;">
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                        <path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"></path>
+                        <circle cx="9" cy="7" r="4"></circle>
+                        <path d="M23 21v-2a4 4 0 0 0-3-3.87"></path>
+                        <path d="M16 3.13a4 4 0 0 1 0 7.75"></path>
+                    </svg>
+                    Global Usage
+                    <span class="admin-badge">Admin</span>
+                </h2>
+                <button class="danger-btn" onclick="clearAllMetrics()">
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                        <polyline points="3 6 5 6 21 6"></polyline>
+                        <path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"></path>
+                    </svg>
+                    Clear All Metrics
+                </button>
+            </div>
 
             <div class="stats-grid">
                 <div class="stat-card highlight">
@@ -344,17 +481,32 @@
                     <div class="stat-value" th:text="${globalSummary.totalRequests}">0</div>
                     <div class="stat-label">Total Requests</div>
                 </div>
+                <div class="stat-card">
+                    <div class="stat-value" th:text="${#numbers.formatDecimal(globalSummary.avgTokensPerSecond, 1, 1)}">0</div>
+                    <div class="stat-label">Avg Tokens/Sec</div>
+                </div>
+                <div class="stat-card">
+                    <div class="stat-value" th:text="${#numbers.formatDecimal(globalSummary.avgTimeToFirstToken, 1, 0)}">0</div>
+                    <div class="stat-label">Avg TTFT (ms)</div>
+                </div>
             </div>
 
-            <div class="charts-grid">
-                <div class="chart-card">
-                    <h3>Global Tokens by Model</h3>
+            <!-- Tokens by Model by Time Period -->
+            <div class="chart-card" style="margin-bottom: 24px;">
+                <h3>Tokens by Model</h3>
+                <div class="time-period-tabs">
+                    <button class="time-period-tab active" onclick="showTimePeriod('all')">All Time</button>
+                    <button class="time-period-tab" onclick="showTimePeriod('month')">This Month</button>
+                    <button class="time-period-tab" onclick="showTimePeriod('week')">This Week</button>
+                    <button class="time-period-tab" onclick="showTimePeriod('today')">Today</button>
+                </div>
+                <div id="tokensByPeriod-all" class="bar-chart">
                     <div th:if="${globalSummary.tokensByModel.isEmpty()}" class="empty-state">
                         <p>No usage data yet</p>
                     </div>
-                    <div th:unless="${globalSummary.tokensByModel.isEmpty()}" class="bar-chart" id="globalTokensChart">
+                    <div th:unless="${globalSummary.tokensByModel.isEmpty()}">
                         <div th:each="entry : ${globalSummary.tokensByModel}" class="bar-item">
-                            <span class="bar-label" th:text="${entry.key}">Model</span>
+                            <span class="bar-label" th:text="${entry.key}" th:title="${entry.key}">Model</span>
                             <div class="bar-container">
                                 <div class="bar-fill" th:data-value="${entry.value}" style="width: 0%"></div>
                             </div>
@@ -362,17 +514,92 @@
                         </div>
                     </div>
                 </div>
+                <div id="tokensByPeriod-month" class="bar-chart" style="display: none;">
+                    <div th:each="entry : ${globalSummary.tokensByModelMonth}" class="bar-item">
+                        <span class="bar-label" th:text="${entry.key}" th:title="${entry.key}">Model</span>
+                        <div class="bar-container">
+                            <div class="bar-fill" th:data-value="${entry.value}" style="width: 0%"></div>
+                        </div>
+                        <span class="bar-value" th:text="${#numbers.formatInteger(entry.value, 1, 'COMMA')}">0</span>
+                    </div>
+                </div>
+                <div id="tokensByPeriod-week" class="bar-chart" style="display: none;">
+                    <div th:each="entry : ${globalSummary.tokensByModelWeek}" class="bar-item">
+                        <span class="bar-label" th:text="${entry.key}" th:title="${entry.key}">Model</span>
+                        <div class="bar-container">
+                            <div class="bar-fill" th:data-value="${entry.value}" style="width: 0%"></div>
+                        </div>
+                        <span class="bar-value" th:text="${#numbers.formatInteger(entry.value, 1, 'COMMA')}">0</span>
+                    </div>
+                </div>
+                <div id="tokensByPeriod-today" class="bar-chart" style="display: none;">
+                    <div th:each="entry : ${globalSummary.tokensByModelToday}" class="bar-item">
+                        <span class="bar-label" th:text="${entry.key}" th:title="${entry.key}">Model</span>
+                        <div class="bar-container">
+                            <div class="bar-fill" th:data-value="${entry.value}" style="width: 0%"></div>
+                        </div>
+                        <span class="bar-value" th:text="${#numbers.formatInteger(entry.value, 1, 'COMMA')}">0</span>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Model Performance Table -->
+            <div class="chart-card" style="margin-bottom: 24px;">
+                <h3>Model Performance Summary</h3>
+                <div th:if="${globalSummary.requestsByModel.isEmpty()}" class="empty-state">
+                    <p>No performance data yet</p>
+                </div>
+                <table th:unless="${globalSummary.requestsByModel.isEmpty()}" class="model-performance-table">
+                    <thead>
+                        <tr>
+                            <th>Model</th>
+                            <th style="text-align: right;">Requests</th>
+                            <th style="text-align: right;">Total Tokens</th>
+                            <th style="text-align: right;">Avg Response (ms)</th>
+                            <th style="text-align: right;">Avg Tokens/Sec</th>
+                            <th style="text-align: right;">Avg TTFT (ms)</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        <tr th:each="entry : ${globalSummary.requestsByModel}">
+                            <td th:text="${entry.key}">Model</td>
+                            <td class="number" th:text="${#numbers.formatInteger(entry.value, 1, 'COMMA')}">0</td>
+                            <td class="number" th:text="${globalSummary.tokensByModel.get(entry.key) != null ? #numbers.formatInteger(globalSummary.tokensByModel.get(entry.key), 1, 'COMMA') : '0'}">0</td>
+                            <td class="number" th:text="${globalSummary.avgResponseTimeByModel.get(entry.key) != null ? #numbers.formatDecimal(globalSummary.avgResponseTimeByModel.get(entry.key), 1, 0, 'COMMA') : '0'}">0</td>
+                            <td class="number" th:text="${globalSummary.avgTokensPerSecondByModel.get(entry.key) != null ? #numbers.formatDecimal(globalSummary.avgTokensPerSecondByModel.get(entry.key), 1, 1) : '0.0'}">0</td>
+                            <td class="number" th:text="${globalSummary.avgTimeToFirstTokenByModel.get(entry.key) != null ? #numbers.formatDecimal(globalSummary.avgTimeToFirstTokenByModel.get(entry.key), 1, 0, 'COMMA') : '0'}">0</td>
+                        </tr>
+                    </tbody>
+                </table>
+            </div>
+
+            <div class="charts-grid">
+                <div class="chart-card">
+                    <h3>Avg Tokens/Second by Model</h3>
+                    <div th:if="${globalSummary.avgTokensPerSecondByModel.isEmpty()}" class="empty-state">
+                        <p>No performance data yet</p>
+                    </div>
+                    <div th:unless="${globalSummary.avgTokensPerSecondByModel.isEmpty()}" class="bar-chart" id="globalTpsChart">
+                        <div th:each="entry : ${globalSummary.avgTokensPerSecondByModel}" class="bar-item">
+                            <span class="bar-label" th:text="${entry.key}" th:title="${entry.key}">Model</span>
+                            <div class="bar-container">
+                                <div class="bar-fill warning" th:data-value="${entry.value}" style="width: 0%"></div>
+                            </div>
+                            <span class="bar-value" th:text="${#numbers.formatDecimal(entry.value, 1, 1)} + ' t/s'">0 t/s</span>
+                        </div>
+                    </div>
+                </div>
 
                 <div class="chart-card">
-                    <h3>Model Performance (Avg Response Time)</h3>
-                    <div th:if="${globalSummary.avgResponseTimeByModel.isEmpty()}" class="empty-state">
-                        <p>No timing data yet</p>
+                    <h3>Avg Time to First Token by Model (ms)</h3>
+                    <div th:if="${globalSummary.avgTimeToFirstTokenByModel.isEmpty()}" class="empty-state">
+                        <p>No TTFT data yet</p>
                     </div>
-                    <div th:unless="${globalSummary.avgResponseTimeByModel.isEmpty()}" class="bar-chart" id="globalResponseTimeChart">
-                        <div th:each="entry : ${globalSummary.avgResponseTimeByModel}" class="bar-item">
-                            <span class="bar-label" th:text="${entry.key}">Model</span>
+                    <div th:unless="${globalSummary.avgTimeToFirstTokenByModel.isEmpty()}" class="bar-chart" id="globalTtftChart">
+                        <div th:each="entry : ${globalSummary.avgTimeToFirstTokenByModel}" class="bar-item">
+                            <span class="bar-label" th:text="${entry.key}" th:title="${entry.key}">Model</span>
                             <div class="bar-container">
-                                <div class="bar-fill" th:data-value="${entry.value}" style="width: 0%"></div>
+                                <div class="bar-fill secondary" th:data-value="${entry.value}" style="width: 0%"></div>
                             </div>
                             <span class="bar-value" th:text="${#numbers.formatDecimal(entry.value, 1, 0, 'COMMA')} + ' ms'">0 ms</span>
                         </div>
@@ -432,12 +659,79 @@
             });
         }
 
+        // Animate bars in a specific container
+        function animateBarsInContainer(container) {
+            const bars = container.querySelectorAll('.bar-fill');
+            let maxValue = 0;
+
+            bars.forEach(bar => {
+                const value = parseFloat(bar.dataset.value) || 0;
+                if (value > maxValue) maxValue = value;
+            });
+
+            if (maxValue === 0) return;
+
+            bars.forEach(bar => {
+                const value = parseFloat(bar.dataset.value) || 0;
+                const percentage = (value / maxValue) * 100;
+                bar.style.width = percentage + '%';
+            });
+        }
+
+        // Show time period for tokens by model
+        function showTimePeriod(period) {
+            // Hide all periods
+            document.querySelectorAll('[id^="tokensByPeriod-"]').forEach(el => {
+                el.style.display = 'none';
+            });
+
+            // Show selected period
+            const container = document.getElementById('tokensByPeriod-' + period);
+            if (container) {
+                container.style.display = 'flex';
+                animateBarsInContainer(container);
+            }
+
+            // Update tab styling
+            document.querySelectorAll('.time-period-tab').forEach(tab => {
+                tab.classList.remove('active');
+            });
+            event.target.classList.add('active');
+        }
+
+        // Clear all metrics
+        async function clearAllMetrics() {
+            if (!confirm('Are you sure you want to clear ALL usage metrics? This action cannot be undone.')) {
+                return;
+            }
+
+            try {
+                const response = await fetch('/api/admin/metrics', {
+                    method: 'DELETE'
+                });
+
+                if (response.ok) {
+                    const data = await response.json();
+                    alert(`Successfully cleared ${data.recordsDeleted} metric records.`);
+                    window.location.reload();
+                } else {
+                    const error = await response.json();
+                    alert('Failed to clear metrics: ' + (error.error || 'Unknown error'));
+                }
+            } catch (error) {
+                console.error('Error clearing metrics:', error);
+                alert('Failed to clear metrics. Please try again.');
+            }
+        }
+
         // Animate all charts on page load
         document.addEventListener('DOMContentLoaded', () => {
             animateBars('userTokensChart');
             animateBars('userResponseTimeChart');
-            animateBars('globalTokensChart');
-            animateBars('globalResponseTimeChart');
+            animateBars('userTpsChart');
+            animateBars('tokensByPeriod-all');
+            animateBars('globalTpsChart');
+            animateBars('globalTtftChart');
         });
     </script>
 </body>
