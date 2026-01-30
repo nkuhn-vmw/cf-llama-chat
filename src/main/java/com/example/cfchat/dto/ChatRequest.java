@@ -24,4 +24,11 @@ public class ChatRequest {
     private String model;
 
     private UUID skillId;
+
+    /**
+     * Whether to use the user's uploaded documents for RAG context.
+     * When true, relevant document chunks will be included in the prompt.
+     */
+    @Builder.Default
+    private boolean useDocumentContext = false;
 }

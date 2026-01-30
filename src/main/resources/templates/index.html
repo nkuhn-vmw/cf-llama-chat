@@ -259,15 +259,70 @@
                         </div>
                         <div class="input-footer">
                             <span class="powered-by">Press Enter to send, Shift+Enter for new line</span>
-                            <label class="stream-toggle">
-                                <input type="checkbox" id="streamToggle" checked>
-                                <span>Stream responses</span>
-                            </label>
+                            <div class="input-toggles">
+                                <label class="stream-toggle">
+                                    <input type="checkbox" id="streamToggle" checked>
+                                    <span>Stream</span>
+                                </label>
+                                <label class="doc-toggle" id="docToggleLabel" style="display: none;">
+                                    <input type="checkbox" id="useDocumentsToggle">
+                                    <span>Use My Docs</span>
+                                </label>
+                                <button type="button" class="docs-btn" id="docsBtn" title="Manage Documents">
+                                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="16" height="16">
+                                        <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"></path>
+                                        <polyline points="14 2 14 8 20 8"></polyline>
+                                        <line x1="12" y1="18" x2="12" y2="12"></line>
+                                        <line x1="9" y1="15" x2="15" y2="15"></line>
+                                    </svg>
+                                    Docs
+                                </button>
+                            </div>
                         </div>
                     </form>
                 </div>
             </div>
         </main>
+
+        <!-- Documents Panel -->
+        <div class="documents-panel" id="documentsPanel">
+            <div class="documents-panel-header">
+                <h3>My Documents</h3>
+                <button class="close-panel-btn" id="closePanelBtn">
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="20" height="20">
+                        <line x1="18" y1="6" x2="6" y2="18"></line>
+                        <line x1="6" y1="6" x2="18" y2="18"></line>
+                    </svg>
+                </button>
+            </div>
+            <div class="documents-panel-content">
+                <div class="upload-section">
+                    <div class="upload-area" id="uploadArea">
+                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="40" height="40">
+                            <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path>
+                            <polyline points="17 8 12 3 7 8"></polyline>
+                            <line x1="12" y1="3" x2="12" y2="15"></line>
+                        </svg>
+                        <p>Drop files here or click to upload</p>
+                        <p class="upload-hint">PDF, Word, Text files up to 10MB</p>
+                        <input type="file" id="fileInput" accept=".pdf,.doc,.docx,.txt,.md" multiple style="display: none;">
+                    </div>
+                    <div class="upload-progress" id="uploadProgress" style="display: none;">
+                        <div class="progress-bar">
+                            <div class="progress-fill" id="progressFill"></div>
+                        </div>
+                        <p class="progress-text" id="progressText">Uploading...</p>
+                    </div>
+                </div>
+                <div class="documents-stats" id="documentsStats">
+                    <span id="docCount">0 documents</span>
+                    <span id="chunkCount">0 chunks</span>
+                </div>
+                <div class="documents-list" id="documentsList">
+                    <p class="no-documents" id="noDocuments">No documents uploaded yet</p>
+                </div>
+            </div>
+        </div>
     </div>
 
     <!-- Hidden data for JavaScript -->

@@ -7,11 +7,14 @@ class ChatApp {
         this.currentUser = window.APP_DATA?.currentUser || null;
         this.isStreaming = true;
         this.isWaiting = false;
+        this.useDocumentContext = false;
+        this.documentsAvailable = false;
 
         this.initElements();
         this.initEventListeners();
         this.initMarkdown();
         this.initTheme();
+        this.initDocuments();
         this.scrollToBottom();
     }
 
@@ -31,6 +34,22 @@ class ChatApp {
         this.themeToggle = document.getElementById('themeToggle');
         this.userMenuBtn = document.getElementById('userMenuBtn');
         this.userMenuDropdown = document.getElementById('userMenuDropdown');
+
+        // Document elements
+        this.documentsPanel = document.getElementById('documentsPanel');
+        this.docsBtn = document.getElementById('docsBtn');
+        this.closePanelBtn = document.getElementById('closePanelBtn');
+        this.uploadArea = document.getElementById('uploadArea');
+        this.fileInput = document.getElementById('fileInput');
+        this.uploadProgress = document.getElementById('uploadProgress');
+        this.progressFill = document.getElementById('progressFill');
+        this.progressText = document.getElementById('progressText');
+        this.documentsList = document.getElementById('documentsList');
+        this.docCount = document.getElementById('docCount');
+        this.chunkCount = document.getElementById('chunkCount');
+        this.noDocuments = document.getElementById('noDocuments');
+        this.useDocumentsToggle = document.getElementById('useDocumentsToggle');
+        this.docToggleLabel = document.getElementById('docToggleLabel');
     }
 
     initEventListeners() {
@@ -299,7 +318,8 @@ class ChatApp {
                 conversationId: this.conversationId,
                 message: message,
                 provider: provider,
-                model: model
+                model: model,
+                useDocumentContext: this.useDocumentContext && this.documentsAvailable
             };
 
             if (this.isStreaming) {
@@ -641,6 +661,252 @@ class ChatApp {
         const div = document.createElement('div');
         div.textContent = text;
         return div.innerHTML;
+    }
+
+    // Document Management Methods
+    async initDocuments() {
+        // Check if document service is available
+        try {
+            const response = await fetch('/api/documents/status');
+            if (response.ok) {
+                const data = await response.json();
+                if (data.available) {
+                    this.initDocumentEventListeners();
+                    await this.loadDocuments();
+                }
+            }
+        } catch (error) {
+            console.warn('Document service not available:', error);
+        }
+    }
+
+    initDocumentEventListeners() {
+        // Documents button
+        if (this.docsBtn) {
+            this.docsBtn.addEventListener('click', () => {
+                this.toggleDocumentsPanel();
+            });
+        }
+
+        // Close panel button
+        if (this.closePanelBtn) {
+            this.closePanelBtn.addEventListener('click', () => {
+                this.closeDocumentsPanel();
+            });
+        }
+
+        // Upload area click
+        if (this.uploadArea) {
+            this.uploadArea.addEventListener('click', () => {
+                this.fileInput.click();
+            });
+
+            // Drag and drop
+            this.uploadArea.addEventListener('dragover', (e) => {
+                e.preventDefault();
+                this.uploadArea.classList.add('dragover');
+            });
+
+            this.uploadArea.addEventListener('dragleave', () => {
+                this.uploadArea.classList.remove('dragover');
+            });
+
+            this.uploadArea.addEventListener('drop', (e) => {
+                e.preventDefault();
+                this.uploadArea.classList.remove('dragover');
+                const files = e.dataTransfer.files;
+                this.uploadFiles(files);
+            });
+        }
+
+        // File input change
+        if (this.fileInput) {
+            this.fileInput.addEventListener('change', (e) => {
+                this.uploadFiles(e.target.files);
+            });
+        }
+
+        // Use documents toggle
+        if (this.useDocumentsToggle) {
+            this.useDocumentsToggle.addEventListener('change', (e) => {
+                this.useDocumentContext = e.target.checked;
+            });
+        }
+    }
+
+    toggleDocumentsPanel() {
+        if (this.documentsPanel) {
+            this.documentsPanel.classList.toggle('open');
+            if (this.documentsPanel.classList.contains('open')) {
+                this.loadDocuments();
+            }
+        }
+    }
+
+    closeDocumentsPanel() {
+        if (this.documentsPanel) {
+            this.documentsPanel.classList.remove('open');
+        }
+    }
+
+    async loadDocuments() {
+        try {
+            const [docsResponse, statsResponse] = await Promise.all([
+                fetch('/api/documents'),
+                fetch('/api/documents/stats')
+            ]);
+
+            if (docsResponse.ok && statsResponse.ok) {
+                const documents = await docsResponse.json();
+                const stats = await statsResponse.json();
+
+                this.renderDocuments(documents);
+                this.updateDocumentStats(stats);
+
+                // Show "Use My Docs" toggle if user has documents
+                this.documentsAvailable = stats.completedDocuments > 0;
+                if (this.docToggleLabel) {
+                    this.docToggleLabel.style.display = this.documentsAvailable ? 'flex' : 'none';
+                }
+            }
+        } catch (error) {
+            console.error('Error loading documents:', error);
+        }
+    }
+
+    renderDocuments(documents) {
+        if (!this.documentsList) return;
+
+        if (documents.length === 0) {
+            this.documentsList.innerHTML = '<p class="no-documents">No documents uploaded yet</p>';
+            return;
+        }
+
+        this.documentsList.innerHTML = documents.map(doc => `
+            <div class="document-item" data-id="${doc.id}">
+                <div class="document-icon">
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="20" height="20">
+                        <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"></path>
+                        <polyline points="14 2 14 8 20 8"></polyline>
+                    </svg>
+                </div>
+                <div class="document-info">
+                    <div class="document-name" title="${this.escapeHtml(doc.originalFilename)}">${this.escapeHtml(doc.originalFilename)}</div>
+                    <div class="document-meta">
+                        <span class="status status-${doc.status.toLowerCase()}">${doc.status}</span>
+                        ${doc.chunkCount ? `<span>${doc.chunkCount} chunks</span>` : ''}
+                        <span>${this.formatFileSize(doc.fileSize)}</span>
+                    </div>
+                </div>
+                <button class="delete-doc-btn" data-id="${doc.id}" title="Delete document">
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="16" height="16">
+                        <polyline points="3 6 5 6 21 6"></polyline>
+                        <path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"></path>
+                    </svg>
+                </button>
+            </div>
+        `).join('');
+
+        // Add delete event listeners
+        this.documentsList.querySelectorAll('.delete-doc-btn').forEach(btn => {
+            btn.addEventListener('click', (e) => {
+                e.stopPropagation();
+                this.deleteDocument(btn.dataset.id);
+            });
+        });
+    }
+
+    updateDocumentStats(stats) {
+        if (this.docCount) {
+            this.docCount.textContent = `${stats.completedDocuments} documents`;
+        }
+        if (this.chunkCount) {
+            this.chunkCount.textContent = `${stats.totalChunks} chunks`;
+        }
+    }
+
+    async uploadFiles(files) {
+        if (!files || files.length === 0) return;
+
+        for (const file of files) {
+            await this.uploadSingleFile(file);
+        }
+
+        this.fileInput.value = '';
+        await this.loadDocuments();
+    }
+
+    async uploadSingleFile(file) {
+        const formData = new FormData();
+        formData.append('file', file);
+
+        if (this.uploadProgress) {
+            this.uploadProgress.style.display = 'block';
+            this.progressText.textContent = `Uploading ${file.name}...`;
+            this.progressFill.style.width = '0%';
+        }
+
+        try {
+            const response = await fetch('/api/documents/upload', {
+                method: 'POST',
+                body: formData
+            });
+
+            const result = await response.json();
+
+            if (response.ok && result.status === 'COMPLETED') {
+                this.progressText.textContent = `${file.name} uploaded successfully!`;
+                this.progressFill.style.width = '100%';
+            } else {
+                this.progressText.textContent = `Error: ${result.message || 'Upload failed'}`;
+                this.progressFill.style.width = '100%';
+                this.progressFill.style.backgroundColor = 'var(--error-color, #ef4444)';
+            }
+
+            setTimeout(() => {
+                if (this.uploadProgress) {
+                    this.uploadProgress.style.display = 'none';
+                    this.progressFill.style.backgroundColor = '';
+                }
+            }, 2000);
+
+        } catch (error) {
+            console.error('Error uploading file:', error);
+            this.progressText.textContent = 'Upload failed';
+            setTimeout(() => {
+                if (this.uploadProgress) {
+                    this.uploadProgress.style.display = 'none';
+                }
+            }, 2000);
+        }
+    }
+
+    async deleteDocument(documentId) {
+        if (!confirm('Are you sure you want to delete this document?')) {
+            return;
+        }
+
+        try {
+            const response = await fetch(`/api/documents/${documentId}`, {
+                method: 'DELETE'
+            });
+
+            if (response.ok) {
+                await this.loadDocuments();
+            } else {
+                alert('Failed to delete document');
+            }
+        } catch (error) {
+            console.error('Error deleting document:', error);
+            alert('Failed to delete document');
+        }
+    }
+
+    formatFileSize(bytes) {
+        if (!bytes) return '0 B';
+        const sizes = ['B', 'KB', 'MB', 'GB'];
+        const i = Math.floor(Math.log(bytes) / Math.log(1024));
+        return (bytes / Math.pow(1024, i)).toFixed(1) + ' ' + sizes[i];
     }
 }
 

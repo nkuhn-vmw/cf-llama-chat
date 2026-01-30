@@ -18,6 +18,18 @@ spring:
       enabled: false
     ollama:
       enabled: false
+    vectorstore:
+      pgvector:
+        initialize-schema: true
+        index-type: HNSW
+        distance-type: COSINE_DISTANCE
+        dimensions: ${EMBEDDING_DIMENSIONS:1536}
+
+  servlet:
+    multipart:
+      enabled: true
+      max-file-size: 50MB
+      max-request-size: 50MB
 
 management:
   endpoints:
@@ -28,6 +40,13 @@ management:
 app:
   chat:
     default-provider: genai
+  # Document embedding configuration for cloud
+  embedding:
+    dimensions: ${EMBEDDING_DIMENSIONS:1536}
+  documents:
+    max-file-size: ${MAX_DOCUMENT_SIZE:52428800}
+    max-documents-per-user: ${MAX_DOCUMENTS_PER_USER:100}
+    rag-top-k: ${RAG_TOP_K:10}
 
 logging:
   level:

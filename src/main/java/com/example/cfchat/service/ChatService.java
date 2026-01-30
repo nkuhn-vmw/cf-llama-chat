@@ -17,6 +17,7 @@ import org.springframework.ai.chat.messages.SystemMessage;
 import org.springframework.ai.chat.messages.UserMessage;
 import org.springframework.ai.chat.model.ChatModel;
 import org.springframework.ai.chat.prompt.Prompt;
+import org.springframework.ai.document.Document;
 import org.springframework.ai.ollama.OllamaChatModel;
 import org.springframework.ai.openai.OpenAiChatModel;
 import org.springframework.ai.tool.ToolCallbackProvider;
@@ -51,9 +52,13 @@ public class ChatService {
     private final GenAiConfig genAiConfig;
     private final SkillService skillService;
     private final McpToolCallbackCacheService mcpToolCallbackCacheService;
+    private final DocumentEmbeddingService documentEmbeddingService;
 
     @Value("${spring.profiles.active:default}")
     private String activeProfile;
+
+    @Value("${app.documents.rag-top-k:5}")
+    private int ragTopK;
 
     public ChatService(
             @Autowired(required = false) ChatClient primaryChatClient,
@@ -67,7 +72,8 @@ public class ChatService {
             MetricsService metricsService,
             @Autowired(required = false) GenAiConfig genAiConfig,
             @Autowired(required = false) SkillService skillService,
-            @Autowired(required = false) McpToolCallbackCacheService mcpToolCallbackCacheService) {
+            @Autowired(required = false) McpToolCallbackCacheService mcpToolCallbackCacheService,
+            @Autowired(required = false) DocumentEmbeddingService documentEmbeddingService) {
         this.primaryChatClient = primaryChatClient;
         // Use OpenAI model as primary for streaming
         this.primaryChatModel = openAiChatModel;
@@ -81,11 +87,13 @@ public class ChatService {
         this.genAiConfig = genAiConfig;
         this.skillService = skillService;
         this.mcpToolCallbackCacheService = mcpToolCallbackCacheService;
+        this.documentEmbeddingService = documentEmbeddingService;
 
-        log.info("ChatService initialized - primaryChatClient: {}, ollamaChatClient: {}, primaryChatModel: {}, mcpTools: {}",
+        log.info("ChatService initialized - primaryChatClient: {}, ollamaChatClient: {}, primaryChatModel: {}, mcpTools: {}, documentEmbedding: {}",
                 primaryChatClient != null, ollamaChatClient != null,
                 openAiChatModel != null ? openAiChatModel.getClass().getSimpleName() : "null",
-                mcpToolCallbackCacheService != null ? mcpToolCallbackCacheService.getMcpServerServices().size() : 0);
+                mcpToolCallbackCacheService != null ? mcpToolCallbackCacheService.getMcpServerServices().size() : 0,
+                documentEmbeddingService != null && documentEmbeddingService.isAvailable());
     }
 
     public ChatResponse chat(ChatRequest request) {
@@ -115,9 +123,9 @@ public class ChatService {
         // Save user message
         conversationService.addMessage(conversationId, Message.MessageRole.USER, request.getMessage(), null);
 
-        // Build prompt with conversation history (with optional skill)
+        // Build prompt with conversation history (with optional skill and document context)
         List<org.springframework.ai.chat.messages.Message> messages = buildMessageHistory(
-            conversation, request.getMessage(), request.getSkillId());
+            conversation, request.getMessage(), request.getSkillId(), userId, request.isUseDocumentContext());
 
         // Get AI response - pass model name for GenAI multi-model support
         ChatClient chatClient = getChatClient(provider, model);
@@ -219,9 +227,9 @@ public class ChatService {
         // Save user message
         conversationService.addMessage(conversationId, Message.MessageRole.USER, request.getMessage(), null);
 
-        // Build prompt with conversation history (with optional skill)
+        // Build prompt with conversation history (with optional skill and document context)
         List<org.springframework.ai.chat.messages.Message> messages = buildMessageHistory(
-            conversation, request.getMessage(), request.getSkillId());
+            conversation, request.getMessage(), request.getSkillId(), userId, request.isUseDocumentContext());
         Prompt prompt = new Prompt(messages);
 
         // Stream AI response
@@ -486,27 +494,53 @@ public class ChatService {
 
     private List<org.springframework.ai.chat.messages.Message> buildMessageHistory(
             Conversation conversation, String currentMessage) {
-        return buildMessageHistory(conversation, currentMessage, null);
+        return buildMessageHistory(conversation, currentMessage, null, null, false);
     }
 
     private List<org.springframework.ai.chat.messages.Message> buildMessageHistory(
             Conversation conversation, String currentMessage, UUID skillId) {
+        return buildMessageHistory(conversation, currentMessage, skillId, null, false);
+    }
+
+    private List<org.springframework.ai.chat.messages.Message> buildMessageHistory(
+            Conversation conversation, String currentMessage, UUID skillId, UUID userId, boolean useDocumentContext) {
         List<org.springframework.ai.chat.messages.Message> messages = new ArrayList<>();
 
-        // Build system prompt (base + optional skill augmentation)
-        String systemPrompt = chatConfig.getSystemPrompt();
+        // Build system prompt (base + optional skill augmentation + optional RAG instructions)
+        StringBuilder systemPromptBuilder = new StringBuilder(chatConfig.getSystemPrompt());
+
+        // Add skill augmentation if available
         if (skillId != null && skillService != null) {
             try {
                 Skill skill = skillService.getSkillById(skillId).orElse(null);
                 if (skill != null && skill.isEnabled() && skill.getSystemPromptAugmentation() != null) {
-                    systemPrompt = systemPrompt + "\n\n" + skill.getSystemPromptAugmentation();
+                    systemPromptBuilder.append("\n\n").append(skill.getSystemPromptAugmentation());
                     log.debug("Applied skill '{}' to system prompt", skill.getName());
                 }
             } catch (Exception e) {
                 log.warn("Failed to apply skill {}: {}", skillId, e.getMessage());
             }
         }
-        messages.add(new SystemMessage(systemPrompt));
+
+        // Add document context if user has documents and RAG is enabled
+        String documentContext = null;
+        if (useDocumentContext && userId != null && documentEmbeddingService != null && documentEmbeddingService.isAvailable()) {
+            documentContext = buildDocumentContext(userId, currentMessage);
+            if (documentContext != null && !documentContext.isEmpty()) {
+                systemPromptBuilder.append("\n\n");
+                systemPromptBuilder.append("You have access to the user's uploaded documents. ");
+                systemPromptBuilder.append("When answering questions, use the relevant document context provided below. ");
+                systemPromptBuilder.append("Always cite the source document when using information from it.\n\n");
+                systemPromptBuilder.append("DOCUMENT CONTEXT:\n");
+                systemPromptBuilder.append("---------------------\n");
+                systemPromptBuilder.append(documentContext);
+                systemPromptBuilder.append("\n---------------------\n");
+                systemPromptBuilder.append("Use the above context to answer the user's question. ");
+                systemPromptBuilder.append("If the context doesn't contain relevant information, say so and answer based on your general knowledge.");
+            }
+        }
+
+        messages.add(new SystemMessage(systemPromptBuilder.toString()));
 
         // Add conversation history
         for (Message msg : conversation.getMessages()) {
@@ -521,6 +555,37 @@ public class ChatService {
         messages.add(new UserMessage(currentMessage));
 
         return messages;
+    }
+
+    /**
+     * Build document context by searching user's documents for relevant content.
+     */
+    private String buildDocumentContext(UUID userId, String query) {
+        if (documentEmbeddingService == null || !documentEmbeddingService.isAvailable()) {
+            return null;
+        }
+
+        try {
+            List<Document> relevantDocs = documentEmbeddingService.searchUserDocuments(userId, query, ragTopK);
+
+            if (relevantDocs.isEmpty()) {
+                log.debug("No relevant documents found for user {} and query: {}", userId, query);
+                return null;
+            }
+
+            StringBuilder contextBuilder = new StringBuilder();
+            for (Document doc : relevantDocs) {
+                contextBuilder.append(doc.getText());
+                contextBuilder.append("\n\n");
+            }
+
+            log.debug("Built document context with {} chunks for user {}", relevantDocs.size(), userId);
+            return contextBuilder.toString().trim();
+
+        } catch (Exception e) {
+            log.warn("Failed to build document context for user {}: {}", userId, e.getMessage());
+            return null;
+        }
     }
 
     private String generateTitle(String firstMessage) {
