@@ -22,4 +22,6 @@ public class ChatRequest {
     private String provider;
 
     private String model;
+
+    private UUID skillId;
 }

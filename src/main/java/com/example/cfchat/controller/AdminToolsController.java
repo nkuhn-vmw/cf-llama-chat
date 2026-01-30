@@ -1,0 +1,202 @@
+package com.example.cfchat.controller;
+
+import com.example.cfchat.auth.UserService;
+import com.example.cfchat.model.McpServer;
+import com.example.cfchat.model.Tool;
+import com.example.cfchat.model.User;
+import com.example.cfchat.service.McpService;
+import com.example.cfchat.service.ToolService;
+import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
+import org.springframework.http.ResponseEntity;
+import org.springframework.stereotype.Controller;
+import org.springframework.ui.Model;
+import org.springframework.web.bind.annotation.*;
+
+import java.util.*;
+
+@Controller
+@Slf4j
+@RequiredArgsConstructor
+public class AdminToolsController {
+
+    private final UserService userService;
+    private final ToolService toolService;
+    private final McpService mcpService;
+
+    @GetMapping("/admin/tools")
+    public String toolsPage(Model model) {
+        Optional<User> currentUser = userService.getCurrentUser();
+        if (currentUser.isEmpty() || currentUser.get().getRole() != User.UserRole.ADMIN) {
+            return "redirect:/";
+        }
+
+        List<Tool> tools = toolService.getAllTools();
+        List<Map<String, Object>> toolDataList = new ArrayList<>();
+
+        for (Tool tool : tools) {
+            Map<String, Object> toolData = new HashMap<>();
+            toolData.put("tool", tool);
+
+            if (tool.getMcpServerId() != null) {
+                mcpService.getServerById(tool.getMcpServerId())
+                    .ifPresent(server -> toolData.put("mcpServerName", server.getName()));
+            }
+
+            toolDataList.add(toolData);
+        }
+
+        model.addAttribute("tools", toolDataList);
+        model.addAttribute("totalTools", tools.size());
+        model.addAttribute("enabledTools", tools.stream().filter(Tool::isEnabled).count());
+
+        // Add MCP servers for filtering
+        model.addAttribute("mcpServers", mcpService.getAllServers());
+
+        return "admin/tools";
+    }
+
+    @GetMapping("/api/admin/tools")
+    @ResponseBody
+    public ResponseEntity<List<Map<String, Object>>> getTools(
+            @RequestParam(required = false) UUID mcpServerId) {
+
+        Optional<User> currentUser = userService.getCurrentUser();
+        if (currentUser.isEmpty() || currentUser.get().getRole() != User.UserRole.ADMIN) {
+            return ResponseEntity.status(403).build();
+        }
+
+        List<Tool> tools;
+        if (mcpServerId != null) {
+            tools = toolService.getToolsByMcpServer(mcpServerId);
+        } else {
+            tools = toolService.getAllTools();
+        }
+
+        List<Map<String, Object>> result = new ArrayList<>();
+        for (Tool tool : tools) {
+            Map<String, Object> toolData = new HashMap<>();
+            toolData.put("id", tool.getId());
+            toolData.put("name", tool.getName());
+            toolData.put("displayName", tool.getDisplayName());
+            toolData.put("description", tool.getDescription());
+            toolData.put("type", tool.getType().name());
+            toolData.put("mcpServerId", tool.getMcpServerId());
+            toolData.put("inputSchema", tool.getInputSchema());
+            toolData.put("enabled", tool.isEnabled());
+            toolData.put("createdAt", tool.getCreatedAt());
+
+            if (tool.getMcpServerId() != null) {
+                mcpService.getServerById(tool.getMcpServerId())
+                    .ifPresent(server -> toolData.put("mcpServerName", server.getName()));
+            }
+
+            result.add(toolData);
+        }
+
+        return ResponseEntity.ok(result);
+    }
+
+    @GetMapping("/api/admin/tools/{id}")
+    @ResponseBody
+    public ResponseEntity<Map<String, Object>> getTool(@PathVariable UUID id) {
+        Optional<User> currentUser = userService.getCurrentUser();
+        if (currentUser.isEmpty() || currentUser.get().getRole() != User.UserRole.ADMIN) {
+            return ResponseEntity.status(403).build();
+        }
+
+        return toolService.getToolById(id)
+            .map(tool -> {
+                Map<String, Object> toolData = new HashMap<>();
+                toolData.put("id", tool.getId());
+                toolData.put("name", tool.getName());
+                toolData.put("displayName", tool.getDisplayName());
+                toolData.put("description", tool.getDescription());
+                toolData.put("type", tool.getType().name());
+                toolData.put("mcpServerId", tool.getMcpServerId());
+                toolData.put("inputSchema", tool.getInputSchema());
+                toolData.put("enabled", tool.isEnabled());
+                toolData.put("createdAt", tool.getCreatedAt());
+
+                if (tool.getMcpServerId() != null) {
+                    mcpService.getServerById(tool.getMcpServerId())
+                        .ifPresent(server -> toolData.put("mcpServerName", server.getName()));
+                }
+
+                return ResponseEntity.ok(toolData);
+            })
+            .orElse(ResponseEntity.notFound().build());
+    }
+
+    @PutMapping("/api/admin/tools/{id}")
+    @ResponseBody
+    public ResponseEntity<Map<String, Object>> updateTool(
+            @PathVariable UUID id,
+            @RequestBody Map<String, Object> body) {
+
+        Optional<User> currentUser = userService.getCurrentUser();
+        if (currentUser.isEmpty() || currentUser.get().getRole() != User.UserRole.ADMIN) {
+            return ResponseEntity.status(403).body(Map.of("error", "Forbidden"));
+        }
+
+        try {
+            Tool updates = Tool.builder()
+                .displayName((String) body.get("displayName"))
+                .description((String) body.get("description"))
+                .inputSchema((String) body.get("inputSchema"))
+                .build();
+
+            Tool updated = toolService.updateTool(id, updates);
+            log.info("Admin {} updated tool: {}", currentUser.get().getUsername(), updated.getName());
+
+            return ResponseEntity.ok(Map.of("success", true, "toolId", updated.getId()));
+
+        } catch (IllegalArgumentException e) {
+            return ResponseEntity.badRequest().body(Map.of("error", e.getMessage()));
+        }
+    }
+
+    @PutMapping("/api/admin/tools/{id}/enabled")
+    @ResponseBody
+    public ResponseEntity<Map<String, Object>> setToolEnabled(
+            @PathVariable UUID id,
+            @RequestBody Map<String, Boolean> body) {
+
+        Optional<User> currentUser = userService.getCurrentUser();
+        if (currentUser.isEmpty() || currentUser.get().getRole() != User.UserRole.ADMIN) {
+            return ResponseEntity.status(403).body(Map.of("error", "Forbidden"));
+        }
+
+        Boolean enabled = body.get("enabled");
+        if (enabled == null) {
+            return ResponseEntity.badRequest().body(Map.of("error", "enabled field is required"));
+        }
+
+        try {
+            Tool tool = toolService.setEnabled(id, enabled);
+            log.info("Admin {} set tool {} enabled: {}",
+                currentUser.get().getUsername(), tool.getName(), enabled);
+
+            return ResponseEntity.ok(Map.of("success", true, "enabled", tool.isEnabled()));
+        } catch (IllegalArgumentException e) {
+            return ResponseEntity.badRequest().body(Map.of("error", e.getMessage()));
+        }
+    }
+
+    @DeleteMapping("/api/admin/tools/{id}")
+    @ResponseBody
+    public ResponseEntity<Map<String, Object>> deleteTool(@PathVariable UUID id) {
+        Optional<User> currentUser = userService.getCurrentUser();
+        if (currentUser.isEmpty() || currentUser.get().getRole() != User.UserRole.ADMIN) {
+            return ResponseEntity.status(403).body(Map.of("error", "Forbidden"));
+        }
+
+        try {
+            toolService.deleteTool(id);
+            log.info("Admin {} deleted tool: {}", currentUser.get().getUsername(), id);
+            return ResponseEntity.ok(Map.of("success", true));
+        } catch (IllegalArgumentException e) {
+            return ResponseEntity.badRequest().body(Map.of("error", e.getMessage()));
+        }
+    }
+}

@@ -2,12 +2,14 @@ package com.example.cfchat.controller;
 
 import com.example.cfchat.auth.UserService;
 import com.example.cfchat.config.GenAiConfig;
+import com.example.cfchat.model.AccessType;
 import com.example.cfchat.model.ModelInfo;
 import com.example.cfchat.model.User;
 import com.example.cfchat.repository.ConversationRepository;
 import com.example.cfchat.repository.OrganizationRepository;
 import com.example.cfchat.service.ChatService;
 import com.example.cfchat.service.ConversationService;
+import com.example.cfchat.service.UserAccessService;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.annotation.Value;
@@ -28,6 +30,7 @@ public class AdminController {
     private final ChatService chatService;
     private final GenAiConfig genAiConfig;
     private final OrganizationRepository organizationRepository;
+    private final UserAccessService userAccessService;
 
     @Value("${spring.profiles.active:default}")
     private String activeProfile;
@@ -38,13 +41,15 @@ public class AdminController {
             ConversationRepository conversationRepository,
             ChatService chatService,
             @Autowired(required = false) GenAiConfig genAiConfig,
-            OrganizationRepository organizationRepository) {
+            OrganizationRepository organizationRepository,
+            UserAccessService userAccessService) {
         this.userService = userService;
         this.conversationService = conversationService;
         this.conversationRepository = conversationRepository;
         this.chatService = chatService;
         this.genAiConfig = genAiConfig;
         this.organizationRepository = organizationRepository;
+        this.userAccessService = userAccessService;
     }
 
     @GetMapping("/admin")
@@ -317,5 +322,139 @@ public class AdminController {
         } catch (IllegalArgumentException e) {
             return ResponseEntity.badRequest().body(Map.of("error", e.getMessage()));
         }
+    }
+
+    @GetMapping("/api/admin/users/{userId}/access")
+    @ResponseBody
+    public ResponseEntity<Map<String, Object>> getUserAccess(@PathVariable UUID userId) {
+        Optional<User> currentUser = userService.getCurrentUser();
+        if (currentUser.isEmpty() || currentUser.get().getRole() != User.UserRole.ADMIN) {
+            return ResponseEntity.status(403).body(Map.of("error", "Forbidden"));
+        }
+
+        Optional<User> targetUser = userService.getUserById(userId);
+        if (targetUser.isEmpty()) {
+            return ResponseEntity.notFound().build();
+        }
+
+        UserAccessService.UserAccessSummary summary = userAccessService.getUserAccessSummary(userId);
+        List<UserAccessService.ResourceAccess> allResources = userAccessService.getAllResourcesWithAccess(userId);
+
+        Map<String, Object> result = new HashMap<>();
+        result.put("userId", userId);
+        result.put("toolIds", summary.toolIds());
+        result.put("mcpServerIds", summary.mcpServerIds());
+        result.put("skillIds", summary.skillIds());
+        result.put("resources", allResources);
+
+        return ResponseEntity.ok(result);
+    }
+
+    @PutMapping("/api/admin/users/{userId}/access")
+    @ResponseBody
+    public ResponseEntity<Map<String, Object>> updateUserAccess(
+            @PathVariable UUID userId,
+            @RequestBody Map<String, Object> body) {
+
+        Optional<User> currentUser = userService.getCurrentUser();
+        if (currentUser.isEmpty() || currentUser.get().getRole() != User.UserRole.ADMIN) {
+            return ResponseEntity.status(403).body(Map.of("error", "Forbidden"));
+        }
+
+        Optional<User> targetUser = userService.getUserById(userId);
+        if (targetUser.isEmpty()) {
+            return ResponseEntity.notFound().build();
+        }
+
+        try {
+            // Update tool access
+            @SuppressWarnings("unchecked")
+            List<String> toolIds = (List<String>) body.get("toolIds");
+            if (toolIds != null) {
+                List<UUID> toolUuids = toolIds.stream().map(UUID::fromString).toList();
+                userAccessService.updateUserAccess(userId, AccessType.TOOL, toolUuids);
+            }
+
+            // Update MCP server access
+            @SuppressWarnings("unchecked")
+            List<String> mcpServerIds = (List<String>) body.get("mcpServerIds");
+            if (mcpServerIds != null) {
+                List<UUID> serverUuids = mcpServerIds.stream().map(UUID::fromString).toList();
+                userAccessService.updateUserAccess(userId, AccessType.MCP_SERVER, serverUuids);
+            }
+
+            // Update skill access
+            @SuppressWarnings("unchecked")
+            List<String> skillIds = (List<String>) body.get("skillIds");
+            if (skillIds != null) {
+                List<UUID> skillUuids = skillIds.stream().map(UUID::fromString).toList();
+                userAccessService.updateUserAccess(userId, AccessType.SKILL, skillUuids);
+            }
+
+            log.info("Admin {} updated access for user {}", currentUser.get().getUsername(), userId);
+
+            return ResponseEntity.ok(Map.of("success", true));
+
+        } catch (IllegalArgumentException e) {
+            return ResponseEntity.badRequest().body(Map.of("error", e.getMessage()));
+        }
+    }
+
+    @PostMapping("/api/admin/users/{userId}/access/grant-all")
+    @ResponseBody
+    public ResponseEntity<Map<String, Object>> grantAllAccess(
+            @PathVariable UUID userId,
+            @RequestBody Map<String, String> body) {
+
+        Optional<User> currentUser = userService.getCurrentUser();
+        if (currentUser.isEmpty() || currentUser.get().getRole() != User.UserRole.ADMIN) {
+            return ResponseEntity.status(403).body(Map.of("error", "Forbidden"));
+        }
+
+        Optional<User> targetUser = userService.getUserById(userId);
+        if (targetUser.isEmpty()) {
+            return ResponseEntity.notFound().build();
+        }
+
+        String accessType = body.get("accessType");
+        if (accessType == null) {
+            // Grant all access of all types
+            userAccessService.grantAllToolsAccess(userId);
+            userAccessService.grantAllMcpServersAccess(userId);
+            userAccessService.grantAllSkillsAccess(userId);
+        } else {
+            switch (accessType.toUpperCase()) {
+                case "TOOL" -> userAccessService.grantAllToolsAccess(userId);
+                case "MCP_SERVER" -> userAccessService.grantAllMcpServersAccess(userId);
+                case "SKILL" -> userAccessService.grantAllSkillsAccess(userId);
+                default -> {
+                    return ResponseEntity.badRequest().body(Map.of("error", "Invalid access type"));
+                }
+            }
+        }
+
+        log.info("Admin {} granted all {} access to user {}",
+            currentUser.get().getUsername(), accessType != null ? accessType : "ALL", userId);
+
+        return ResponseEntity.ok(Map.of("success", true));
+    }
+
+    @PostMapping("/api/admin/users/{userId}/access/revoke-all")
+    @ResponseBody
+    public ResponseEntity<Map<String, Object>> revokeAllAccess(@PathVariable UUID userId) {
+        Optional<User> currentUser = userService.getCurrentUser();
+        if (currentUser.isEmpty() || currentUser.get().getRole() != User.UserRole.ADMIN) {
+            return ResponseEntity.status(403).body(Map.of("error", "Forbidden"));
+        }
+
+        Optional<User> targetUser = userService.getUserById(userId);
+        if (targetUser.isEmpty()) {
+            return ResponseEntity.notFound().build();
+        }
+
+        userAccessService.revokeAllAccess(userId);
+        log.info("Admin {} revoked all access for user {}", currentUser.get().getUsername(), userId);
+
+        return ResponseEntity.ok(Map.of("success", true));
     }
 }

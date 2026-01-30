@@ -4,9 +4,11 @@ import com.example.cfchat.auth.UserService;
 import com.example.cfchat.config.ChatConfig;
 import com.example.cfchat.dto.ChatRequest;
 import com.example.cfchat.dto.ChatResponse;
+import com.example.cfchat.mcp.McpToolCallbackCacheService;
 import com.example.cfchat.model.Conversation;
 import com.example.cfchat.model.Message;
 import com.example.cfchat.model.ModelInfo;
+import com.example.cfchat.model.Skill;
 import com.example.cfchat.model.User;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.ai.chat.client.ChatClient;
@@ -17,6 +19,7 @@ import org.springframework.ai.chat.model.ChatModel;
 import org.springframework.ai.chat.prompt.Prompt;
 import org.springframework.ai.ollama.OllamaChatModel;
 import org.springframework.ai.openai.OpenAiChatModel;
+import org.springframework.ai.tool.ToolCallbackProvider;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.annotation.Qualifier;
 import org.springframework.beans.factory.annotation.Value;
@@ -46,6 +49,8 @@ public class ChatService {
     private final UserService userService;
     private final MetricsService metricsService;
     private final GenAiConfig genAiConfig;
+    private final SkillService skillService;
+    private final McpToolCallbackCacheService mcpToolCallbackCacheService;
 
     @Value("${spring.profiles.active:default}")
     private String activeProfile;
@@ -60,7 +65,9 @@ public class ChatService {
             ChatConfig chatConfig,
             UserService userService,
             MetricsService metricsService,
-            @Autowired(required = false) GenAiConfig genAiConfig) {
+            @Autowired(required = false) GenAiConfig genAiConfig,
+            @Autowired(required = false) SkillService skillService,
+            @Autowired(required = false) McpToolCallbackCacheService mcpToolCallbackCacheService) {
         this.primaryChatClient = primaryChatClient;
         // Use OpenAI model as primary for streaming
         this.primaryChatModel = openAiChatModel;
@@ -72,10 +79,13 @@ public class ChatService {
         this.userService = userService;
         this.metricsService = metricsService;
         this.genAiConfig = genAiConfig;
+        this.skillService = skillService;
+        this.mcpToolCallbackCacheService = mcpToolCallbackCacheService;
 
-        log.info("ChatService initialized - primaryChatClient: {}, ollamaChatClient: {}, primaryChatModel: {}",
+        log.info("ChatService initialized - primaryChatClient: {}, ollamaChatClient: {}, primaryChatModel: {}, mcpTools: {}",
                 primaryChatClient != null, ollamaChatClient != null,
-                openAiChatModel != null ? openAiChatModel.getClass().getSimpleName() : "null");
+                openAiChatModel != null ? openAiChatModel.getClass().getSimpleName() : "null",
+                mcpToolCallbackCacheService != null ? mcpToolCallbackCacheService.getMcpServerServices().size() : 0);
     }
 
     public ChatResponse chat(ChatRequest request) {
@@ -105,8 +115,9 @@ public class ChatService {
         // Save user message
         conversationService.addMessage(conversationId, Message.MessageRole.USER, request.getMessage(), null);
 
-        // Build prompt with conversation history
-        List<org.springframework.ai.chat.messages.Message> messages = buildMessageHistory(conversation, request.getMessage());
+        // Build prompt with conversation history (with optional skill)
+        List<org.springframework.ai.chat.messages.Message> messages = buildMessageHistory(
+            conversation, request.getMessage(), request.getSkillId());
 
         // Get AI response - pass model name for GenAI multi-model support
         ChatClient chatClient = getChatClient(provider, model);
@@ -116,10 +127,19 @@ public class ChatService {
 
         long startTime = System.currentTimeMillis();
 
-        String response = chatClient.prompt()
-                .messages(messages)
-                .call()
-                .content();
+        // Build the chat request with optional MCP tools
+        var promptSpec = chatClient.prompt().messages(messages);
+
+        // Add MCP tools if available
+        if (mcpToolCallbackCacheService != null) {
+            ToolCallbackProvider[] toolProviders = mcpToolCallbackCacheService.getToolCallbackProviders();
+            if (toolProviders.length > 0) {
+                log.debug("Adding {} MCP tool callback providers to chat request", toolProviders.length);
+                promptSpec = promptSpec.toolCallbacks(toolProviders);
+            }
+        }
+
+        String response = promptSpec.call().content();
 
         long responseTime = System.currentTimeMillis() - startTime;
 
@@ -199,8 +219,9 @@ public class ChatService {
         // Save user message
         conversationService.addMessage(conversationId, Message.MessageRole.USER, request.getMessage(), null);
 
-        // Build prompt with conversation history
-        List<org.springframework.ai.chat.messages.Message> messages = buildMessageHistory(conversation, request.getMessage());
+        // Build prompt with conversation history (with optional skill)
+        List<org.springframework.ai.chat.messages.Message> messages = buildMessageHistory(
+            conversation, request.getMessage(), request.getSkillId());
         Prompt prompt = new Prompt(messages);
 
         // Stream AI response
@@ -212,35 +233,73 @@ public class ChatService {
 
         Flux<ChatResponse> responseFlux;
 
-        // Get the appropriate ChatModel for streaming
-        ChatModel streamingModel = getStreamingModel(provider, model);
+        // Check if we have MCP tools available
+        ToolCallbackProvider[] toolProviders = mcpToolCallbackCacheService != null
+                ? mcpToolCallbackCacheService.getToolCallbackProviders()
+                : new ToolCallbackProvider[0];
 
-        if (streamingModel == null) {
-            return Flux.error(new IllegalStateException("No chat model available for provider: " + provider));
+        // If we have tools, use ChatClient for streaming (supports tool callbacks)
+        // Otherwise, use ChatModel directly for better compatibility
+        if (toolProviders.length > 0) {
+            ChatClient chatClient = getChatClient(provider, model);
+            if (chatClient == null) {
+                return Flux.error(new IllegalStateException("No chat client available for provider: " + provider));
+            }
+
+            log.debug("Using ChatClient streaming with {} MCP tool providers", toolProviders.length);
+
+            responseFlux = chatClient.prompt()
+                    .messages(messages)
+                    .toolCallbacks(toolProviders)
+                    .stream()
+                    .content()
+                    .map(content -> {
+                        if (content != null && !content.isEmpty() && firstTokenReceived.compareAndSet(false, true)) {
+                            firstTokenTime.set(System.currentTimeMillis());
+                        }
+
+                        if (content != null) {
+                            fullResponse.append(content);
+                            tokenCount.incrementAndGet();
+                        }
+
+                        return ChatResponse.builder()
+                                .conversationId(finalConversationId)
+                                .content(content != null ? content : "")
+                                .streaming(true)
+                                .complete(false)
+                                .build();
+                    });
+        } else {
+            // No tools - use ChatModel for streaming
+            ChatModel streamingModel = getStreamingModel(provider, model);
+
+            if (streamingModel == null) {
+                return Flux.error(new IllegalStateException("No chat model available for provider: " + provider));
+            }
+
+            responseFlux = streamingModel.stream(prompt)
+                    .map(chatResponse -> {
+                        String content = chatResponse.getResult() != null ?
+                                chatResponse.getResult().getOutput().getText() : "";
+
+                        if (content != null && !content.isEmpty() && firstTokenReceived.compareAndSet(false, true)) {
+                            firstTokenTime.set(System.currentTimeMillis());
+                        }
+
+                        if (content != null) {
+                            fullResponse.append(content);
+                            tokenCount.incrementAndGet();
+                        }
+
+                        return ChatResponse.builder()
+                                .conversationId(finalConversationId)
+                                .content(content != null ? content : "")
+                                .streaming(true)
+                                .complete(false)
+                                .build();
+                    });
         }
-
-        responseFlux = streamingModel.stream(prompt)
-                .map(chatResponse -> {
-                    String content = chatResponse.getResult() != null ?
-                            chatResponse.getResult().getOutput().getText() : "";
-
-                    // Track time to first token
-                    if (content != null && !content.isEmpty() && firstTokenReceived.compareAndSet(false, true)) {
-                        firstTokenTime.set(System.currentTimeMillis());
-                    }
-
-                    if (content != null) {
-                        fullResponse.append(content);
-                        tokenCount.incrementAndGet(); // Count streaming chunks as approximate tokens
-                    }
-
-                    return ChatResponse.builder()
-                            .conversationId(finalConversationId)
-                            .content(content != null ? content : "")
-                            .streaming(true)
-                            .complete(false)
-                            .build();
-                });
 
         return responseFlux.concatWith(Flux.defer(() -> {
             // Save complete response
@@ -427,10 +486,27 @@ public class ChatService {
 
     private List<org.springframework.ai.chat.messages.Message> buildMessageHistory(
             Conversation conversation, String currentMessage) {
+        return buildMessageHistory(conversation, currentMessage, null);
+    }
+
+    private List<org.springframework.ai.chat.messages.Message> buildMessageHistory(
+            Conversation conversation, String currentMessage, UUID skillId) {
         List<org.springframework.ai.chat.messages.Message> messages = new ArrayList<>();
 
-        // Add system prompt
-        messages.add(new SystemMessage(chatConfig.getSystemPrompt()));
+        // Build system prompt (base + optional skill augmentation)
+        String systemPrompt = chatConfig.getSystemPrompt();
+        if (skillId != null && skillService != null) {
+            try {
+                Skill skill = skillService.getSkillById(skillId).orElse(null);
+                if (skill != null && skill.isEnabled() && skill.getSystemPromptAugmentation() != null) {
+                    systemPrompt = systemPrompt + "\n\n" + skill.getSystemPromptAugmentation();
+                    log.debug("Applied skill '{}' to system prompt", skill.getName());
+                }
+            } catch (Exception e) {
+                log.warn("Failed to apply skill {}: {}", skillId, e.getMessage());
+            }
+        }
+        messages.add(new SystemMessage(systemPrompt));
 
         // Add conversation history
         for (Message msg : conversation.getMessages()) {
