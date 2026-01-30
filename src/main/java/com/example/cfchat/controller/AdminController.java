@@ -5,6 +5,7 @@ import com.example.cfchat.config.GenAiConfig;
 import com.example.cfchat.model.ModelInfo;
 import com.example.cfchat.model.User;
 import com.example.cfchat.repository.ConversationRepository;
+import com.example.cfchat.repository.OrganizationRepository;
 import com.example.cfchat.service.ChatService;
 import com.example.cfchat.service.ConversationService;
 import lombok.extern.slf4j.Slf4j;
@@ -26,6 +27,7 @@ public class AdminController {
     private final ConversationRepository conversationRepository;
     private final ChatService chatService;
     private final GenAiConfig genAiConfig;
+    private final OrganizationRepository organizationRepository;
 
     @Value("${spring.profiles.active:default}")
     private String activeProfile;
@@ -35,12 +37,14 @@ public class AdminController {
             ConversationService conversationService,
             ConversationRepository conversationRepository,
             ChatService chatService,
-            @Autowired(required = false) GenAiConfig genAiConfig) {
+            @Autowired(required = false) GenAiConfig genAiConfig,
+            OrganizationRepository organizationRepository) {
         this.userService = userService;
         this.conversationService = conversationService;
         this.conversationRepository = conversationRepository;
         this.chatService = chatService;
         this.genAiConfig = genAiConfig;
+        this.organizationRepository = organizationRepository;
     }
 
     @GetMapping("/admin")
@@ -66,6 +70,9 @@ public class AdminController {
         } else {
             model.addAttribute("genAiModelCount", 0);
         }
+
+        // Add organization count
+        model.addAttribute("organizationCount", organizationRepository.count());
 
         return "admin";
     }

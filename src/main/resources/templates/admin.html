@@ -180,6 +180,10 @@
                 <div class="stat-value" th:text="${modelCount}">0</div>
                 <div class="stat-label">Available Models</div>
             </div>
+            <div class="stat-card">
+                <div class="stat-value" th:text="${organizationCount}">0</div>
+                <div class="stat-label">Organizations</div>
+            </div>
             <div class="stat-card" th:if="${isCloudProfile}">
                 <div class="stat-value" th:text="${genAiModelCount}">0</div>
                 <div class="stat-label">GenAI Services</div>
@@ -215,6 +219,20 @@
                 <p>View configured AI models, check availability status, and manage Tanzu GenAI service bindings.</p>
                 <div class="card-stat">
                     <strong th:text="${modelCount}">0</strong> models configured
+                </div>
+            </a>
+
+            <a href="/admin/organizations" class="admin-nav-card">
+                <div class="card-icon">
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                        <path d="M3 9l9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"></path>
+                        <path d="M9 22V12h6v10"></path>
+                    </svg>
+                </div>
+                <h3>Organizations</h3>
+                <p>Manage organizations, customize branding, colors, logos, and UI settings for each organization.</p>
+                <div class="card-stat">
+                    <strong th:text="${organizationCount}">0</strong> organizations configured
                 </div>
             </a>
         </nav>

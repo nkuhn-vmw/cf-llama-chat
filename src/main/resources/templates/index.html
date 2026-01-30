@@ -3,21 +3,41 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>CF Llama Chat</title>
+    <title th:text="${orgTheme != null && orgTheme.headerText != null && !orgTheme.headerText.equals('Chat')} ? ${orgTheme.headerText} : 'CF Llama Chat'">CF Llama Chat</title>
     <link rel="stylesheet" th:href="@{/css/style.css}">
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.9.0/styles/github-dark.min.css">
+    <!-- Organization favicon -->
+    <link th:if="${orgTheme != null && orgTheme.faviconUrl != null}" rel="icon" th:href="${orgTheme.faviconUrl}">
+    <!-- Server-side organization theme CSS variables -->
+    <style th:if="${orgTheme != null}" th:inline="text">
+        :root {
+            [[${orgTheme.primaryColor != null ? '--accent-color: ' + orgTheme.primaryColor + ';' : ''}]]
+            [[${orgTheme.accentColor != null ? '--org-accent: ' + orgTheme.accentColor + ';' : ''}]]
+            [[${orgTheme.backgroundColor != null ? '--org-bg-primary: ' + orgTheme.backgroundColor + ';' : ''}]]
+            [[${orgTheme.sidebarColor != null ? '--org-sidebar-bg: ' + orgTheme.sidebarColor + ';' : ''}]]
+        }
+    </style>
+    <!-- Organization custom CSS -->
+    <style th:if="${orgTheme != null && orgTheme.customCss != null}" th:utext="${orgTheme.customCss}"></style>
 </head>
 <body>
     <div class="app-container">
         <!-- Sidebar -->
         <aside class="sidebar" id="sidebar">
             <div class="sidebar-header">
-                <h1 class="logo">
-                    <svg class="logo-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                        <path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"></path>
-                    </svg>
-                    CF Llama Chat
-                </h1>
+                <div class="org-logo">
+                    <img th:if="${orgTheme != null && orgTheme.logoUrl != null}"
+                         class="org-logo-img visible" id="orgLogoImg"
+                         th:src="${orgTheme.logoUrl}" alt="Logo">
+                    <h1 class="logo org-logo-text">
+                        <svg th:if="${orgTheme == null || orgTheme.logoUrl == null}"
+                             class="logo-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                            <path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"></path>
+                        </svg>
+                        <span class="chat-header-title"
+                              th:text="${orgTheme != null && orgTheme.headerText != null ? orgTheme.headerText : 'CF Llama Chat'}">CF Llama Chat</span>
+                    </h1>
+                </div>
                 <button class="new-chat-btn" id="newChatBtn">
                     <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
                         <line x1="12" y1="5" x2="12" y2="19"></line>
@@ -171,12 +191,18 @@
                     <!-- Welcome screen when no conversation -->
                     <div class="welcome-screen" id="welcomeScreen" th:if="${currentConversation == null}">
                         <div class="welcome-icon">
-                            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5">
+                            <img th:if="${orgTheme != null && orgTheme.logoUrl != null}"
+                                 th:src="${orgTheme.logoUrl}" alt="Logo"
+                                 style="width: 80px; height: 80px; object-fit: contain; border-radius: 12px;">
+                            <svg th:if="${orgTheme == null || orgTheme.logoUrl == null}"
+                                 viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5">
                                 <path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"></path>
                             </svg>
                         </div>
-                        <h2>Welcome to CF Llama Chat</h2>
-                        <p>Start a new conversation or select one from the sidebar.</p>
+                        <h2 th:text="${orgTheme != null && orgTheme.name != null && !orgTheme.name.equals('Default')} ? 'Welcome to ' + ${orgTheme.name} : 'Welcome to CF Llama Chat'">Welcome to CF Llama Chat</h2>
+                        <p th:if="${orgTheme != null && orgTheme.welcomeMessage != null}"
+                           th:text="${orgTheme.welcomeMessage}"></p>
+                        <p th:if="${orgTheme == null || orgTheme.welcomeMessage == null}">Start a new conversation or select one from the sidebar.</p>
                         <div class="quick-actions">
                             <button class="quick-action" data-prompt="Explain how Cloud Foundry works">
                                 <span class="action-icon">&#9729;</span>
@@ -249,7 +275,8 @@
         window.APP_DATA = {
             conversationId: [[${conversationId}]],
             models: [[${models}]],
-            currentUser: [[${currentUser}]]
+            currentUser: [[${currentUser}]],
+            orgTheme: [[${orgTheme}]]
         };
     </script>
 
