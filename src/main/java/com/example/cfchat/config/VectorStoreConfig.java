@@ -34,7 +34,7 @@ public class VectorStoreConfig {
     @Value("${app.embedding.model:text-embedding-3-small}")
     private String embeddingModelName;
 
-    @Value("${app.embedding.dimensions:1536}")
+    @Value("${app.embedding.dimensions:512}")
     private int embeddingDimensions;
 
     /**
