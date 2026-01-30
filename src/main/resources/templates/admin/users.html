@@ -1,0 +1,454 @@
+<!DOCTYPE html>
+<html lang="en" xmlns:th="http://www.thymeleaf.org">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>User Management - Admin Portal</title>
+    <link rel="stylesheet" th:href="@{/css/style.css}">
+    <style>
+        .admin-container {
+            max-width: 1200px;
+            margin: 0 auto;
+            padding: 24px;
+        }
+
+        .admin-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 32px;
+        }
+
+        .admin-header h1 {
+            font-size: 1.8rem;
+            font-weight: 600;
+        }
+
+        .header-nav {
+            display: flex;
+            align-items: center;
+            gap: 24px;
+        }
+
+        .back-link {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            color: var(--accent-color);
+            text-decoration: none;
+            font-size: 0.95rem;
+        }
+
+        .back-link:hover {
+            text-decoration: underline;
+        }
+
+        .back-link svg {
+            width: 18px;
+            height: 18px;
+        }
+
+        .stats-cards {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+            gap: 16px;
+            margin-bottom: 32px;
+        }
+
+        .stat-card {
+            background-color: var(--bg-secondary);
+            border: 1px solid var(--border-color);
+            border-radius: 12px;
+            padding: 20px;
+        }
+
+        .stat-card .stat-value {
+            font-size: 2rem;
+            font-weight: 700;
+            color: var(--accent-color);
+        }
+
+        .stat-card .stat-label {
+            font-size: 0.9rem;
+            color: var(--text-secondary);
+            margin-top: 4px;
+        }
+
+        .users-section h2 {
+            font-size: 1.3rem;
+            margin-bottom: 16px;
+        }
+
+        .users-table {
+            width: 100%;
+            background-color: var(--bg-secondary);
+            border: 1px solid var(--border-color);
+            border-radius: 12px;
+            overflow: hidden;
+        }
+
+        .users-table table {
+            width: 100%;
+            border-collapse: collapse;
+        }
+
+        .users-table th,
+        .users-table td {
+            padding: 14px 16px;
+            text-align: left;
+            border-bottom: 1px solid var(--border-color);
+        }
+
+        .users-table th {
+            background-color: var(--bg-tertiary);
+            font-weight: 600;
+            font-size: 0.85rem;
+            text-transform: uppercase;
+            color: var(--text-secondary);
+        }
+
+        .users-table tr:last-child td {
+            border-bottom: none;
+        }
+
+        .users-table tr:hover td {
+            background-color: var(--bg-hover);
+        }
+
+        .role-badge {
+            display: inline-block;
+            padding: 4px 10px;
+            border-radius: 20px;
+            font-size: 0.75rem;
+            font-weight: 600;
+            text-transform: uppercase;
+        }
+
+        .role-badge.admin {
+            background-color: rgba(239, 68, 68, 0.2);
+            color: #ef4444;
+        }
+
+        .role-badge.user {
+            background-color: rgba(16, 163, 127, 0.2);
+            color: var(--accent-color);
+        }
+
+        .provider-badge {
+            display: inline-block;
+            padding: 4px 8px;
+            border-radius: 4px;
+            font-size: 0.75rem;
+            background-color: var(--bg-tertiary);
+            color: var(--text-secondary);
+        }
+
+        .action-btn {
+            padding: 6px 12px;
+            border: 1px solid var(--border-color);
+            border-radius: 6px;
+            background: none;
+            color: var(--text-primary);
+            cursor: pointer;
+            font-size: 0.85rem;
+            margin-right: 8px;
+            transition: background-color 0.2s, border-color 0.2s;
+        }
+
+        .action-btn:hover {
+            background-color: var(--bg-hover);
+            border-color: var(--accent-color);
+        }
+
+        .action-btn.danger {
+            color: var(--error-color);
+            border-color: var(--error-color);
+        }
+
+        .action-btn.danger:hover {
+            background-color: rgba(239, 68, 68, 0.1);
+        }
+
+        .role-select {
+            padding: 6px 10px;
+            background-color: var(--bg-tertiary);
+            border: 1px solid var(--border-color);
+            border-radius: 6px;
+            color: var(--text-primary);
+            font-size: 0.85rem;
+            cursor: pointer;
+        }
+
+        .role-select:focus {
+            outline: none;
+            border-color: var(--accent-color);
+        }
+
+        .date-cell {
+            font-size: 0.85rem;
+            color: var(--text-secondary);
+        }
+
+        @media (max-width: 768px) {
+            .users-table {
+                overflow-x: auto;
+            }
+
+            .users-table table {
+                min-width: 700px;
+            }
+        }
+
+        .modal-overlay {
+            display: none;
+            position: fixed;
+            top: 0;
+            left: 0;
+            right: 0;
+            bottom: 0;
+            background-color: rgba(0, 0, 0, 0.5);
+            z-index: 1000;
+            align-items: center;
+            justify-content: center;
+        }
+
+        .modal-overlay.open {
+            display: flex;
+        }
+
+        .modal {
+            background-color: var(--bg-secondary);
+            border: 1px solid var(--border-color);
+            border-radius: 16px;
+            padding: 24px;
+            max-width: 400px;
+            width: 90%;
+        }
+
+        .modal h3 {
+            margin-bottom: 16px;
+        }
+
+        .modal p {
+            color: var(--text-secondary);
+            margin-bottom: 20px;
+        }
+
+        .modal-actions {
+            display: flex;
+            gap: 12px;
+            justify-content: flex-end;
+        }
+
+        .modal-btn {
+            padding: 10px 20px;
+            border-radius: 8px;
+            border: none;
+            cursor: pointer;
+            font-size: 0.95rem;
+            font-weight: 500;
+        }
+
+        .modal-btn.cancel {
+            background-color: var(--bg-tertiary);
+            color: var(--text-primary);
+        }
+
+        .modal-btn.confirm {
+            background-color: var(--error-color);
+            color: white;
+        }
+
+        .checkbox-group {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            margin-bottom: 16px;
+            font-size: 0.9rem;
+        }
+    </style>
+</head>
+<body>
+    <div class="admin-container">
+        <header class="admin-header">
+            <h1>User Management</h1>
+            <div class="header-nav">
+                <a href="/admin" class="back-link">
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                        <line x1="19" y1="12" x2="5" y2="12"></line>
+                        <polyline points="12 19 5 12 12 5"></polyline>
+                    </svg>
+                    Back to Admin
+                </a>
+                <a href="/" class="back-link">
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                        <path d="M3 9l9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"></path>
+                        <polyline points="9 22 9 12 15 12 15 22"></polyline>
+                    </svg>
+                    Chat
+                </a>
+            </div>
+        </header>
+
+        <div class="stats-cards">
+            <div class="stat-card">
+                <div class="stat-value" th:text="${totalUsers}">0</div>
+                <div class="stat-label">Total Users</div>
+            </div>
+            <div class="stat-card">
+                <div class="stat-value" th:text="${totalAdmins}">0</div>
+                <div class="stat-label">Administrators</div>
+            </div>
+            <div class="stat-card">
+                <div class="stat-value" th:text="${totalUsers - totalAdmins}">0</div>
+                <div class="stat-label">Regular Users</div>
+            </div>
+        </div>
+
+        <section class="users-section">
+            <h2>All Users</h2>
+            <div class="users-table">
+                <table>
+                    <thead>
+                        <tr>
+                            <th>User</th>
+                            <th>Role</th>
+                            <th>Auth Provider</th>
+                            <th>Conversations</th>
+                            <th>Last Login</th>
+                            <th>Actions</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        <tr th:each="userData : ${users}">
+                            <td>
+                                <div style="font-weight: 500;" th:text="${userData.user.displayName != null ? userData.user.displayName : userData.user.username}">Username</div>
+                                <div style="font-size: 0.8rem; color: var(--text-muted);" th:text="${userData.user.email}">email@example.com</div>
+                            </td>
+                            <td>
+                                <select class="role-select"
+                                        th:data-user-id="${userData.user.id}"
+                                        onchange="updateRole(this)"
+                                        th:disabled="${userData.user.id == currentUser.id}">
+                                    <option value="USER" th:selected="${userData.user.role.name() == 'USER'}">User</option>
+                                    <option value="ADMIN" th:selected="${userData.user.role.name() == 'ADMIN'}">Admin</option>
+                                </select>
+                            </td>
+                            <td>
+                                <span class="provider-badge" th:text="${userData.user.authProvider}">LOCAL</span>
+                            </td>
+                            <td th:text="${userData.conversationCount}">0</td>
+                            <td class="date-cell">
+                                <span th:if="${userData.user.lastLoginAt != null}"
+                                      th:text="${#temporals.format(userData.user.lastLoginAt, 'MMM d, yyyy HH:mm')}">Jan 1, 2024</span>
+                                <span th:if="${userData.user.lastLoginAt == null}">Never</span>
+                            </td>
+                            <td>
+                                <button class="action-btn danger"
+                                        th:data-user-id="${userData.user.id}"
+                                        th:data-username="${userData.user.displayName != null ? userData.user.displayName : userData.user.username}"
+                                        th:disabled="${userData.user.id == currentUser.id}"
+                                        onclick="showDeleteModal(this)">
+                                    Delete
+                                </button>
+                            </td>
+                        </tr>
+                    </tbody>
+                </table>
+            </div>
+        </section>
+    </div>
+
+    <!-- Delete Confirmation Modal -->
+    <div class="modal-overlay" id="deleteModal">
+        <div class="modal">
+            <h3>Delete User</h3>
+            <p>Are you sure you want to delete <strong id="deleteUsername"></strong>?</p>
+            <div class="checkbox-group">
+                <input type="checkbox" id="deleteConversations">
+                <label for="deleteConversations">Also delete user's conversations</label>
+            </div>
+            <div class="modal-actions">
+                <button class="modal-btn cancel" onclick="closeDeleteModal()">Cancel</button>
+                <button class="modal-btn confirm" id="confirmDeleteBtn">Delete</button>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        // Apply saved theme
+        const savedTheme = localStorage.getItem('theme') || 'dark';
+        document.body.setAttribute('data-theme', savedTheme);
+
+        let deleteUserId = null;
+
+        function updateRole(select) {
+            const userId = select.dataset.userId;
+            const newRole = select.value;
+
+            fetch(`/api/admin/users/${userId}/role`, {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json'
+                },
+                body: JSON.stringify({ role: newRole })
+            })
+            .then(response => response.json())
+            .then(data => {
+                if (data.error) {
+                    alert(data.error);
+                    location.reload();
+                }
+            })
+            .catch(error => {
+                console.error('Error updating role:', error);
+                alert('Failed to update role');
+                location.reload();
+            });
+        }
+
+        function showDeleteModal(btn) {
+            deleteUserId = btn.dataset.userId;
+            document.getElementById('deleteUsername').textContent = btn.dataset.username;
+            document.getElementById('deleteConversations').checked = false;
+            document.getElementById('deleteModal').classList.add('open');
+        }
+
+        function closeDeleteModal() {
+            document.getElementById('deleteModal').classList.remove('open');
+            deleteUserId = null;
+        }
+
+        document.getElementById('confirmDeleteBtn').addEventListener('click', function() {
+            if (!deleteUserId) return;
+
+            const deleteConversations = document.getElementById('deleteConversations').checked;
+
+            fetch(`/api/admin/users/${deleteUserId}?deleteConversations=${deleteConversations}`, {
+                method: 'DELETE'
+            })
+            .then(response => response.json())
+            .then(data => {
+                if (data.error) {
+                    alert(data.error);
+                } else {
+                    location.reload();
+                }
+            })
+            .catch(error => {
+                console.error('Error deleting user:', error);
+                alert('Failed to delete user');
+            });
+
+            closeDeleteModal();
+        });
+
+        // Close modal on overlay click
+        document.getElementById('deleteModal').addEventListener('click', function(e) {
+            if (e.target === this) {
+                closeDeleteModal();
+            }
+        });
+    </script>
+</body>
+</html>

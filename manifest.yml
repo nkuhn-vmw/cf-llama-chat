@@ -15,5 +15,3 @@ applications:
       - chat-llm
       - gpt-oss-120b
       - cf-llama-sso
-    routes:
-      - route: cf-llama-chat.apps.internal

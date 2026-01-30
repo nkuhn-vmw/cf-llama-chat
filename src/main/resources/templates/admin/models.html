@@ -1,0 +1,383 @@
+<!DOCTYPE html>
+<html lang="en" xmlns:th="http://www.thymeleaf.org">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Model Configuration - Admin Portal</title>
+    <link rel="stylesheet" th:href="@{/css/style.css}">
+    <style>
+        .admin-container {
+            max-width: 1200px;
+            margin: 0 auto;
+            padding: 24px;
+        }
+
+        .admin-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 32px;
+        }
+
+        .admin-header h1 {
+            font-size: 1.8rem;
+            font-weight: 600;
+        }
+
+        .header-nav {
+            display: flex;
+            align-items: center;
+            gap: 24px;
+        }
+
+        .back-link {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            color: var(--accent-color);
+            text-decoration: none;
+            font-size: 0.95rem;
+        }
+
+        .back-link:hover {
+            text-decoration: underline;
+        }
+
+        .back-link svg {
+            width: 18px;
+            height: 18px;
+        }
+
+        .stats-cards {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+            gap: 16px;
+            margin-bottom: 32px;
+        }
+
+        .stat-card {
+            background-color: var(--bg-secondary);
+            border: 1px solid var(--border-color);
+            border-radius: 12px;
+            padding: 20px;
+        }
+
+        .stat-card .stat-value {
+            font-size: 2rem;
+            font-weight: 700;
+            color: var(--accent-color);
+        }
+
+        .stat-card .stat-label {
+            font-size: 0.9rem;
+            color: var(--text-secondary);
+            margin-top: 4px;
+        }
+
+        .models-section {
+            margin-bottom: 32px;
+        }
+
+        .models-section h2 {
+            font-size: 1.3rem;
+            margin-bottom: 16px;
+        }
+
+        .models-table {
+            width: 100%;
+            background-color: var(--bg-secondary);
+            border: 1px solid var(--border-color);
+            border-radius: 12px;
+            overflow: hidden;
+        }
+
+        .models-table table {
+            width: 100%;
+            border-collapse: collapse;
+        }
+
+        .models-table th,
+        .models-table td {
+            padding: 14px 16px;
+            text-align: left;
+            border-bottom: 1px solid var(--border-color);
+        }
+
+        .models-table th {
+            background-color: var(--bg-tertiary);
+            font-weight: 600;
+            font-size: 0.85rem;
+            text-transform: uppercase;
+            color: var(--text-secondary);
+        }
+
+        .models-table tr:last-child td {
+            border-bottom: none;
+        }
+
+        .models-table tr:hover td {
+            background-color: var(--bg-hover);
+        }
+
+        .provider-badge {
+            display: inline-block;
+            padding: 4px 8px;
+            border-radius: 4px;
+            font-size: 0.75rem;
+            background-color: var(--bg-tertiary);
+            color: var(--text-secondary);
+        }
+
+        .status-available {
+            color: var(--accent-color);
+            display: flex;
+            align-items: center;
+            gap: 6px;
+        }
+
+        .status-unavailable {
+            color: var(--error-color);
+            display: flex;
+            align-items: center;
+            gap: 6px;
+        }
+
+        .status-available svg,
+        .status-unavailable svg {
+            width: 16px;
+            height: 16px;
+        }
+
+        .genai-section {
+            margin-top: 32px;
+        }
+
+        .genai-section h3 {
+            font-size: 1.1rem;
+            margin-bottom: 16px;
+            color: var(--text-secondary);
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+
+        .genai-section h3 svg {
+            width: 20px;
+            height: 20px;
+            color: var(--accent-color);
+        }
+
+        .genai-cards {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+            gap: 16px;
+        }
+
+        .genai-card {
+            background-color: var(--bg-secondary);
+            border: 1px solid var(--border-color);
+            border-radius: 12px;
+            padding: 20px;
+        }
+
+        .genai-card .model-name {
+            font-weight: 600;
+            margin-bottom: 12px;
+            word-break: break-all;
+            font-size: 0.95rem;
+        }
+
+        .genai-card .model-details {
+            display: flex;
+            flex-direction: column;
+            gap: 8px;
+            font-size: 0.85rem;
+            color: var(--text-secondary);
+        }
+
+        .genai-card .model-details span {
+            display: flex;
+            gap: 8px;
+        }
+
+        .genai-card .model-details strong {
+            color: var(--text-muted);
+            min-width: 60px;
+        }
+
+        .environment-info {
+            margin-top: 32px;
+            padding: 20px;
+            background-color: var(--bg-tertiary);
+            border-radius: 12px;
+        }
+
+        .environment-info h3 {
+            font-size: 1rem;
+            margin-bottom: 12px;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+
+        .environment-info h3 svg {
+            width: 18px;
+            height: 18px;
+        }
+
+        .environment-info .env-value {
+            font-size: 0.9rem;
+        }
+
+        .environment-info .env-value.cloud {
+            color: var(--accent-color);
+            font-weight: 500;
+        }
+
+        @media (max-width: 768px) {
+            .models-table {
+                overflow-x: auto;
+            }
+
+            .models-table table {
+                min-width: 600px;
+            }
+        }
+    </style>
+</head>
+<body>
+    <div class="admin-container">
+        <header class="admin-header">
+            <h1>Model Configuration</h1>
+            <div class="header-nav">
+                <a href="/admin" class="back-link">
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                        <line x1="19" y1="12" x2="5" y2="12"></line>
+                        <polyline points="12 19 5 12 12 5"></polyline>
+                    </svg>
+                    Back to Admin
+                </a>
+                <a href="/" class="back-link">
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                        <path d="M3 9l9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"></path>
+                        <polyline points="9 22 9 12 15 12 15 22"></polyline>
+                    </svg>
+                    Chat
+                </a>
+            </div>
+        </header>
+
+        <div class="stats-cards">
+            <div class="stat-card">
+                <div class="stat-value" th:text="${modelCount}">0</div>
+                <div class="stat-label">Total Models</div>
+            </div>
+            <div class="stat-card">
+                <div class="stat-value" th:text="${availableCount}">0</div>
+                <div class="stat-label">Available</div>
+            </div>
+            <div class="stat-card" th:if="${isCloudProfile}">
+                <div class="stat-value" th:text="${genAiModelCount}">0</div>
+                <div class="stat-label">GenAI Services</div>
+            </div>
+        </div>
+
+        <section class="models-section">
+            <h2>Configured Models</h2>
+            <div class="models-table">
+                <table>
+                    <thead>
+                        <tr>
+                            <th>Model Name</th>
+                            <th>Provider</th>
+                            <th>Description</th>
+                            <th>Status</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        <tr th:each="model : ${models}">
+                            <td>
+                                <div style="font-weight: 500;" th:text="${model.name}">Model Name</div>
+                                <div style="font-size: 0.8rem; color: var(--text-muted);" th:text="${model.id}">model-id</div>
+                            </td>
+                            <td>
+                                <span class="provider-badge" th:text="${model.provider}">provider</span>
+                            </td>
+                            <td style="font-size: 0.9rem; color: var(--text-secondary);" th:text="${model.description}">Description</td>
+                            <td>
+                                <span th:if="${model.available}" class="status-available">
+                                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                        <path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"></path>
+                                        <polyline points="22 4 12 14.01 9 11.01"></polyline>
+                                    </svg>
+                                    Available
+                                </span>
+                                <span th:unless="${model.available}" class="status-unavailable">
+                                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                        <circle cx="12" cy="12" r="10"></circle>
+                                        <line x1="15" y1="9" x2="9" y2="15"></line>
+                                        <line x1="9" y1="9" x2="15" y2="15"></line>
+                                    </svg>
+                                    Unavailable
+                                </span>
+                            </td>
+                        </tr>
+                        <tr th:if="${#lists.isEmpty(models)}">
+                            <td colspan="4" style="text-align: center; padding: 40px; color: var(--text-muted);">
+                                No models configured
+                            </td>
+                        </tr>
+                    </tbody>
+                </table>
+            </div>
+        </section>
+
+        <!-- GenAI Service Details (Cloud only) -->
+        <section th:if="${isCloudProfile && genAiModelCount > 0}" class="genai-section">
+            <h3>
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                    <path d="M21 16V8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16z"></path>
+                    <polyline points="3.27 6.96 12 12.01 20.73 6.96"></polyline>
+                    <line x1="12" y1="22.08" x2="12" y2="12"></line>
+                </svg>
+                Tanzu GenAI Service Bindings
+            </h3>
+            <div class="genai-cards">
+                <div th:each="entry : ${genAiModelMetadata}" class="genai-card">
+                    <div class="model-name" th:text="${entry.value.modelName()}">Model Name</div>
+                    <div class="model-details">
+                        <span>
+                            <strong>Service:</strong>
+                            <span th:text="${entry.value.serviceName()}">service</span>
+                        </span>
+                        <span>
+                            <strong>Type:</strong>
+                            <span th:text="${entry.value.modelType()}">OpenAiChatModel</span>
+                        </span>
+                    </div>
+                </div>
+            </div>
+        </section>
+
+        <div class="environment-info">
+            <h3>
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                    <circle cx="12" cy="12" r="3"></circle>
+                    <path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1 0 2.83 2 2 0 0 1-2.83 0l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-2 2 2 2 0 0 1-2-2v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83 0 2 2 0 0 1 0-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1-2-2 2 2 0 0 1 2-2h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 0-2.83 2 2 0 0 1 2.83 0l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 2-2 2 2 0 0 1 2 2v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 0 2 2 0 0 1 0 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 2 2 2 2 0 0 1-2 2h-.09a1.65 1.65 0 0 0-1.51 1z"></path>
+                </svg>
+                Environment
+            </h3>
+            <div class="env-value" th:classappend="${isCloudProfile} ? 'cloud' : ''">
+                <span th:if="${isCloudProfile}">Cloud Foundry (Tanzu GenAI)</span>
+                <span th:unless="${isCloudProfile}">Local Development</span>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        // Apply saved theme
+        const savedTheme = localStorage.getItem('theme') || 'dark';
+        document.body.setAttribute('data-theme', savedTheme);
+    </script>
+</body>
+</html>

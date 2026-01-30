@@ -68,197 +68,89 @@
             margin-top: 4px;
         }
 
-        .users-section h2 {
-            font-size: 1.3rem;
-            margin-bottom: 16px;
+        .admin-nav {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+            gap: 24px;
+            margin-top: 32px;
         }
 
-        .users-table {
-            width: 100%;
-            background-color: var(--bg-secondary);
-            border: 1px solid var(--border-color);
-            border-radius: 12px;
-            overflow: hidden;
-        }
-
-        .users-table table {
-            width: 100%;
-            border-collapse: collapse;
-        }
-
-        .users-table th,
-        .users-table td {
-            padding: 14px 16px;
-            text-align: left;
-            border-bottom: 1px solid var(--border-color);
-        }
-
-        .users-table th {
-            background-color: var(--bg-tertiary);
-            font-weight: 600;
-            font-size: 0.85rem;
-            text-transform: uppercase;
-            color: var(--text-secondary);
-        }
-
-        .users-table tr:last-child td {
-            border-bottom: none;
-        }
-
-        .users-table tr:hover td {
-            background-color: var(--bg-hover);
-        }
-
-        .role-badge {
-            display: inline-block;
-            padding: 4px 10px;
-            border-radius: 20px;
-            font-size: 0.75rem;
-            font-weight: 600;
-            text-transform: uppercase;
-        }
-
-        .role-badge.admin {
-            background-color: rgba(239, 68, 68, 0.2);
-            color: #ef4444;
-        }
-
-        .role-badge.user {
-            background-color: rgba(16, 163, 127, 0.2);
-            color: var(--accent-color);
-        }
-
-        .provider-badge {
-            display: inline-block;
-            padding: 4px 8px;
-            border-radius: 4px;
-            font-size: 0.75rem;
-            background-color: var(--bg-tertiary);
-            color: var(--text-secondary);
-        }
-
-        .action-btn {
-            padding: 6px 12px;
-            border: 1px solid var(--border-color);
-            border-radius: 6px;
-            background: none;
-            color: var(--text-primary);
-            cursor: pointer;
-            font-size: 0.85rem;
-            margin-right: 8px;
-            transition: background-color 0.2s, border-color 0.2s;
-        }
-
-        .action-btn:hover {
-            background-color: var(--bg-hover);
-            border-color: var(--accent-color);
-        }
-
-        .action-btn.danger {
-            color: var(--error-color);
-            border-color: var(--error-color);
-        }
-
-        .action-btn.danger:hover {
-            background-color: rgba(239, 68, 68, 0.1);
-        }
-
-        .role-select {
-            padding: 6px 10px;
-            background-color: var(--bg-tertiary);
-            border: 1px solid var(--border-color);
-            border-radius: 6px;
-            color: var(--text-primary);
-            font-size: 0.85rem;
-            cursor: pointer;
-        }
-
-        .role-select:focus {
-            outline: none;
-            border-color: var(--accent-color);
-        }
-
-        .date-cell {
-            font-size: 0.85rem;
-            color: var(--text-secondary);
-        }
-
-        @media (max-width: 768px) {
-            .users-table {
-                overflow-x: auto;
-            }
-
-            .users-table table {
-                min-width: 700px;
-            }
-        }
-
-        .modal-overlay {
-            display: none;
-            position: fixed;
-            top: 0;
-            left: 0;
-            right: 0;
-            bottom: 0;
-            background-color: rgba(0, 0, 0, 0.5);
-            z-index: 1000;
-            align-items: center;
-            justify-content: center;
-        }
-
-        .modal-overlay.open {
-            display: flex;
-        }
-
-        .modal {
+        .admin-nav-card {
             background-color: var(--bg-secondary);
             border: 1px solid var(--border-color);
             border-radius: 16px;
             padding: 24px;
-            max-width: 400px;
-            width: 90%;
-        }
-
-        .modal h3 {
-            margin-bottom: 16px;
-        }
-
-        .modal p {
-            color: var(--text-secondary);
-            margin-bottom: 20px;
-        }
-
-        .modal-actions {
-            display: flex;
-            gap: 12px;
-            justify-content: flex-end;
-        }
-
-        .modal-btn {
-            padding: 10px 20px;
-            border-radius: 8px;
-            border: none;
-            cursor: pointer;
-            font-size: 0.95rem;
-            font-weight: 500;
-        }
-
-        .modal-btn.cancel {
-            background-color: var(--bg-tertiary);
+            text-decoration: none;
             color: var(--text-primary);
+            transition: transform 0.2s, border-color 0.2s, box-shadow 0.2s;
         }
 
-        .modal-btn.confirm {
-            background-color: var(--error-color);
-            color: white;
+        .admin-nav-card:hover {
+            transform: translateY(-4px);
+            border-color: var(--accent-color);
+            box-shadow: 0 8px 24px rgba(0, 0, 0, 0.15);
         }
 
-        .checkbox-group {
+        .admin-nav-card .card-icon {
+            width: 48px;
+            height: 48px;
+            background-color: var(--bg-tertiary);
+            border-radius: 12px;
             display: flex;
             align-items: center;
-            gap: 8px;
+            justify-content: center;
             margin-bottom: 16px;
+        }
+
+        .admin-nav-card .card-icon svg {
+            width: 24px;
+            height: 24px;
+            color: var(--accent-color);
+        }
+
+        .admin-nav-card h3 {
+            font-size: 1.2rem;
+            font-weight: 600;
+            margin-bottom: 8px;
+        }
+
+        .admin-nav-card p {
             font-size: 0.9rem;
+            color: var(--text-secondary);
+            line-height: 1.5;
+        }
+
+        .admin-nav-card .card-stat {
+            margin-top: 16px;
+            padding-top: 16px;
+            border-top: 1px solid var(--border-color);
+            font-size: 0.85rem;
+            color: var(--text-muted);
+        }
+
+        .admin-nav-card .card-stat strong {
+            color: var(--accent-color);
+        }
+
+        .environment-badge {
+            display: inline-flex;
+            align-items: center;
+            gap: 8px;
+            padding: 12px 16px;
+            background-color: var(--bg-secondary);
+            border: 1px solid var(--border-color);
+            border-radius: 8px;
+            font-size: 0.9rem;
+            margin-top: 24px;
+        }
+
+        .environment-badge.cloud {
+            border-color: var(--accent-color);
+        }
+
+        .environment-badge svg {
+            width: 18px;
+            height: 18px;
         }
     </style>
 </head>
@@ -294,159 +186,49 @@
             </div>
         </div>
 
-        <!-- Models Section -->
-        <section class="models-section" style="margin-bottom: 32px;">
-            <h2 style="font-size: 1.3rem; margin-bottom: 16px;">Configured Models</h2>
-            <div class="users-table">
-                <table>
-                    <thead>
-                        <tr>
-                            <th>Model Name</th>
-                            <th>Provider</th>
-                            <th>Description</th>
-                            <th>Status</th>
-                        </tr>
-                    </thead>
-                    <tbody>
-                        <tr th:each="model : ${models}">
-                            <td>
-                                <div style="font-weight: 500;" th:text="${model.name}">Model Name</div>
-                                <div style="font-size: 0.8rem; color: var(--text-muted);" th:text="${model.id}">model-id</div>
-                            </td>
-                            <td>
-                                <span class="provider-badge" th:text="${model.provider}">provider</span>
-                            </td>
-                            <td style="font-size: 0.9rem; color: var(--text-secondary);" th:text="${model.description}">Description</td>
-                            <td>
-                                <span th:if="${model.available}" style="color: var(--accent-color);">
-                                    <svg style="width: 16px; height: 16px; vertical-align: middle;" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                                        <path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"></path>
-                                        <polyline points="22 4 12 14.01 9 11.01"></polyline>
-                                    </svg>
-                                    Available
-                                </span>
-                                <span th:unless="${model.available}" style="color: var(--error-color);">
-                                    <svg style="width: 16px; height: 16px; vertical-align: middle;" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                                        <circle cx="12" cy="12" r="10"></circle>
-                                        <line x1="15" y1="9" x2="9" y2="15"></line>
-                                        <line x1="9" y1="9" x2="15" y2="15"></line>
-                                    </svg>
-                                    Unavailable
-                                </span>
-                            </td>
-                        </tr>
-                        <tr th:if="${#lists.isEmpty(models)}">
-                            <td colspan="4" style="text-align: center; padding: 40px; color: var(--text-muted);">
-                                No models configured
-                            </td>
-                        </tr>
-                    </tbody>
-                </table>
-            </div>
+        <nav class="admin-nav">
+            <a href="/admin/users" class="admin-nav-card">
+                <div class="card-icon">
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                        <path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"></path>
+                        <circle cx="9" cy="7" r="4"></circle>
+                        <path d="M23 21v-2a4 4 0 0 0-3-3.87"></path>
+                        <path d="M16 3.13a4 4 0 0 1 0 7.75"></path>
+                    </svg>
+                </div>
+                <h3>User Management</h3>
+                <p>View and manage user accounts, roles, and permissions. Delete users or promote them to administrators.</p>
+                <div class="card-stat">
+                    <strong th:text="${totalUsers}">0</strong> users registered
+                </div>
+            </a>
 
-            <!-- GenAI Service Details (Cloud only) -->
-            <div th:if="${isCloudProfile && genAiModelCount > 0}" style="margin-top: 24px;">
-                <h3 style="font-size: 1.1rem; margin-bottom: 12px; color: var(--text-secondary);">
-                    <svg style="width: 18px; height: 18px; vertical-align: middle; margin-right: 6px;" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+            <a href="/admin/models" class="admin-nav-card">
+                <div class="card-icon">
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
                         <path d="M21 16V8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16z"></path>
                         <polyline points="3.27 6.96 12 12.01 20.73 6.96"></polyline>
                         <line x1="12" y1="22.08" x2="12" y2="12"></line>
                     </svg>
-                    Tanzu GenAI Service Bindings
-                </h3>
-                <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(300px, 1fr)); gap: 16px;">
-                    <div th:each="entry : ${genAiModelMetadata}"
-                         style="background-color: var(--bg-secondary); border: 1px solid var(--border-color); border-radius: 12px; padding: 16px;">
-                        <div style="font-weight: 600; margin-bottom: 8px; word-break: break-all;" th:text="${entry.value.modelName()}">Model Name</div>
-                        <div style="display: flex; flex-direction: column; gap: 4px; font-size: 0.85rem; color: var(--text-secondary);">
-                            <span>
-                                <strong>Service:</strong>
-                                <span th:text="${entry.value.serviceName()}">service</span>
-                            </span>
-                            <span>
-                                <strong>Type:</strong>
-                                <span th:text="${entry.value.modelType()}">OpenAiChatModel</span>
-                            </span>
-                        </div>
-                    </div>
                 </div>
-            </div>
+                <h3>Model Configuration</h3>
+                <p>View configured AI models, check availability status, and manage Tanzu GenAI service bindings.</p>
+                <div class="card-stat">
+                    <strong th:text="${modelCount}">0</strong> models configured
+                </div>
+            </a>
+        </nav>
 
-            <!-- Environment Info -->
-            <div style="margin-top: 24px; padding: 16px; background-color: var(--bg-tertiary); border-radius: 8px; font-size: 0.85rem;">
+        <div class="environment-badge" th:classappend="${isCloudProfile} ? 'cloud' : ''">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                <circle cx="12" cy="12" r="3"></circle>
+                <path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1 0 2.83 2 2 0 0 1-2.83 0l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-2 2 2 2 0 0 1-2-2v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83 0 2 2 0 0 1 0-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1-2-2 2 2 0 0 1 2-2h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 0-2.83 2 2 0 0 1 2.83 0l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 2-2 2 2 0 0 1 2 2v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 0 2 2 0 0 1 0 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 2 2 2 2 0 0 1-2 2h-.09a1.65 1.65 0 0 0-1.51 1z"></path>
+            </svg>
+            <span>
                 <strong>Environment:</strong>
                 <span th:if="${isCloudProfile}" style="color: var(--accent-color);">Cloud Foundry (Tanzu GenAI)</span>
-                <span th:unless="${isCloudProfile}" style="color: var(--text-secondary);">Local Development</span>
-            </div>
-        </section>
-
-        <section class="users-section">
-            <h2>Users</h2>
-            <div class="users-table">
-                <table>
-                    <thead>
-                        <tr>
-                            <th>User</th>
-                            <th>Role</th>
-                            <th>Auth Provider</th>
-                            <th>Conversations</th>
-                            <th>Last Login</th>
-                            <th>Actions</th>
-                        </tr>
-                    </thead>
-                    <tbody>
-                        <tr th:each="userData : ${users}">
-                            <td>
-                                <div style="font-weight: 500;" th:text="${userData.user.displayName != null ? userData.user.displayName : userData.user.username}">Username</div>
-                                <div style="font-size: 0.8rem; color: var(--text-muted);" th:text="${userData.user.email}">email@example.com</div>
-                            </td>
-                            <td>
-                                <select class="role-select"
-                                        th:data-user-id="${userData.user.id}"
-                                        onchange="updateRole(this)"
-                                        th:disabled="${userData.user.id == currentUser.id}">
-                                    <option value="USER" th:selected="${userData.user.role.name() == 'USER'}">User</option>
-                                    <option value="ADMIN" th:selected="${userData.user.role.name() == 'ADMIN'}">Admin</option>
-                                </select>
-                            </td>
-                            <td>
-                                <span class="provider-badge" th:text="${userData.user.authProvider}">LOCAL</span>
-                            </td>
-                            <td th:text="${userData.conversationCount}">0</td>
-                            <td class="date-cell">
-                                <span th:if="${userData.user.lastLoginAt != null}"
-                                      th:text="${#temporals.format(userData.user.lastLoginAt, 'MMM d, yyyy HH:mm')}">Jan 1, 2024</span>
-                                <span th:if="${userData.user.lastLoginAt == null}">Never</span>
-                            </td>
-                            <td>
-                                <button class="action-btn danger"
-                                        th:data-user-id="${userData.user.id}"
-                                        th:data-username="${userData.user.displayName != null ? userData.user.displayName : userData.user.username}"
-                                        th:disabled="${userData.user.id == currentUser.id}"
-                                        onclick="showDeleteModal(this)">
-                                    Delete
-                                </button>
-                            </td>
-                        </tr>
-                    </tbody>
-                </table>
-            </div>
-        </section>
-    </div>
-
-    <!-- Delete Confirmation Modal -->
-    <div class="modal-overlay" id="deleteModal">
-        <div class="modal">
-            <h3>Delete User</h3>
-            <p>Are you sure you want to delete <strong id="deleteUsername"></strong>?</p>
-            <div class="checkbox-group">
-                <input type="checkbox" id="deleteConversations">
-                <label for="deleteConversations">Also delete user's conversations</label>
-            </div>
-            <div class="modal-actions">
-                <button class="modal-btn cancel" onclick="closeDeleteModal()">Cancel</button>
-                <button class="modal-btn confirm" id="confirmDeleteBtn">Delete</button>
-            </div>
+                <span th:unless="${isCloudProfile}">Local Development</span>
+            </span>
         </div>
     </div>
 
@@ -454,76 +236,6 @@
         // Apply saved theme
         const savedTheme = localStorage.getItem('theme') || 'dark';
         document.body.setAttribute('data-theme', savedTheme);
-
-        let deleteUserId = null;
-
-        function updateRole(select) {
-            const userId = select.dataset.userId;
-            const newRole = select.value;
-
-            fetch(`/api/admin/users/${userId}/role`, {
-                method: 'POST',
-                headers: {
-                    'Content-Type': 'application/json'
-                },
-                body: JSON.stringify({ role: newRole })
-            })
-            .then(response => response.json())
-            .then(data => {
-                if (data.error) {
-                    alert(data.error);
-                    location.reload();
-                }
-            })
-            .catch(error => {
-                console.error('Error updating role:', error);
-                alert('Failed to update role');
-                location.reload();
-            });
-        }
-
-        function showDeleteModal(btn) {
-            deleteUserId = btn.dataset.userId;
-            document.getElementById('deleteUsername').textContent = btn.dataset.username;
-            document.getElementById('deleteConversations').checked = false;
-            document.getElementById('deleteModal').classList.add('open');
-        }
-
-        function closeDeleteModal() {
-            document.getElementById('deleteModal').classList.remove('open');
-            deleteUserId = null;
-        }
-
-        document.getElementById('confirmDeleteBtn').addEventListener('click', function() {
-            if (!deleteUserId) return;
-
-            const deleteConversations = document.getElementById('deleteConversations').checked;
-
-            fetch(`/api/admin/users/${deleteUserId}?deleteConversations=${deleteConversations}`, {
-                method: 'DELETE'
-            })
-            .then(response => response.json())
-            .then(data => {
-                if (data.error) {
-                    alert(data.error);
-                } else {
-                    location.reload();
-                }
-            })
-            .catch(error => {
-                console.error('Error deleting user:', error);
-                alert('Failed to delete user');
-            });
-
-            closeDeleteModal();
-        });
-
-        // Close modal on overlay click
-        document.getElementById('deleteModal').addEventListener('click', function(e) {
-            if (e.target === this) {
-                closeDeleteModal();
-            }
-        });
     </script>
 </body>
 </html>

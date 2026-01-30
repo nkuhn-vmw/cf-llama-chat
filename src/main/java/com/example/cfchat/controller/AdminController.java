@@ -2,6 +2,7 @@ package com.example.cfchat.controller;
 
 import com.example.cfchat.auth.UserService;
 import com.example.cfchat.config.GenAiConfig;
+import com.example.cfchat.model.ModelInfo;
 import com.example.cfchat.model.User;
 import com.example.cfchat.repository.ConversationRepository;
 import com.example.cfchat.service.ChatService;
@@ -50,6 +51,33 @@ public class AdminController {
         }
 
         List<User> users = userService.getAllUsers();
+        model.addAttribute("totalUsers", users.size());
+        model.addAttribute("totalAdmins", userService.getAdminCount());
+
+        // Add model configuration info
+        model.addAttribute("modelCount", chatService.getAvailableModels().size());
+
+        // Add GenAI-specific info if available
+        boolean isCloudProfile = activeProfile != null && activeProfile.contains("cloud");
+        model.addAttribute("isCloudProfile", isCloudProfile);
+
+        if (genAiConfig != null) {
+            model.addAttribute("genAiModelCount", genAiConfig.getModelCount());
+        } else {
+            model.addAttribute("genAiModelCount", 0);
+        }
+
+        return "admin";
+    }
+
+    @GetMapping("/admin/users")
+    public String adminUsersPage(Model model) {
+        Optional<User> currentUser = userService.getCurrentUser();
+        if (currentUser.isEmpty() || currentUser.get().getRole() != User.UserRole.ADMIN) {
+            return "redirect:/";
+        }
+
+        List<User> users = userService.getAllUsers();
         List<Map<String, Object>> userDataList = new ArrayList<>();
 
         for (User user : users) {
@@ -64,9 +92,23 @@ public class AdminController {
         model.addAttribute("totalUsers", users.size());
         model.addAttribute("totalAdmins", userService.getAdminCount());
 
-        // Add model configuration info
-        model.addAttribute("models", chatService.getAvailableModels());
-        model.addAttribute("modelCount", chatService.getAvailableModels().size());
+        return "admin/users";
+    }
+
+    @GetMapping("/admin/models")
+    public String adminModelsPage(Model model) {
+        Optional<User> currentUser = userService.getCurrentUser();
+        if (currentUser.isEmpty() || currentUser.get().getRole() != User.UserRole.ADMIN) {
+            return "redirect:/";
+        }
+
+        var models = chatService.getAvailableModels();
+        model.addAttribute("models", models);
+        model.addAttribute("modelCount", models.size());
+
+        // Count available models
+        long availableCount = models.stream().filter(ModelInfo::isAvailable).count();
+        model.addAttribute("availableCount", availableCount);
 
         // Add GenAI-specific info if available
         boolean isCloudProfile = activeProfile != null && activeProfile.contains("cloud");
@@ -80,7 +122,7 @@ public class AdminController {
             model.addAttribute("genAiModelMetadata", Map.of());
         }
 
-        return "admin";
+        return "admin/models";
     }
 
     @GetMapping("/api/admin/models")
