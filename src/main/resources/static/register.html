@@ -1,0 +1,567 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Register - CF Llama Chat</title>
+    <style>
+        :root {
+            --bg-primary: #0f0f0f;
+            --bg-secondary: #1a1a1a;
+            --bg-tertiary: #2a2a2a;
+            --text-primary: #ffffff;
+            --text-secondary: #a0a0a0;
+            --text-muted: #6b6b6b;
+            --border-color: #333333;
+            --accent-color: #10a37f;
+            --accent-hover: #0d8c6d;
+            --error-color: #ef4444;
+            --success-color: #22c55e;
+        }
+
+        [data-theme="light"] {
+            --bg-primary: #ffffff;
+            --bg-secondary: #f7f7f8;
+            --bg-tertiary: #ececf1;
+            --text-primary: #1a1a1a;
+            --text-secondary: #6b6b6b;
+            --text-muted: #9b9b9b;
+            --border-color: #e5e5e5;
+        }
+
+        * {
+            box-sizing: border-box;
+            margin: 0;
+            padding: 0;
+        }
+
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;
+            background-color: var(--bg-primary);
+            color: var(--text-primary);
+            min-height: 100vh;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            padding: 20px;
+        }
+
+        .register-container {
+            width: 100%;
+            max-width: 420px;
+        }
+
+        .register-header {
+            text-align: center;
+            margin-bottom: 32px;
+        }
+
+        .logo {
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 12px;
+            font-size: 1.5rem;
+            font-weight: 600;
+            margin-bottom: 8px;
+        }
+
+        .logo-icon {
+            width: 40px;
+            height: 40px;
+            color: var(--accent-color);
+        }
+
+        .register-subtitle {
+            color: var(--text-secondary);
+            font-size: 0.95rem;
+        }
+
+        .register-card {
+            background-color: var(--bg-secondary);
+            border: 1px solid var(--border-color);
+            border-radius: 16px;
+            padding: 32px;
+        }
+
+        .error-message, .success-message {
+            padding: 12px 16px;
+            border-radius: 8px;
+            margin-bottom: 20px;
+            font-size: 0.9rem;
+            display: none;
+        }
+
+        .error-message {
+            background-color: rgba(239, 68, 68, 0.1);
+            border: 1px solid var(--error-color);
+            color: var(--error-color);
+        }
+
+        .success-message {
+            background-color: rgba(34, 197, 94, 0.1);
+            border: 1px solid var(--success-color);
+            color: var(--success-color);
+        }
+
+        .error-message.show, .success-message.show {
+            display: block;
+        }
+
+        .form-group {
+            margin-bottom: 20px;
+        }
+
+        .form-group label {
+            display: block;
+            margin-bottom: 8px;
+            font-size: 0.9rem;
+            font-weight: 500;
+            color: var(--text-primary);
+        }
+
+        .form-group label .required {
+            color: var(--error-color);
+        }
+
+        .form-group label .optional {
+            color: var(--text-muted);
+            font-weight: 400;
+            font-size: 0.85rem;
+        }
+
+        .form-group input {
+            width: 100%;
+            padding: 12px 16px;
+            background-color: var(--bg-tertiary);
+            border: 1px solid var(--border-color);
+            border-radius: 8px;
+            color: var(--text-primary);
+            font-size: 1rem;
+            transition: border-color 0.2s;
+        }
+
+        .form-group input:focus {
+            outline: none;
+            border-color: var(--accent-color);
+        }
+
+        .form-group input::placeholder {
+            color: var(--text-muted);
+        }
+
+        .form-group input.error {
+            border-color: var(--error-color);
+        }
+
+        .form-group input.success {
+            border-color: var(--success-color);
+        }
+
+        .field-hint {
+            margin-top: 6px;
+            font-size: 0.8rem;
+            color: var(--text-muted);
+        }
+
+        .field-hint.error {
+            color: var(--error-color);
+        }
+
+        .field-hint.success {
+            color: var(--success-color);
+        }
+
+        .submit-btn {
+            width: 100%;
+            padding: 14px 20px;
+            background-color: var(--accent-color);
+            color: white;
+            border: none;
+            border-radius: 8px;
+            font-size: 1rem;
+            font-weight: 500;
+            cursor: pointer;
+            transition: background-color 0.2s;
+        }
+
+        .submit-btn:hover:not(:disabled) {
+            background-color: var(--accent-hover);
+        }
+
+        .submit-btn:disabled {
+            opacity: 0.6;
+            cursor: not-allowed;
+        }
+
+        .login-link {
+            margin-top: 24px;
+            text-align: center;
+            font-size: 0.9rem;
+            color: var(--text-secondary);
+        }
+
+        .login-link a {
+            color: var(--accent-color);
+            text-decoration: none;
+        }
+
+        .login-link a:hover {
+            text-decoration: underline;
+        }
+
+        .password-requirements {
+            margin-top: 8px;
+            font-size: 0.8rem;
+            color: var(--text-muted);
+        }
+
+        .password-requirements ul {
+            margin-top: 4px;
+            padding-left: 20px;
+        }
+
+        .password-requirements li {
+            margin-bottom: 2px;
+        }
+
+        .password-requirements li.valid {
+            color: var(--success-color);
+        }
+
+        .invitation-notice {
+            background-color: rgba(16, 163, 127, 0.1);
+            border: 1px solid var(--accent-color);
+            border-radius: 8px;
+            padding: 12px 16px;
+            margin-bottom: 20px;
+            font-size: 0.85rem;
+            color: var(--text-secondary);
+        }
+
+        .first-user-notice {
+            background-color: rgba(34, 197, 94, 0.1);
+            border: 1px solid var(--success-color);
+            border-radius: 8px;
+            padding: 12px 16px;
+            margin-bottom: 20px;
+            font-size: 0.85rem;
+            color: var(--success-color);
+        }
+    </style>
+</head>
+<body>
+    <div class="register-container">
+        <div class="register-header">
+            <div class="logo">
+                <svg class="logo-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                    <path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"></path>
+                </svg>
+                CF Llama Chat
+            </div>
+            <p class="register-subtitle">Create your account</p>
+        </div>
+
+        <div class="register-card">
+            <div id="errorMessage" class="error-message"></div>
+            <div id="successMessage" class="success-message"></div>
+
+            <div id="firstUserNotice" class="first-user-notice" style="display: none;">
+                You will be the first user and will be assigned the Admin role.
+            </div>
+
+            <div id="invitationNotice" class="invitation-notice" style="display: none;">
+                An invitation code is required to register.
+            </div>
+
+            <form id="registerForm">
+                <div class="form-group">
+                    <label for="username">Username <span class="required">*</span></label>
+                    <input type="text" id="username" name="username" placeholder="Choose a username" required autocomplete="username">
+                    <div id="usernameHint" class="field-hint">3-30 characters, letters, numbers, underscores, hyphens</div>
+                </div>
+
+                <div class="form-group">
+                    <label for="email">Email <span class="optional">(optional)</span></label>
+                    <input type="email" id="email" name="email" placeholder="your@email.com" autocomplete="email">
+                    <div id="emailHint" class="field-hint"></div>
+                </div>
+
+                <div class="form-group">
+                    <label for="displayName">Display Name <span class="optional">(optional)</span></label>
+                    <input type="text" id="displayName" name="displayName" placeholder="How you want to be called">
+                </div>
+
+                <div class="form-group">
+                    <label for="password">Password <span class="required">*</span></label>
+                    <input type="password" id="password" name="password" placeholder="Create a password" required autocomplete="new-password">
+                    <div class="password-requirements">
+                        <ul>
+                            <li id="pwLength">At least 6 characters</li>
+                        </ul>
+                    </div>
+                </div>
+
+                <div class="form-group">
+                    <label for="confirmPassword">Confirm Password <span class="required">*</span></label>
+                    <input type="password" id="confirmPassword" name="confirmPassword" placeholder="Confirm your password" required autocomplete="new-password">
+                    <div id="confirmHint" class="field-hint"></div>
+                </div>
+
+                <div class="form-group" id="invitationGroup" style="display: none;">
+                    <label for="invitationCode">Invitation Code <span class="required">*</span></label>
+                    <input type="text" id="invitationCode" name="invitationCode" placeholder="Enter invitation code">
+                </div>
+
+                <button type="submit" class="submit-btn" id="submitBtn">Create Account</button>
+            </form>
+
+            <div class="login-link">
+                Already have an account? <a href="/login.html">Sign in</a>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        const form = document.getElementById('registerForm');
+        const usernameInput = document.getElementById('username');
+        const emailInput = document.getElementById('email');
+        const passwordInput = document.getElementById('password');
+        const confirmPasswordInput = document.getElementById('confirmPassword');
+        const invitationCodeInput = document.getElementById('invitationCode');
+        const submitBtn = document.getElementById('submitBtn');
+        const errorMessage = document.getElementById('errorMessage');
+        const successMessage = document.getElementById('successMessage');
+
+        let invitationRequired = false;
+        let usernameTimeout = null;
+        let emailTimeout = null;
+
+        // Apply saved theme
+        const savedTheme = localStorage.getItem('theme') || 'dark';
+        document.body.setAttribute('data-theme', savedTheme);
+
+        // Check auth provider settings
+        fetch('/auth/provider')
+            .then(response => response.json())
+            .then(data => {
+                invitationRequired = data.invitationRequired;
+                if (invitationRequired) {
+                    document.getElementById('invitationGroup').style.display = 'block';
+                    document.getElementById('invitationNotice').style.display = 'block';
+                }
+            })
+            .catch(err => console.log('Could not check auth provider'));
+
+        // Check if this is the first user
+        fetch('/auth/check-username?username=_test_')
+            .then(() => {
+                // If we can check, we might be first user - this is just a hint
+            })
+            .catch(() => {});
+
+        // Username validation
+        usernameInput.addEventListener('input', () => {
+            clearTimeout(usernameTimeout);
+            const username = usernameInput.value.trim();
+            const hint = document.getElementById('usernameHint');
+
+            if (username.length < 3) {
+                usernameInput.classList.remove('success', 'error');
+                hint.textContent = '3-30 characters, letters, numbers, underscores, hyphens';
+                hint.classList.remove('error', 'success');
+                return;
+            }
+
+            if (!/^[a-zA-Z0-9_-]{3,30}$/.test(username)) {
+                usernameInput.classList.remove('success');
+                usernameInput.classList.add('error');
+                hint.textContent = 'Invalid characters. Use only letters, numbers, underscores, hyphens.';
+                hint.classList.remove('success');
+                hint.classList.add('error');
+                return;
+            }
+
+            usernameTimeout = setTimeout(() => {
+                fetch(`/auth/check-username?username=${encodeURIComponent(username)}`)
+                    .then(response => response.json())
+                    .then(data => {
+                        if (data.available) {
+                            usernameInput.classList.remove('error');
+                            usernameInput.classList.add('success');
+                            hint.textContent = 'Username is available';
+                            hint.classList.remove('error');
+                            hint.classList.add('success');
+                        } else {
+                            usernameInput.classList.remove('success');
+                            usernameInput.classList.add('error');
+                            hint.textContent = 'Username is already taken';
+                            hint.classList.remove('success');
+                            hint.classList.add('error');
+                        }
+                    })
+                    .catch(() => {
+                        hint.textContent = 'Could not verify username';
+                        hint.classList.remove('success', 'error');
+                    });
+            }, 500);
+        });
+
+        // Email validation
+        emailInput.addEventListener('input', () => {
+            clearTimeout(emailTimeout);
+            const email = emailInput.value.trim();
+            const hint = document.getElementById('emailHint');
+
+            if (!email) {
+                emailInput.classList.remove('success', 'error');
+                hint.textContent = '';
+                return;
+            }
+
+            if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
+                emailInput.classList.remove('success');
+                emailInput.classList.add('error');
+                hint.textContent = 'Invalid email format';
+                hint.classList.remove('success');
+                hint.classList.add('error');
+                return;
+            }
+
+            emailTimeout = setTimeout(() => {
+                fetch(`/auth/check-email?email=${encodeURIComponent(email)}`)
+                    .then(response => response.json())
+                    .then(data => {
+                        if (data.available) {
+                            emailInput.classList.remove('error');
+                            emailInput.classList.add('success');
+                            hint.textContent = 'Email is available';
+                            hint.classList.remove('error');
+                            hint.classList.add('success');
+                        } else {
+                            emailInput.classList.remove('success');
+                            emailInput.classList.add('error');
+                            hint.textContent = 'Email is already registered';
+                            hint.classList.remove('success');
+                            hint.classList.add('error');
+                        }
+                    })
+                    .catch(() => {
+                        hint.textContent = '';
+                    });
+            }, 500);
+        });
+
+        // Password validation
+        passwordInput.addEventListener('input', () => {
+            const password = passwordInput.value;
+            const lengthEl = document.getElementById('pwLength');
+
+            if (password.length >= 6) {
+                lengthEl.classList.add('valid');
+            } else {
+                lengthEl.classList.remove('valid');
+            }
+
+            validateConfirmPassword();
+        });
+
+        // Confirm password validation
+        confirmPasswordInput.addEventListener('input', validateConfirmPassword);
+
+        function validateConfirmPassword() {
+            const password = passwordInput.value;
+            const confirmPassword = confirmPasswordInput.value;
+            const hint = document.getElementById('confirmHint');
+
+            if (!confirmPassword) {
+                confirmPasswordInput.classList.remove('success', 'error');
+                hint.textContent = '';
+                return;
+            }
+
+            if (password === confirmPassword) {
+                confirmPasswordInput.classList.remove('error');
+                confirmPasswordInput.classList.add('success');
+                hint.textContent = 'Passwords match';
+                hint.classList.remove('error');
+                hint.classList.add('success');
+            } else {
+                confirmPasswordInput.classList.remove('success');
+                confirmPasswordInput.classList.add('error');
+                hint.textContent = 'Passwords do not match';
+                hint.classList.remove('success');
+                hint.classList.add('error');
+            }
+        }
+
+        // Form submission
+        form.addEventListener('submit', async (e) => {
+            e.preventDefault();
+
+            errorMessage.classList.remove('show');
+            successMessage.classList.remove('show');
+
+            const username = usernameInput.value.trim();
+            const email = emailInput.value.trim();
+            const displayName = document.getElementById('displayName').value.trim();
+            const password = passwordInput.value;
+            const confirmPassword = confirmPasswordInput.value;
+            const invitationCode = invitationCodeInput.value.trim();
+
+            // Validate
+            if (password !== confirmPassword) {
+                errorMessage.textContent = 'Passwords do not match';
+                errorMessage.classList.add('show');
+                return;
+            }
+
+            if (password.length < 6) {
+                errorMessage.textContent = 'Password must be at least 6 characters';
+                errorMessage.classList.add('show');
+                return;
+            }
+
+            submitBtn.disabled = true;
+            submitBtn.textContent = 'Creating account...';
+
+            try {
+                const response = await fetch('/auth/register', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json'
+                    },
+                    body: JSON.stringify({
+                        username,
+                        email: email || null,
+                        displayName: displayName || null,
+                        password,
+                        invitationCode: invitationRequired ? invitationCode : null
+                    })
+                });
+
+                const data = await response.json();
+
+                if (data.success) {
+                    successMessage.textContent = data.message || 'Registration successful! Redirecting to login...';
+                    successMessage.classList.add('show');
+                    form.reset();
+
+                    setTimeout(() => {
+                        window.location.href = '/login.html?registered=true';
+                    }, 1500);
+                } else {
+                    errorMessage.textContent = data.error || 'Registration failed';
+                    errorMessage.classList.add('show');
+                }
+            } catch (err) {
+                errorMessage.textContent = 'An error occurred. Please try again.';
+                errorMessage.classList.add('show');
+            } finally {
+                submitBtn.disabled = false;
+                submitBtn.textContent = 'Create Account';
+            }
+        });
+    </script>
+</body>
+</html>

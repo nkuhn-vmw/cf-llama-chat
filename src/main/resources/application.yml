@@ -59,4 +59,5 @@ app:
       accurate, and thoughtful responses. When you don't know something, you
       say so. You format your responses using Markdown when appropriate.
   auth:
-    secret: ${APP_AUTH_SECRET:changeme}
+    secret: ${APP_AUTH_SECRET:}
+    require-invitation: ${APP_REQUIRE_INVITATION:false}

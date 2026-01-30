@@ -222,4 +222,51 @@ public class AdminController {
 
         return ResponseEntity.ok(result);
     }
+
+    @PostMapping("/api/admin/users")
+    @ResponseBody
+    public ResponseEntity<Map<String, Object>> createUser(@RequestBody Map<String, String> body) {
+        Optional<User> currentUser = userService.getCurrentUser();
+        if (currentUser.isEmpty() || currentUser.get().getRole() != User.UserRole.ADMIN) {
+            return ResponseEntity.status(403).body(Map.of("error", "Forbidden"));
+        }
+
+        String username = body.get("username");
+        String password = body.get("password");
+        String email = body.get("email");
+        String displayName = body.get("displayName");
+        String roleStr = body.get("role");
+
+        if (username == null || username.isBlank()) {
+            return ResponseEntity.badRequest().body(Map.of("error", "Username is required"));
+        }
+
+        if (password == null || password.length() < 6) {
+            return ResponseEntity.badRequest().body(Map.of("error", "Password must be at least 6 characters"));
+        }
+
+        try {
+            User user = userService.registerUser(username, password, email, displayName);
+
+            // Update role if specified and different from default
+            if (roleStr != null && !roleStr.isBlank()) {
+                User.UserRole role = User.UserRole.valueOf(roleStr.toUpperCase());
+                if (role != user.getRole()) {
+                    user = userService.updateUserRole(user.getId(), role);
+                }
+            }
+
+            log.info("Admin {} created user: {} with role: {}",
+                    currentUser.get().getUsername(), username, user.getRole());
+
+            return ResponseEntity.ok(Map.of(
+                    "success", true,
+                    "userId", user.getId(),
+                    "username", user.getUsername(),
+                    "role", user.getRole().name()
+            ));
+        } catch (IllegalArgumentException e) {
+            return ResponseEntity.badRequest().body(Map.of("error", e.getMessage()));
+        }
+    }
 }

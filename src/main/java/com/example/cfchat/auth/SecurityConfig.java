@@ -34,8 +34,11 @@ import java.util.List;
 @Slf4j
 public class SecurityConfig {
 
-    @Value("${app.auth.secret:changeme}")
-    private String authSecret;
+    @Value("${app.auth.secret:}")
+    private String invitationCode;
+
+    @Value("${app.auth.require-invitation:false}")
+    private boolean requireInvitation;
 
     private final Environment environment;
     private final UserService userService;
@@ -43,6 +46,15 @@ public class SecurityConfig {
     public SecurityConfig(Environment environment, UserService userService) {
         this.environment = environment;
         this.userService = userService;
+        log.info("SecurityConfig initialized");
+    }
+
+    public String getInvitationCode() {
+        return invitationCode;
+    }
+
+    public boolean isInvitationRequired() {
+        return requireInvitation && invitationCode != null && !invitationCode.isBlank();
     }
 
     @Bean
@@ -52,7 +64,7 @@ public class SecurityConfig {
                 .ignoringRequestMatchers("/api/**", "/auth/**")
             )
             .authorizeHttpRequests(auth -> auth
-                .requestMatchers("/login.html", "/auth/provider", "/auth/login", "/actuator/health", "/css/**", "/js/**", "/error").permitAll()
+                .requestMatchers("/login.html", "/register.html", "/auth/provider", "/auth/login", "/auth/register", "/auth/check-username", "/auth/check-email", "/actuator/health", "/css/**", "/js/**", "/error").permitAll()
                 .requestMatchers("/admin/**", "/api/admin/**").hasRole("ADMIN")
                 .anyRequest().authenticated()
             )
@@ -73,11 +85,14 @@ public class SecurityConfig {
 
         // Add OAuth2 login if SSO is configured
         if (isSsoConfigured()) {
+            log.info("SSO is configured - enabling OAuth2 login");
             http.oauth2Login(oauth2 -> oauth2
                 .loginPage("/login.html")
                 .successHandler(oauth2AuthenticationSuccessHandler())
                 .failureUrl("/login.html?error=true")
             );
+        } else {
+            log.info("SSO is not configured - OAuth2 login disabled");
         }
 
         return http.build();
@@ -89,19 +104,31 @@ public class SecurityConfig {
             String username = authentication.getName();
             String password = authentication.getCredentials().toString();
 
-            // Validate against the configured access code
-            if (!authSecret.equals(password)) {
-                throw new BadCredentialsException("Invalid access code");
+            log.debug("Authentication attempt for user: {}", username);
+
+            try {
+                // Authenticate user with stored password
+                java.util.Optional<User> userOpt = userService.authenticateUser(username, password);
+
+                if (userOpt.isEmpty()) {
+                    log.warn("Authentication failed for user: {}", username);
+                    throw new BadCredentialsException("Invalid username or password");
+                }
+
+                User user = userOpt.get();
+                log.info("User authenticated: {} with role: {}", username, user.getRole());
+
+                List<SimpleGrantedAuthority> authorities = Collections.singletonList(
+                    new SimpleGrantedAuthority("ROLE_" + user.getRole().name())
+                );
+
+                return new UsernamePasswordAuthenticationToken(username, null, authorities);
+            } catch (BadCredentialsException e) {
+                throw e;
+            } catch (Exception e) {
+                log.error("Error authenticating user {}: {}", username, e.getMessage());
+                throw new BadCredentialsException("Authentication failed: " + e.getMessage());
             }
-
-            // Get or create user
-            User user = userService.getOrCreateUser(username, null, null, User.AuthProvider.LOCAL);
-
-            List<SimpleGrantedAuthority> authorities = Collections.singletonList(
-                new SimpleGrantedAuthority("ROLE_" + user.getRole().name())
-            );
-
-            return new UsernamePasswordAuthenticationToken(username, null, authorities);
         };
     }
 
@@ -167,7 +194,7 @@ public class SecurityConfig {
                 .clientSecret(clientSecret)
                 .authorizationGrantType(AuthorizationGrantType.AUTHORIZATION_CODE)
                 .redirectUri(redirectUri)
-                .scope("openid", "profile", "email")
+                .scope("openid", "profile")
                 .authorizationUri(authUri)
                 .tokenUri(tokenUri)
                 .userInfoUri(userInfoUri)
@@ -198,6 +225,11 @@ public class SecurityConfig {
     public boolean isSsoConfigured() {
         String clientId = environment.getProperty("sso.client-id");
         String authUri = environment.getProperty("sso.auth-uri");
-        return clientId != null && !clientId.isEmpty() && authUri != null && !authUri.isEmpty();
+        boolean configured = clientId != null && !clientId.isEmpty() && authUri != null && !authUri.isEmpty();
+        log.debug("SSO configured check - clientId: {}, authUri: {}, result: {}",
+                clientId != null ? "present" : "null",
+                authUri != null ? "present" : "null",
+                configured);
+        return configured;
     }
 }

@@ -2,12 +2,11 @@ package com.example.cfchat.auth;
 
 import com.example.cfchat.model.User;
 import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.core.Authentication;
 import org.springframework.security.core.context.SecurityContextHolder;
-import org.springframework.web.bind.annotation.GetMapping;
-import org.springframework.web.bind.annotation.RequestMapping;
-import org.springframework.web.bind.annotation.RestController;
+import org.springframework.web.bind.annotation.*;
 
 import java.util.HashMap;
 import java.util.Map;
@@ -16,6 +15,7 @@ import java.util.Optional;
 @RestController
 @RequestMapping("/auth")
 @RequiredArgsConstructor
+@Slf4j
 public class AuthController {
 
     private final UserService userService;
@@ -49,6 +49,88 @@ public class AuthController {
         Map<String, Object> provider = new HashMap<>();
         provider.put("ssoEnabled", securityConfig.isSsoConfigured());
         provider.put("ssoUrl", securityConfig.isSsoConfigured() ? "/oauth2/authorization/sso" : null);
+        provider.put("registrationEnabled", true);
+        provider.put("invitationRequired", securityConfig.isInvitationRequired());
         return ResponseEntity.ok(provider);
+    }
+
+    @PostMapping("/register")
+    public ResponseEntity<Map<String, Object>> register(@RequestBody Map<String, String> body) {
+        String username = body.get("username");
+        String password = body.get("password");
+        String email = body.get("email");
+        String displayName = body.get("displayName");
+        String invitationCode = body.get("invitationCode");
+
+        Map<String, Object> response = new HashMap<>();
+
+        // Validate required fields
+        if (username == null || username.isBlank()) {
+            response.put("success", false);
+            response.put("error", "Username is required");
+            return ResponseEntity.badRequest().body(response);
+        }
+
+        if (password == null || password.length() < 6) {
+            response.put("success", false);
+            response.put("error", "Password must be at least 6 characters");
+            return ResponseEntity.badRequest().body(response);
+        }
+
+        // Validate username format
+        if (!username.matches("^[a-zA-Z0-9_-]{3,30}$")) {
+            response.put("success", false);
+            response.put("error", "Username must be 3-30 characters and contain only letters, numbers, underscores, and hyphens");
+            return ResponseEntity.badRequest().body(response);
+        }
+
+        // Check invitation code if required
+        if (securityConfig.isInvitationRequired()) {
+            if (invitationCode == null || !invitationCode.equals(securityConfig.getInvitationCode())) {
+                response.put("success", false);
+                response.put("error", "Invalid invitation code");
+                return ResponseEntity.badRequest().body(response);
+            }
+        }
+
+        try {
+            User user = userService.registerUser(username, password, email, displayName);
+            log.info("User registered successfully: {}", username);
+
+            response.put("success", true);
+            response.put("username", user.getUsername());
+            response.put("role", user.getRole().name());
+            response.put("message", "Registration successful. Please log in.");
+
+            return ResponseEntity.ok(response);
+        } catch (IllegalArgumentException e) {
+            log.warn("Registration failed for {}: {}", username, e.getMessage());
+            response.put("success", false);
+            response.put("error", e.getMessage());
+            return ResponseEntity.badRequest().body(response);
+        } catch (Exception e) {
+            log.error("Registration error for {}: {}", username, e.getMessage());
+            response.put("success", false);
+            response.put("error", "Registration failed. Please try again.");
+            return ResponseEntity.internalServerError().body(response);
+        }
+    }
+
+    @GetMapping("/check-username")
+    public ResponseEntity<Map<String, Object>> checkUsername(@RequestParam String username) {
+        Map<String, Object> response = new HashMap<>();
+        boolean available = userService.isUsernameAvailable(username);
+        response.put("available", available);
+        response.put("username", username);
+        return ResponseEntity.ok(response);
+    }
+
+    @GetMapping("/check-email")
+    public ResponseEntity<Map<String, Object>> checkEmail(@RequestParam String email) {
+        Map<String, Object> response = new HashMap<>();
+        boolean available = userService.isEmailAvailable(email);
+        response.put("available", available);
+        response.put("email", email);
+        return ResponseEntity.ok(response);
     }
 }

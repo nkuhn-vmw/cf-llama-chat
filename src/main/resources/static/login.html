@@ -223,23 +223,30 @@
 
         <div class="login-card">
             <div id="errorMessage" class="error-message hidden">
-                Invalid credentials. Please try again.
+                Invalid username or password. Please try again.
             </div>
-            <div id="successMessage" class="success-message hidden">
+            <div id="logoutMessage" class="success-message hidden">
                 You have been logged out successfully.
+            </div>
+            <div id="registeredMessage" class="success-message hidden">
+                Account created successfully! Please sign in.
             </div>
 
             <form action="/auth/login" method="post" id="loginForm">
                 <div class="form-group">
                     <label for="username">Username</label>
-                    <input type="text" id="username" name="username" placeholder="Enter your username" required autofocus>
+                    <input type="text" id="username" name="username" placeholder="Enter your username" required autofocus autocomplete="username">
                 </div>
                 <div class="form-group">
-                    <label for="password">Access Code</label>
-                    <input type="password" id="password" name="password" placeholder="Enter the access code" required>
+                    <label for="password">Password</label>
+                    <input type="password" id="password" name="password" placeholder="Enter your password" required autocomplete="current-password">
                 </div>
                 <button type="submit" class="submit-btn">Sign In</button>
             </form>
+
+            <div class="register-link" style="margin-top: 20px; text-align: center; font-size: 0.9rem; color: var(--text-secondary);">
+                Don't have an account? <a href="/register.html" style="color: var(--accent-color); text-decoration: none;">Create one</a>
+            </div>
 
             <div id="ssoSection" class="hidden">
                 <div class="divider">
@@ -261,13 +268,16 @@
     </div>
 
     <script>
-        // Check URL params for error/logout messages
+        // Check URL params for error/logout/registered messages
         const params = new URLSearchParams(window.location.search);
         if (params.has('error')) {
             document.getElementById('errorMessage').classList.remove('hidden');
         }
         if (params.has('logout')) {
-            document.getElementById('successMessage').classList.remove('hidden');
+            document.getElementById('logoutMessage').classList.remove('hidden');
+        }
+        if (params.has('registered')) {
+            document.getElementById('registeredMessage').classList.remove('hidden');
         }
 
         // Check if SSO is available

@@ -6,6 +6,7 @@ import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.security.core.Authentication;
 import org.springframework.security.core.context.SecurityContextHolder;
+import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.security.oauth2.core.user.OAuth2User;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -21,13 +22,119 @@ import java.util.UUID;
 public class UserService {
 
     private final UserRepository userRepository;
+    private final PasswordEncoder passwordEncoder;
 
+    /**
+     * Register a new local user with username and password.
+     */
+    @Transactional
+    public User registerUser(String username, String password, String email, String displayName) {
+        log.info("Registering new user: {}", username);
+
+        // Check if username already exists
+        if (userRepository.findByUsername(username).isPresent()) {
+            throw new IllegalArgumentException("Username already exists");
+        }
+
+        // Check if email already exists (if provided)
+        if (email != null && !email.isBlank() && userRepository.findByEmail(email).isPresent()) {
+            throw new IllegalArgumentException("Email already registered");
+        }
+
+        // Determine role - first user becomes admin
+        long userCount = userRepository.count();
+        User.UserRole role = userCount == 0 ? User.UserRole.ADMIN : User.UserRole.USER;
+
+        User newUser = User.builder()
+                .username(username)
+                .passwordHash(passwordEncoder.encode(password))
+                .email(email != null && !email.isBlank() ? email : null)
+                .displayName(displayName != null && !displayName.isBlank() ? displayName : username)
+                .role(role)
+                .authProvider(User.AuthProvider.LOCAL)
+                .build();
+
+        User savedUser = userRepository.save(newUser);
+        log.info("Registered new user: {} with role: {} (id: {})", username, role, savedUser.getId());
+        return savedUser;
+    }
+
+    /**
+     * Authenticate a local user with username and password.
+     */
+    @Transactional
+    public Optional<User> authenticateUser(String username, String password) {
+        log.debug("Authenticating user: {}", username);
+
+        Optional<User> userOpt = userRepository.findByUsername(username);
+        if (userOpt.isEmpty()) {
+            log.debug("User not found: {}", username);
+            return Optional.empty();
+        }
+
+        User user = userOpt.get();
+
+        // SSO users cannot login with password
+        if (user.getAuthProvider() == User.AuthProvider.SSO) {
+            log.debug("User {} is SSO user, cannot authenticate with password", username);
+            return Optional.empty();
+        }
+
+        // Legacy user without password - set password on first login
+        if (user.getPasswordHash() == null) {
+            log.info("Legacy user {} logging in for first time - setting password", username);
+            user.setPasswordHash(passwordEncoder.encode(password));
+            user.setLastLoginAt(LocalDateTime.now());
+            userRepository.save(user);
+            log.info("Password set for legacy user: {}", username);
+            return Optional.of(user);
+        }
+
+        // Check password
+        if (!passwordEncoder.matches(password, user.getPasswordHash())) {
+            log.debug("Invalid password for user: {}", username);
+            return Optional.empty();
+        }
+
+        // Update last login
+        user.setLastLoginAt(LocalDateTime.now());
+        userRepository.save(user);
+
+        log.info("User authenticated: {} with role: {}", username, user.getRole());
+        return Optional.of(user);
+    }
+
+    /**
+     * Check if a username is available.
+     */
+    @Transactional(readOnly = true)
+    public boolean isUsernameAvailable(String username) {
+        return userRepository.findByUsername(username).isEmpty();
+    }
+
+    /**
+     * Check if an email is available.
+     */
+    @Transactional(readOnly = true)
+    public boolean isEmailAvailable(String email) {
+        if (email == null || email.isBlank()) {
+            return true;
+        }
+        return userRepository.findByEmail(email).isEmpty();
+    }
+
+    /**
+     * Get or create user for SSO login.
+     */
     @Transactional
     public User getOrCreateUser(String username, String email, String displayName, User.AuthProvider provider) {
+        log.debug("getOrCreateUser called - username: {}, provider: {}", username, provider);
+
         Optional<User> existingUser = userRepository.findByUsername(username);
 
         if (existingUser.isPresent()) {
             User user = existingUser.get();
+            log.debug("Found existing user: {} (id: {}, role: {})", username, user.getId(), user.getRole());
             user.setLastLoginAt(LocalDateTime.now());
             if (email != null && user.getEmail() == null) {
                 user.setEmail(email);
@@ -39,7 +146,9 @@ public class UserService {
         }
 
         // Determine role - first user becomes admin
-        User.UserRole role = userRepository.count() == 0 ? User.UserRole.ADMIN : User.UserRole.USER;
+        long userCount = userRepository.count();
+        User.UserRole role = userCount == 0 ? User.UserRole.ADMIN : User.UserRole.USER;
+        log.info("Creating new user: {} (current user count: {}, assigning role: {})", username, userCount, role);
 
         User newUser = User.builder()
                 .username(username)
@@ -50,7 +159,7 @@ public class UserService {
                 .build();
 
         User savedUser = userRepository.save(newUser);
-        log.info("Created new user: {} with role: {}", username, role);
+        log.info("Created new user: {} with role: {} (id: {})", username, role, savedUser.getId());
         return savedUser;
     }
 
