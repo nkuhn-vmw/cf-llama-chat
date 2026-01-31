@@ -54,6 +54,13 @@ public class UserDocument {
     @Column(name = "error_message")
     private String errorMessage;
 
+    /**
+     * The S3 storage path (key) for the original document.
+     * Null if S3 storage is not enabled or document was uploaded before S3 was configured.
+     */
+    @Column(name = "storage_path")
+    private String storagePath;
+
     @Column(name = "created_at", nullable = false, updatable = false)
     private LocalDateTime createdAt;
 

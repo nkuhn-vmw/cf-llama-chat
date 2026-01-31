@@ -5,15 +5,20 @@ import com.example.cfchat.dto.DocumentUploadResponse;
 import com.example.cfchat.dto.UserDocumentDto;
 import com.example.cfchat.model.User;
 import com.example.cfchat.service.DocumentEmbeddingService;
+import com.example.cfchat.model.UserDocument;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.core.io.InputStreamResource;
+import org.springframework.http.HttpHeaders;
 import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 import org.springframework.web.multipart.MultipartFile;
 
+import java.io.InputStream;
 import java.util.List;
 import java.util.Map;
+import java.util.Optional;
 import java.util.UUID;
 
 /**
@@ -109,6 +114,63 @@ public class DocumentController {
         return documentService.getUserDocument(user.getId(), documentId)
                 .map(ResponseEntity::ok)
                 .orElse(ResponseEntity.notFound().build());
+    }
+
+    /**
+     * Download the original document file (requires S3 storage to be enabled).
+     */
+    @GetMapping("/{documentId}/download")
+    public ResponseEntity<?> downloadDocument(@PathVariable UUID documentId) {
+        User user = userService.getCurrentUser()
+                .orElseThrow(() -> new IllegalStateException("User not authenticated"));
+
+        try {
+            // Get document metadata
+            Optional<UserDocument> documentOpt = documentService.getUserDocumentEntity(user.getId(), documentId);
+            if (documentOpt.isEmpty()) {
+                return ResponseEntity.notFound().build();
+            }
+
+            UserDocument document = documentOpt.get();
+
+            // Check if document has stored file
+            if (document.getStoragePath() == null) {
+                return ResponseEntity.badRequest().body(Map.of(
+                        "error", "Document original file is not available",
+                        "message", "This document was uploaded before S3 storage was enabled"
+                ));
+            }
+
+            // Get document content
+            Optional<InputStream> contentOpt = documentService.getDocumentContent(user.getId(), documentId);
+            if (contentOpt.isEmpty()) {
+                return ResponseEntity.badRequest().body(Map.of(
+                        "error", "Unable to retrieve document",
+                        "message", "S3 storage may not be properly configured"
+                ));
+            }
+
+            // Build response with proper headers
+            HttpHeaders headers = new HttpHeaders();
+            headers.setContentDispositionFormData("attachment", document.getOriginalFilename());
+            if (document.getContentType() != null) {
+                headers.setContentType(MediaType.parseMediaType(document.getContentType()));
+            }
+            if (document.getFileSize() != null) {
+                headers.setContentLength(document.getFileSize());
+            }
+
+            return ResponseEntity.ok()
+                    .headers(headers)
+                    .body(new InputStreamResource(contentOpt.get()));
+
+        } catch (Exception e) {
+            log.error("Failed to download document {}: {}", documentId, e.getMessage(), e);
+            return ResponseEntity.internalServerError().body(Map.of(
+                    "error", "Failed to download document",
+                    "message", e.getMessage()
+            ));
+        }
     }
 
     /**

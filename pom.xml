@@ -139,6 +139,13 @@
             <version>0.21.0</version>
         </dependency>
 
+        <!-- AWS S3 SDK for document storage -->
+        <dependency>
+            <groupId>software.amazon.awssdk</groupId>
+            <artifactId>s3</artifactId>
+            <version>2.25.16</version>
+        </dependency>
+
         <!-- Testing -->
         <dependency>
             <groupId>org.springframework.boot</groupId>

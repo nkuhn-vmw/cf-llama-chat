@@ -28,6 +28,7 @@ public class UserDocumentDto {
     private String errorMessage;
     private LocalDateTime createdAt;
     private LocalDateTime processedAt;
+    private boolean hasStoredFile;
 
     public static UserDocumentDto fromEntity(UserDocument document) {
         return UserDocumentDto.builder()
@@ -41,6 +42,7 @@ public class UserDocumentDto {
                 .errorMessage(document.getErrorMessage())
                 .createdAt(document.getCreatedAt())
                 .processedAt(document.getProcessedAt())
+                .hasStoredFile(document.getStoragePath() != null)
                 .build();
     }
 }

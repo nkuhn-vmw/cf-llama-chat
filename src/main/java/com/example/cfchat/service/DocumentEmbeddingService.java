@@ -25,6 +25,7 @@ import org.springframework.web.multipart.MultipartFile;
 
 import java.io.ByteArrayInputStream;
 import java.io.IOException;
+import java.io.InputStream;
 import java.time.LocalDateTime;
 import java.util.ArrayList;
 import java.util.List;
@@ -45,6 +46,7 @@ public class DocumentEmbeddingService {
     private final UserDocumentRepository documentRepository;
     private final UserRepository userRepository;
     private final JdbcTemplate jdbcTemplate;
+    private final DocumentStorageService storageService;
 
     @Value("${app.documents.max-file-size:10485760}")  // 10MB default
     private long maxFileSize;
@@ -64,11 +66,13 @@ public class DocumentEmbeddingService {
             @Autowired(required = false) VectorStore vectorStore,
             UserDocumentRepository documentRepository,
             UserRepository userRepository,
-            JdbcTemplate jdbcTemplate) {
+            JdbcTemplate jdbcTemplate,
+            DocumentStorageService storageService) {
         this.vectorStore = vectorStore;
         this.documentRepository = documentRepository;
         this.userRepository = userRepository;
         this.jdbcTemplate = jdbcTemplate;
+        this.storageService = storageService;
 
         // Initialize text splitter for chunking documents
         this.textSplitter = TokenTextSplitter.builder()
@@ -119,6 +123,17 @@ public class DocumentEmbeddingService {
         log.info("Created document record: {} for user: {}", document.getId(), userId);
 
         try {
+            // Store original document in S3 if enabled
+            if (storageService.isStorageEnabled()) {
+                try {
+                    String storagePath = storageService.storeDocument(userId, document.getId(), file);
+                    document.setStoragePath(storagePath);
+                    log.info("Stored original document in S3: {}", storagePath);
+                } catch (Exception e) {
+                    log.warn("Failed to store document in S3, continuing with embedding only: {}", e.getMessage());
+                }
+            }
+
             // Read and chunk the document
             List<Document> documents = readAndChunkDocument(file, document.getId(), userId);
 
@@ -299,6 +314,40 @@ public class DocumentEmbeddingService {
     }
 
     /**
+     * Get the original document content from S3 storage.
+     *
+     * @param userId     The user's ID
+     * @param documentId The document's ID
+     * @return InputStream of the document content, or empty if not stored
+     */
+    public Optional<InputStream> getDocumentContent(UUID userId, UUID documentId) throws IOException {
+        Optional<UserDocument> docOpt = documentRepository.findByIdAndUserId(documentId, userId);
+
+        if (docOpt.isEmpty()) {
+            return Optional.empty();
+        }
+
+        UserDocument document = docOpt.get();
+
+        if (document.getStoragePath() == null) {
+            return Optional.empty();
+        }
+
+        if (!storageService.isStorageEnabled()) {
+            return Optional.empty();
+        }
+
+        return Optional.of(storageService.getDocument(document.getStoragePath()));
+    }
+
+    /**
+     * Get the raw UserDocument entity for a user's document.
+     */
+    public Optional<UserDocument> getUserDocumentEntity(UUID userId, UUID documentId) {
+        return documentRepository.findByIdAndUserId(documentId, userId);
+    }
+
+    /**
      * Delete a document and its embeddings for a user.
      */
     @Transactional
@@ -316,6 +365,15 @@ public class DocumentEmbeddingService {
             deleteDocumentEmbeddings(documentId);
         } catch (Exception e) {
             log.warn("Failed to delete embeddings for document {}: {}", documentId, e.getMessage());
+        }
+
+        // Delete from S3 if stored
+        if (document.getStoragePath() != null) {
+            try {
+                storageService.deleteDocument(document.getStoragePath());
+            } catch (Exception e) {
+                log.warn("Failed to delete document from S3: {}", e.getMessage());
+            }
         }
 
         // Delete document record
@@ -337,6 +395,15 @@ public class DocumentEmbeddingService {
                 deleteDocumentEmbeddings(doc.getId());
             } catch (Exception e) {
                 log.warn("Failed to delete embeddings for document {}: {}", doc.getId(), e.getMessage());
+            }
+
+            // Delete from S3 if stored
+            if (doc.getStoragePath() != null) {
+                try {
+                    storageService.deleteDocument(doc.getStoragePath());
+                } catch (Exception e) {
+                    log.warn("Failed to delete document from S3: {}", e.getMessage());
+                }
             }
         }
 

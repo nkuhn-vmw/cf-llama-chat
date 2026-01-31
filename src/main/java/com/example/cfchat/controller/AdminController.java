@@ -137,6 +137,16 @@ public class AdminController {
         return "admin/models";
     }
 
+    @GetMapping("/admin/storage")
+    public String adminStoragePage(Model model) {
+        Optional<User> currentUser = userService.getCurrentUser();
+        if (currentUser.isEmpty() || currentUser.get().getRole() != User.UserRole.ADMIN) {
+            return "redirect:/";
+        }
+
+        return "admin/storage";
+    }
+
     @GetMapping("/api/admin/models")
     @ResponseBody
     public ResponseEntity<Map<String, Object>> getModels() {
