@@ -4,10 +4,12 @@ import io.pivotal.cfenv.core.CfCredentials;
 import io.pivotal.cfenv.core.CfEnv;
 import io.pivotal.cfenv.core.CfService;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.ai.document.MetadataMode;
 import org.springframework.ai.embedding.EmbeddingModel;
 import org.springframework.ai.openai.OpenAiEmbeddingModel;
 import org.springframework.ai.openai.OpenAiEmbeddingOptions;
 import org.springframework.ai.openai.api.OpenAiApi;
+import org.springframework.ai.retry.RetryUtils;
 import org.springframework.ai.vectorstore.pgvector.PgVectorStore;
 import org.springframework.ai.vectorstore.VectorStore;
 import org.springframework.beans.factory.annotation.Value;
@@ -40,10 +42,11 @@ public class VectorStoreConfig {
     /**
      * Creates an EmbeddingModel for local development using OpenAI.
      */
-    @Bean
-    @Profile("!cloud")
+    @Bean("documentEmbeddingModel")
+    @Profile({"default", "local"})
     @ConditionalOnProperty(name = "spring.ai.openai.api-key")
-    public EmbeddingModel openAiEmbeddingModel() {
+    @Primary
+    public EmbeddingModel localEmbeddingModel() {
         log.info("Creating OpenAI EmbeddingModel with model: {}", embeddingModelName);
 
         OpenAiApi openAiApi = OpenAiApi.builder()
@@ -55,20 +58,28 @@ public class VectorStoreConfig {
                 .dimensions(embeddingDimensions)
                 .build();
 
-        return OpenAiEmbeddingModel.builder()
-                .openAiApi(openAiApi)
-                .defaultOptions(options)
-                .build();
+        return new OpenAiEmbeddingModel(openAiApi, MetadataMode.EMBED, options, RetryUtils.DEFAULT_RETRY_TEMPLATE);
+    }
+
+    /**
+     * Creates a null EmbeddingModel for test profile to avoid auto-configuration conflicts.
+     */
+    @Bean("documentEmbeddingModel")
+    @Profile("test")
+    @Primary
+    public EmbeddingModel testEmbeddingModel() {
+        log.info("Test profile - no EmbeddingModel created");
+        return null;
     }
 
     /**
      * Creates an EmbeddingModel for Cloud Foundry using GenAI service.
      * Looks for a GenAI service with embedding capabilities in VCAP_SERVICES.
      */
-    @Bean
+    @Bean("documentEmbeddingModel")
     @Profile("cloud")
     @Primary
-    public EmbeddingModel genAiEmbeddingModel() {
+    public EmbeddingModel cloudEmbeddingModel() {
         log.info("Creating GenAI EmbeddingModel from VCAP_SERVICES");
 
         try {
@@ -104,10 +115,7 @@ public class VectorStoreConfig {
                                 .model(modelName)
                                 .build();
 
-                        return OpenAiEmbeddingModel.builder()
-                                .openAiApi(openAiApi)
-                                .defaultOptions(options)
-                                .build();
+                        return new OpenAiEmbeddingModel(openAiApi, MetadataMode.EMBED, options, RetryUtils.DEFAULT_RETRY_TEMPLATE);
                     }
                 }
             }
@@ -141,10 +149,7 @@ public class VectorStoreConfig {
                             .model("text-embedding-3-small")
                             .build();
 
-                    return OpenAiEmbeddingModel.builder()
-                            .openAiApi(openAiApi)
-                            .defaultOptions(options)
-                            .build();
+                    return new OpenAiEmbeddingModel(openAiApi, MetadataMode.EMBED, options, RetryUtils.DEFAULT_RETRY_TEMPLATE);
                 }
             }
 
@@ -162,8 +167,9 @@ public class VectorStoreConfig {
      * Uses the same PostgreSQL database as the application.
      */
     @Bean
+    @Profile("!test")
     public VectorStore vectorStore(JdbcTemplate jdbcTemplate,
-                                   EmbeddingModel embeddingModel) {
+                                   @org.springframework.beans.factory.annotation.Autowired(required = false) EmbeddingModel embeddingModel) {
         if (embeddingModel == null) {
             log.warn("No EmbeddingModel available - VectorStore will not be created");
             return null;
