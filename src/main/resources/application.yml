@@ -29,6 +29,9 @@ spring:
         options:
           model: ${OPENAI_MODEL:gpt-4o-mini}
           temperature: 0.7
+      embedding:
+        options:
+          model: ${EMBEDDING_MODEL:text-embedding-3-small}
     ollama:
       base-url: ${OLLAMA_BASE_URL:http://localhost:11434}
       chat:
@@ -38,6 +41,12 @@ spring:
 
   thymeleaf:
     cache: false
+
+  servlet:
+    multipart:
+      enabled: true
+      max-file-size: 100MB
+      max-request-size: 100MB
 
 server:
   port: ${PORT:8080}
@@ -61,3 +70,13 @@ app:
   auth:
     secret: ${APP_AUTH_SECRET:}
     require-invitation: ${APP_REQUIRE_INVITATION:false}
+  # Document embedding configuration
+  embedding:
+    model: ${EMBEDDING_MODEL:text-embedding-3-small}
+    dimensions: ${EMBEDDING_DIMENSIONS:512}
+  documents:
+    max-file-size: ${MAX_DOCUMENT_SIZE:104857600}
+    max-documents-per-user: ${MAX_DOCUMENTS_PER_USER:50}
+    chunk-size: ${DOCUMENT_CHUNK_SIZE:800}
+    chunk-overlap: ${DOCUMENT_CHUNK_OVERLAP:100}
+    rag-top-k: ${RAG_TOP_K:5}
