@@ -1,4 +1,8 @@
 spring:
+  autoconfigure:
+    exclude:
+      - org.springframework.ai.vectorstore.pgvector.autoconfigure.PgVectorStoreAutoConfiguration
+      - org.springframework.ai.model.openai.autoconfigure.OpenAiEmbeddingAutoConfiguration
   datasource:
     url: ${vcap.services.chat-db.credentials.uri:jdbc:postgresql://localhost:5432/chatdb}
     driver-class-name: org.postgresql.Driver

@@ -166,9 +166,10 @@ public class VectorStoreConfig {
      * Creates a PgVector store for document embeddings.
      * Uses the same PostgreSQL database as the application.
      */
-    @Bean
+    @Bean("documentVectorStore")
     @Profile("!test")
-    public VectorStore vectorStore(JdbcTemplate jdbcTemplate,
+    @Primary
+    public VectorStore documentVectorStore(JdbcTemplate jdbcTemplate,
                                    @org.springframework.beans.factory.annotation.Autowired(required = false) EmbeddingModel embeddingModel) {
         if (embeddingModel == null) {
             log.warn("No EmbeddingModel available - VectorStore will not be created");
