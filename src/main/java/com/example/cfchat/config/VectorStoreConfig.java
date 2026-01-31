@@ -5,10 +5,12 @@ import io.pivotal.cfenv.core.CfEnv;
 import io.pivotal.cfenv.core.CfService;
 import lombok.Getter;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.ai.document.MetadataMode;
 import org.springframework.ai.embedding.EmbeddingModel;
 import org.springframework.ai.openai.OpenAiEmbeddingModel;
 import org.springframework.ai.openai.OpenAiEmbeddingOptions;
 import org.springframework.ai.openai.api.OpenAiApi;
+import org.springframework.ai.retry.RetryUtils;
 import org.springframework.ai.vectorstore.pgvector.PgVectorStore;
 import org.springframework.ai.vectorstore.VectorStore;
 import org.springframework.beans.factory.annotation.Value;
@@ -20,7 +22,6 @@ import org.springframework.context.annotation.Profile;
 import org.springframework.jdbc.core.JdbcTemplate;
 
 import java.util.ArrayList;
-import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 
@@ -51,10 +52,11 @@ public class VectorStoreConfig {
     /**
      * Creates an EmbeddingModel for local development using OpenAI.
      */
-    @Bean
-    @Profile("!cloud")
+    @Bean("documentEmbeddingModel")
+    @Profile({"default", "local"})
     @ConditionalOnProperty(name = "spring.ai.openai.api-key")
-    public EmbeddingModel openAiEmbeddingModel() {
+    @Primary
+    public EmbeddingModel localEmbeddingModel() {
         log.info("Creating OpenAI EmbeddingModel with model: {}, dimensions: {}",
                 embeddingModelName, embeddingDimensions);
 
@@ -67,13 +69,19 @@ public class VectorStoreConfig {
                 .dimensions(embeddingDimensions)
                 .build();
 
-        EmbeddingModel model = OpenAiEmbeddingModel.builder()
-                .openAiApi(openAiApi)
-                .defaultOptions(options)
-                .build();
-
         activeEmbeddingModel = new EmbeddingModelInfo(embeddingModelName, "openai", "OpenAI API");
-        return model;
+        return new OpenAiEmbeddingModel(openAiApi, MetadataMode.EMBED, options, RetryUtils.DEFAULT_RETRY_TEMPLATE);
+    }
+
+    /**
+     * Creates a null EmbeddingModel for test profile to avoid auto-configuration conflicts.
+     */
+    @Bean("documentEmbeddingModel")
+    @Profile("test")
+    @Primary
+    public EmbeddingModel testEmbeddingModel() {
+        log.info("Test profile - no EmbeddingModel created");
+        return null;
     }
 
     /**
@@ -86,10 +94,10 @@ public class VectorStoreConfig {
      * 3. Services with model_name containing "embed"
      * 4. Fallback to first available GenAI service
      */
-    @Bean
+    @Bean("documentEmbeddingModel")
     @Profile("cloud")
     @Primary
-    public EmbeddingModel genAiEmbeddingModel() {
+    public EmbeddingModel cloudEmbeddingModel() {
         log.info("Creating GenAI EmbeddingModel from VCAP_SERVICES");
 
         try {
@@ -178,18 +186,13 @@ public class VectorStoreConfig {
                     optionsBuilder.dimensions(embeddingDimensions);
                 }
 
-                EmbeddingModel model = OpenAiEmbeddingModel.builder()
-                        .openAiApi(openAiApi)
-                        .defaultOptions(optionsBuilder.build())
-                        .build();
-
                 activeEmbeddingModel = new EmbeddingModelInfo(
                         selected.modelName,
                         "genai",
                         selected.serviceName
                 );
 
-                return model;
+                return new OpenAiEmbeddingModel(openAiApi, MetadataMode.EMBED, optionsBuilder.build(), RetryUtils.DEFAULT_RETRY_TEMPLATE);
             }
 
             log.warn("No suitable GenAI embedding service found in VCAP_SERVICES");
@@ -205,9 +208,11 @@ public class VectorStoreConfig {
      * Creates a PgVector store for document embeddings.
      * Uses the same PostgreSQL database as the application.
      */
-    @Bean
-    public VectorStore vectorStore(JdbcTemplate jdbcTemplate,
-                                   EmbeddingModel embeddingModel) {
+    @Bean("documentVectorStore")
+    @Profile("!test")
+    @Primary
+    public VectorStore documentVectorStore(JdbcTemplate jdbcTemplate,
+                                   @org.springframework.beans.factory.annotation.Autowired(required = false) EmbeddingModel embeddingModel) {
         if (embeddingModel == null) {
             log.warn("No EmbeddingModel available - VectorStore will not be created");
             return null;
