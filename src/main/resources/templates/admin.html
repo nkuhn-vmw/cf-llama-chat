@@ -292,6 +292,21 @@
                     Configure S3 storage
                 </div>
             </a>
+
+            <a href="/admin/database" class="admin-nav-card">
+                <div class="card-icon">
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                        <path d="M12 2L2 7l10 5 10-5-10-5z"></path>
+                        <path d="M2 17l10 5 10-5"></path>
+                        <path d="M2 12l10 5 10-5"></path>
+                    </svg>
+                </div>
+                <h3>Database Monitoring</h3>
+                <p>Monitor PostgreSQL performance, view table statistics, index usage, and active connections.</p>
+                <div class="card-stat">
+                    View database performance
+                </div>
+            </a>
         </nav>
 
         <div class="environment-badge" th:classappend="${isCloudProfile} ? 'cloud' : ''">

@@ -96,4 +96,20 @@ public class ConversationController {
                 .toList();
         return ResponseEntity.ok(messages);
     }
+
+    @DeleteMapping("/clear-all")
+    public ResponseEntity<Map<String, Object>> clearAllConversations() {
+        Optional<User> currentUser = userService.getCurrentUser();
+        if (currentUser.isEmpty()) {
+            return ResponseEntity.status(401).body(Map.of("error", "Not authenticated"));
+        }
+
+        int deletedCount = conversationService.deleteAllConversationsForUser(currentUser.get().getId());
+        log.info("User {} cleared all {} conversations", currentUser.get().getUsername(), deletedCount);
+
+        return ResponseEntity.ok(Map.of(
+                "success", true,
+                "deletedCount", deletedCount
+        ));
+    }
 }

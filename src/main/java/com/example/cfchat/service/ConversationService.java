@@ -112,6 +112,15 @@ public class ConversationService {
         log.info("Deleted conversation: {}", id);
     }
 
+    @Transactional
+    public int deleteAllConversationsForUser(UUID userId) {
+        List<Conversation> conversations = conversationRepository.findByUserIdOrderByUpdatedAtDesc(userId);
+        int count = conversations.size();
+        conversationRepository.deleteByUserId(userId);
+        log.info("Deleted {} conversations for user: {}", count, userId);
+        return count;
+    }
+
     @Transactional(readOnly = true)
     public List<Message> getMessages(UUID conversationId) {
         return messageRepository.findByConversationIdOrderByCreatedAtAsc(conversationId);

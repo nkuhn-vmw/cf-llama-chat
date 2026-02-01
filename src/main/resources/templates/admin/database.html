@@ -1,0 +1,507 @@
+<!DOCTYPE html>
+<html lang="en" xmlns:th="http://www.thymeleaf.org">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Database Monitoring - Admin Portal</title>
+    <link rel="stylesheet" th:href="@{/css/style.css}">
+    <style>
+        .admin-container {
+            max-width: 1400px;
+            margin: 0 auto;
+            padding: 24px;
+        }
+
+        .admin-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 32px;
+        }
+
+        .admin-header h1 {
+            font-size: 1.8rem;
+            font-weight: 600;
+        }
+
+        .header-nav {
+            display: flex;
+            align-items: center;
+            gap: 24px;
+        }
+
+        .back-link {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            color: var(--accent-color);
+            text-decoration: none;
+            font-size: 0.95rem;
+        }
+
+        .back-link:hover {
+            text-decoration: underline;
+        }
+
+        .back-link svg {
+            width: 18px;
+            height: 18px;
+        }
+
+        .db-overview {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+            gap: 16px;
+            margin-bottom: 32px;
+        }
+
+        .overview-card {
+            background-color: var(--bg-secondary);
+            border: 1px solid var(--border-color);
+            border-radius: 12px;
+            padding: 20px;
+        }
+
+        .overview-card .value {
+            font-size: 1.5rem;
+            font-weight: 700;
+            color: var(--accent-color);
+            word-break: break-all;
+        }
+
+        .overview-card .label {
+            font-size: 0.85rem;
+            color: var(--text-secondary);
+            margin-top: 4px;
+        }
+
+        .section {
+            margin-bottom: 32px;
+        }
+
+        .section-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 16px;
+        }
+
+        .section h2 {
+            font-size: 1.3rem;
+            font-weight: 600;
+        }
+
+        .refresh-btn {
+            display: flex;
+            align-items: center;
+            gap: 6px;
+            padding: 8px 14px;
+            background-color: var(--accent-color);
+            color: white;
+            border: none;
+            border-radius: 8px;
+            cursor: pointer;
+            font-size: 0.85rem;
+            transition: background-color 0.2s;
+        }
+
+        .refresh-btn:hover {
+            background-color: var(--accent-hover);
+        }
+
+        .refresh-btn svg {
+            width: 16px;
+            height: 16px;
+        }
+
+        .data-table {
+            width: 100%;
+            background-color: var(--bg-secondary);
+            border: 1px solid var(--border-color);
+            border-radius: 12px;
+            overflow: hidden;
+        }
+
+        .data-table table {
+            width: 100%;
+            border-collapse: collapse;
+        }
+
+        .data-table th,
+        .data-table td {
+            padding: 12px 14px;
+            text-align: left;
+            border-bottom: 1px solid var(--border-color);
+        }
+
+        .data-table th {
+            background-color: var(--bg-tertiary);
+            font-weight: 600;
+            font-size: 0.8rem;
+            text-transform: uppercase;
+            color: var(--text-secondary);
+        }
+
+        .data-table tr:last-child td {
+            border-bottom: none;
+        }
+
+        .data-table tr:hover td {
+            background-color: var(--bg-hover);
+        }
+
+        .data-table .number {
+            text-align: right;
+            font-family: 'SF Mono', Monaco, monospace;
+            font-size: 0.9rem;
+        }
+
+        .data-table .query-cell {
+            max-width: 400px;
+            overflow: hidden;
+            text-overflow: ellipsis;
+            white-space: nowrap;
+            font-family: 'SF Mono', Monaco, monospace;
+            font-size: 0.8rem;
+        }
+
+        .badge {
+            display: inline-block;
+            padding: 3px 8px;
+            border-radius: 12px;
+            font-size: 0.75rem;
+            font-weight: 500;
+        }
+
+        .badge.active {
+            background-color: rgba(16, 163, 127, 0.2);
+            color: var(--accent-color);
+        }
+
+        .badge.idle {
+            background-color: rgba(156, 163, 175, 0.2);
+            color: var(--text-secondary);
+        }
+
+        .badge.postgres {
+            background-color: rgba(59, 130, 246, 0.2);
+            color: #3b82f6;
+        }
+
+        .badge.h2 {
+            background-color: rgba(234, 179, 8, 0.2);
+            color: #eab308;
+        }
+
+        .empty-state {
+            text-align: center;
+            padding: 40px;
+            color: var(--text-muted);
+        }
+
+        .tabs {
+            display: flex;
+            gap: 4px;
+            margin-bottom: 16px;
+            background-color: var(--bg-secondary);
+            padding: 4px;
+            border-radius: 10px;
+            border: 1px solid var(--border-color);
+        }
+
+        .tab-btn {
+            padding: 10px 20px;
+            background: none;
+            border: none;
+            border-radius: 8px;
+            color: var(--text-secondary);
+            cursor: pointer;
+            font-size: 0.9rem;
+            transition: all 0.2s;
+        }
+
+        .tab-btn:hover {
+            color: var(--text-primary);
+            background-color: var(--bg-hover);
+        }
+
+        .tab-btn.active {
+            background-color: var(--accent-color);
+            color: white;
+        }
+
+        .tab-content {
+            display: none;
+        }
+
+        .tab-content.active {
+            display: block;
+        }
+
+        .notice-box {
+            background-color: var(--bg-tertiary);
+            border: 1px solid var(--border-color);
+            border-radius: 8px;
+            padding: 16px;
+            color: var(--text-secondary);
+            font-size: 0.9rem;
+        }
+
+        .notice-box.info {
+            border-left: 4px solid var(--accent-color);
+        }
+
+        @media (max-width: 768px) {
+            .data-table {
+                overflow-x: auto;
+            }
+
+            .data-table table {
+                min-width: 600px;
+            }
+
+            .tabs {
+                flex-wrap: wrap;
+            }
+        }
+    </style>
+</head>
+<body>
+    <div class="admin-container">
+        <header class="admin-header">
+            <h1>Database Monitoring</h1>
+            <div class="header-nav">
+                <a href="/admin" class="back-link">
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                        <line x1="19" y1="12" x2="5" y2="12"></line>
+                        <polyline points="12 19 5 12 12 5"></polyline>
+                    </svg>
+                    Back to Admin
+                </a>
+                <a href="/" class="back-link">
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                        <path d="M3 9l9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"></path>
+                        <polyline points="9 22 9 12 15 12 15 22"></polyline>
+                    </svg>
+                    Chat
+                </a>
+            </div>
+        </header>
+
+        <!-- Database Overview -->
+        <div class="db-overview">
+            <div class="overview-card">
+                <div class="value" th:text="${dbOverview.databaseType}">PostgreSQL</div>
+                <div class="label">Database Type</div>
+            </div>
+            <div class="overview-card">
+                <div class="value" th:text="${dbOverview.databaseSize}">0 MB</div>
+                <div class="label">Database Size</div>
+            </div>
+            <div class="overview-card">
+                <div class="value" th:text="${dbOverview.tableCount}">0</div>
+                <div class="label">Tables</div>
+            </div>
+            <div class="overview-card">
+                <div class="value" th:text="${dbOverview.totalRows}">0</div>
+                <div class="label">Total Rows</div>
+            </div>
+            <div class="overview-card">
+                <div class="value" th:text="${dbOverview.activeConnections}">0</div>
+                <div class="label">Active Connections</div>
+            </div>
+        </div>
+
+        <!-- Tabs Navigation -->
+        <div class="tabs">
+            <button class="tab-btn active" data-tab="tables">Tables</button>
+            <button class="tab-btn" data-tab="indexes" th:if="${isPostgres}">Indexes</button>
+            <button class="tab-btn" data-tab="connections" th:if="${isPostgres}">Connections</button>
+            <button class="tab-btn" data-tab="queries" th:if="${isPostgres}">Slow Queries</button>
+        </div>
+
+        <!-- Tables Tab -->
+        <div class="tab-content active" id="tables-tab">
+            <div class="section">
+                <div class="section-header">
+                    <h2>Table Statistics</h2>
+                    <button class="refresh-btn" onclick="location.reload()">
+                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                            <polyline points="23 4 23 10 17 10"></polyline>
+                            <polyline points="1 20 1 14 7 14"></polyline>
+                            <path d="M3.51 9a9 9 0 0 1 14.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0 0 20.49 15"></path>
+                        </svg>
+                        Refresh
+                    </button>
+                </div>
+                <div class="data-table">
+                    <table>
+                        <thead>
+                            <tr>
+                                <th>Table Name</th>
+                                <th class="number">Row Count</th>
+                                <th class="number" th:if="${isPostgres}">Total Size</th>
+                                <th class="number" th:if="${isPostgres}">Index Size</th>
+                                <th class="number" th:if="${isPostgres}">Inserts</th>
+                                <th class="number" th:if="${isPostgres}">Updates</th>
+                                <th class="number" th:if="${isPostgres}">Deletes</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            <tr th:each="table : ${tableStats}">
+                                <td th:text="${table.tableName}">table_name</td>
+                                <td class="number" th:text="${#numbers.formatInteger(table.rowCount, 1, 'COMMA')}">0</td>
+                                <td class="number" th:if="${isPostgres}" th:text="${table.totalSize}">0 KB</td>
+                                <td class="number" th:if="${isPostgres}" th:text="${table.indexSize}">0 KB</td>
+                                <td class="number" th:if="${isPostgres}" th:text="${#numbers.formatInteger(table.inserts, 1, 'COMMA')}">0</td>
+                                <td class="number" th:if="${isPostgres}" th:text="${#numbers.formatInteger(table.updates, 1, 'COMMA')}">0</td>
+                                <td class="number" th:if="${isPostgres}" th:text="${#numbers.formatInteger(table.deletes, 1, 'COMMA')}">0</td>
+                            </tr>
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
+
+        <!-- Indexes Tab -->
+        <div class="tab-content" id="indexes-tab" th:if="${isPostgres}">
+            <div class="section">
+                <h2>Index Usage Statistics</h2>
+                <div class="data-table" th:if="${!indexStats.isEmpty()}">
+                    <table>
+                        <thead>
+                            <tr>
+                                <th>Index Name</th>
+                                <th>Table</th>
+                                <th class="number">Scans</th>
+                                <th class="number">Tuples Read</th>
+                                <th class="number">Tuples Fetched</th>
+                                <th class="number">Size</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            <tr th:each="idx : ${indexStats}">
+                                <td th:text="${idx.indexName}">index_name</td>
+                                <td th:text="${idx.tableName}">table_name</td>
+                                <td class="number" th:text="${#numbers.formatInteger(idx.scans, 1, 'COMMA')}">0</td>
+                                <td class="number" th:text="${#numbers.formatInteger(idx.tuplesRead, 1, 'COMMA')}">0</td>
+                                <td class="number" th:text="${#numbers.formatInteger(idx.tuplesFetched, 1, 'COMMA')}">0</td>
+                                <td class="number" th:text="${idx.indexSize}">0 KB</td>
+                            </tr>
+                        </tbody>
+                    </table>
+                </div>
+                <div class="empty-state" th:if="${indexStats.isEmpty()}">
+                    <p>No index statistics available.</p>
+                </div>
+            </div>
+        </div>
+
+        <!-- Connections Tab -->
+        <div class="tab-content" id="connections-tab" th:if="${isPostgres}">
+            <div class="section">
+                <h2>Active Database Connections</h2>
+                <div class="data-table" th:if="${!activeConnections.isEmpty()}">
+                    <table>
+                        <thead>
+                            <tr>
+                                <th>PID</th>
+                                <th>User</th>
+                                <th>Application</th>
+                                <th>Client</th>
+                                <th>State</th>
+                                <th>Query Preview</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            <tr th:each="conn : ${activeConnections}">
+                                <td th:text="${conn.pid}">0</td>
+                                <td th:text="${conn.username}">user</td>
+                                <td th:text="${conn.applicationName}">app</td>
+                                <td th:text="${conn.clientAddr}">127.0.0.1</td>
+                                <td>
+                                    <span class="badge"
+                                          th:classappend="${conn.state == 'active'} ? 'active' : 'idle'"
+                                          th:text="${conn.state}">active</span>
+                                </td>
+                                <td class="query-cell" th:text="${conn.queryPreview}" th:title="${conn.queryPreview}">SELECT ...</td>
+                            </tr>
+                        </tbody>
+                    </table>
+                </div>
+                <div class="empty-state" th:if="${activeConnections.isEmpty()}">
+                    <p>No active connections (other than current).</p>
+                </div>
+            </div>
+        </div>
+
+        <!-- Slow Queries Tab -->
+        <div class="tab-content" id="queries-tab" th:if="${isPostgres}">
+            <div class="section">
+                <h2>Query Performance (Top 20 by Total Time)</h2>
+                <div th:if="${slowQueries != null && !slowQueries.isEmpty() && slowQueries[0].notice != null}" class="notice-box info">
+                    <p th:text="${slowQueries[0].notice}">Notice</p>
+                    <p style="margin-top: 8px;">To enable query statistics, run: <code>CREATE EXTENSION pg_stat_statements;</code></p>
+                </div>
+                <div class="data-table" th:if="${slowQueries != null && !slowQueries.isEmpty() && slowQueries[0].notice == null}">
+                    <table>
+                        <thead>
+                            <tr>
+                                <th>Query</th>
+                                <th class="number">Calls</th>
+                                <th class="number">Total Time (ms)</th>
+                                <th class="number">Mean Time (ms)</th>
+                                <th class="number">Rows</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            <tr th:each="q : ${slowQueries}">
+                                <td class="query-cell" th:text="${q.query}" th:title="${q.query}">SELECT ...</td>
+                                <td class="number" th:text="${#numbers.formatInteger(q.calls, 1, 'COMMA')}">0</td>
+                                <td class="number" th:text="${#numbers.formatDecimal(q.totalTimeMs, 1, 2, 'COMMA')}">0.00</td>
+                                <td class="number" th:text="${#numbers.formatDecimal(q.meanTimeMs, 1, 2, 'COMMA')}">0.00</td>
+                                <td class="number" th:text="${#numbers.formatInteger(q.rows, 1, 'COMMA')}">0</td>
+                            </tr>
+                        </tbody>
+                    </table>
+                </div>
+                <div class="empty-state" th:if="${slowQueries == null || slowQueries.isEmpty()}">
+                    <p>No query statistics available.</p>
+                </div>
+            </div>
+        </div>
+
+        <!-- H2 Notice -->
+        <div class="notice-box info" th:if="${!isPostgres}" style="margin-top: 24px;">
+            <p><strong>Development Mode (H2 Database)</strong></p>
+            <p style="margin-top: 8px;">Limited statistics available in H2 in-memory database. Deploy with PostgreSQL for full monitoring capabilities including:</p>
+            <ul style="margin-top: 8px; margin-left: 20px;">
+                <li>Table sizes and storage usage</li>
+                <li>Index performance metrics</li>
+                <li>Active connection monitoring</li>
+                <li>Query performance analysis</li>
+            </ul>
+        </div>
+    </div>
+
+    <script>
+        // Apply saved theme
+        const savedTheme = localStorage.getItem('theme') || 'dark';
+        document.body.setAttribute('data-theme', savedTheme);
+
+        // Tab switching
+        document.querySelectorAll('.tab-btn').forEach(btn => {
+            btn.addEventListener('click', () => {
+                // Remove active class from all tabs and content
+                document.querySelectorAll('.tab-btn').forEach(t => t.classList.remove('active'));
+                document.querySelectorAll('.tab-content').forEach(c => c.classList.remove('active'));
+
+                // Add active class to clicked tab and corresponding content
+                btn.classList.add('active');
+                const tabId = btn.dataset.tab + '-tab';
+                document.getElementById(tabId)?.classList.add('active');
+            });
+        });
+    </script>
+</body>
+</html>

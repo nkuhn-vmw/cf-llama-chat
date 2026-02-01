@@ -9,6 +9,7 @@ import com.example.cfchat.repository.ConversationRepository;
 import com.example.cfchat.repository.OrganizationRepository;
 import com.example.cfchat.service.ChatService;
 import com.example.cfchat.service.ConversationService;
+import com.example.cfchat.service.DatabaseStatsService;
 import com.example.cfchat.service.UserAccessService;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -31,6 +32,7 @@ public class AdminController {
     private final GenAiConfig genAiConfig;
     private final OrganizationRepository organizationRepository;
     private final UserAccessService userAccessService;
+    private final DatabaseStatsService databaseStatsService;
 
     @Value("${spring.profiles.active:default}")
     private String activeProfile;
@@ -42,7 +44,8 @@ public class AdminController {
             ChatService chatService,
             @Autowired(required = false) GenAiConfig genAiConfig,
             OrganizationRepository organizationRepository,
-            UserAccessService userAccessService) {
+            UserAccessService userAccessService,
+            DatabaseStatsService databaseStatsService) {
         this.userService = userService;
         this.conversationService = conversationService;
         this.conversationRepository = conversationRepository;
@@ -50,6 +53,7 @@ public class AdminController {
         this.genAiConfig = genAiConfig;
         this.organizationRepository = organizationRepository;
         this.userAccessService = userAccessService;
+        this.databaseStatsService = databaseStatsService;
     }
 
     @GetMapping("/admin")
@@ -145,6 +149,42 @@ public class AdminController {
         }
 
         return "admin/storage";
+    }
+
+    @GetMapping("/admin/database")
+    public String adminDatabasePage(Model model) {
+        Optional<User> currentUser = userService.getCurrentUser();
+        if (currentUser.isEmpty() || currentUser.get().getRole() != User.UserRole.ADMIN) {
+            return "redirect:/";
+        }
+
+        model.addAttribute("dbOverview", databaseStatsService.getDatabaseOverview());
+        model.addAttribute("tableStats", databaseStatsService.getTableStats());
+        model.addAttribute("indexStats", databaseStatsService.getIndexStats());
+        model.addAttribute("activeConnections", databaseStatsService.getActiveConnections());
+        model.addAttribute("slowQueries", databaseStatsService.getSlowQueries());
+        model.addAttribute("isPostgres", databaseStatsService.isPostgres());
+
+        return "admin/database";
+    }
+
+    @GetMapping("/api/admin/database/stats")
+    @ResponseBody
+    public ResponseEntity<Map<String, Object>> getDatabaseStats() {
+        Optional<User> currentUser = userService.getCurrentUser();
+        if (currentUser.isEmpty() || currentUser.get().getRole() != User.UserRole.ADMIN) {
+            return ResponseEntity.status(403).build();
+        }
+
+        Map<String, Object> stats = new HashMap<>();
+        stats.put("overview", databaseStatsService.getDatabaseOverview());
+        stats.put("tables", databaseStatsService.getTableStats());
+        stats.put("indexes", databaseStatsService.getIndexStats());
+        stats.put("connections", databaseStatsService.getActiveConnections());
+        stats.put("slowQueries", databaseStatsService.getSlowQueries());
+        stats.put("isPostgres", databaseStatsService.isPostgres());
+
+        return ResponseEntity.ok(stats);
     }
 
     @GetMapping("/api/admin/models")
