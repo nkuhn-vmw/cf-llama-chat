@@ -9,12 +9,15 @@ class ChatApp {
         this.isWaiting = false;
         this.useDocumentContext = false;
         this.documentsAvailable = false;
+        this.useTools = true;
+        this.toolsAvailable = false;
 
         this.initElements();
         this.initEventListeners();
         this.initMarkdown();
         this.initTheme();
         this.initDocuments();
+        this.initTools();
         this.scrollToBottom();
     }
 
@@ -51,6 +54,10 @@ class ChatApp {
         this.noDocuments = document.getElementById('noDocuments');
         this.useDocumentsToggle = document.getElementById('useDocumentsToggle');
         this.docToggleLabel = document.getElementById('docToggleLabel');
+
+        // Tools elements
+        this.useToolsToggle = document.getElementById('useToolsToggle');
+        this.toolsToggleLabel = document.getElementById('toolsToggleLabel');
     }
 
     initEventListeners() {
@@ -360,7 +367,8 @@ class ChatApp {
                 message: message,
                 provider: provider,
                 model: model,
-                useDocumentContext: this.useDocumentContext && this.documentsAvailable
+                useDocumentContext: this.useDocumentContext && this.documentsAvailable,
+                useTools: this.useTools && this.toolsAvailable
             };
 
             if (this.isStreaming) {
@@ -889,6 +897,14 @@ class ChatApp {
                 this.useDocumentContext = e.target.checked;
             });
         }
+
+        // Use tools toggle
+        if (this.useToolsToggle) {
+            this.useToolsToggle.addEventListener('change', (e) => {
+                this.useTools = e.target.checked;
+                localStorage.setItem('useTools', this.useTools);
+            });
+        }
     }
 
     toggleDocumentsPanel() {
@@ -928,6 +944,37 @@ class ChatApp {
             }
         } catch (error) {
             console.error('Error loading documents:', error);
+        }
+    }
+
+    async initTools() {
+        // Check if MCP tools are available
+        try {
+            const response = await fetch('/api/admin/tools/available');
+            if (response.ok) {
+                const data = await response.json();
+                this.toolsAvailable = data.available && data.count > 0;
+
+                // Show "Use Tools" toggle if tools are available
+                if (this.toolsToggleLabel) {
+                    this.toolsToggleLabel.style.display = this.toolsAvailable ? 'flex' : 'none';
+                }
+
+                // Set initial toggle state from saved preference
+                const savedPref = localStorage.getItem('useTools');
+                if (savedPref !== null) {
+                    this.useTools = savedPref === 'true';
+                    if (this.useToolsToggle) {
+                        this.useToolsToggle.checked = this.useTools;
+                    }
+                }
+            }
+        } catch (error) {
+            console.warn('Could not check tools availability:', error);
+            // Hide the toggle if we can't determine availability
+            if (this.toolsToggleLabel) {
+                this.toolsToggleLabel.style.display = 'none';
+            }
         }
     }
 

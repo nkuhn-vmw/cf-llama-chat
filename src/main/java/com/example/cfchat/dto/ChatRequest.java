@@ -31,4 +31,11 @@ public class ChatRequest {
      */
     @Builder.Default
     private boolean useDocumentContext = false;
+
+    /**
+     * Whether to use MCP tools during chat.
+     * When true, available MCP tools will be provided to the model for function calling.
+     */
+    @Builder.Default
+    private boolean useTools = true;
 }

@@ -1442,6 +1442,19 @@ body {
     accent-color: var(--accent-color);
 }
 
+.tools-toggle {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    font-size: 0.85rem;
+    color: var(--text-secondary);
+    cursor: pointer;
+}
+
+.tools-toggle input {
+    accent-color: var(--accent-color);
+}
+
 .docs-btn {
     display: flex;
     align-items: center;
