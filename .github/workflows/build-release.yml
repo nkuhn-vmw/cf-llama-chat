@@ -8,6 +8,9 @@ on:
     branches:
       - main
 
+permissions:
+  contents: write
+
 jobs:
   build:
     runs-on: ubuntu-latest
@@ -43,9 +46,6 @@ jobs:
     runs-on: ubuntu-latest
     if: github.event_name == 'push' && github.ref == 'refs/heads/main'
 
-    permissions:
-      contents: write
-
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
@@ -71,10 +71,8 @@ jobs:
       - name: Generate release tag
         id: release_tag
         run: |
-          # Use version + short commit hash + timestamp for unique releases
           VERSION=${{ steps.get_version.outputs.version }}
           SHORT_SHA=$(git rev-parse --short HEAD)
-          TIMESTAMP=$(date +%Y%m%d%H%M%S)
           TAG="v${VERSION}-${SHORT_SHA}"
           echo "tag=$TAG" >> $GITHUB_OUTPUT
           echo "Generated tag: $TAG"
@@ -82,20 +80,17 @@ jobs:
       - name: Generate changelog
         id: changelog
         run: |
-          # Get commits since last tag or last 10 commits
           LAST_TAG=$(git describe --tags --abbrev=0 2>/dev/null || echo "")
           if [ -n "$LAST_TAG" ]; then
             CHANGELOG=$(git log ${LAST_TAG}..HEAD --pretty=format:"- %s (%h)" --no-merges | head -50)
           else
             CHANGELOG=$(git log --pretty=format:"- %s (%h)" --no-merges -10)
           fi
-
-          # Write to file for multiline support
           echo "$CHANGELOG" > changelog.txt
-          echo "Generated changelog with $(echo "$CHANGELOG" | wc -l) entries"
+          echo "Generated changelog with $(wc -l < changelog.txt) entries"
 
       - name: Create GitHub Release
-        uses: softprops/action-gh-release@v1
+        uses: softprops/action-gh-release@v2
         with:
           tag_name: ${{ steps.release_tag.outputs.tag }}
           name: Release ${{ steps.release_tag.outputs.tag }}
@@ -104,8 +99,7 @@ jobs:
           prerelease: ${{ contains(steps.get_version.outputs.version, 'SNAPSHOT') }}
           files: |
             target/*.jar
-        env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          generate_release_notes: false
 
       - name: Summary
         run: |
