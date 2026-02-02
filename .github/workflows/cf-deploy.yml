@@ -132,6 +132,7 @@ jobs:
           APP_ROUTE: ${{ secrets.APP_ROUTE_NONPROD }}
           CF_DOMAIN: ${{ secrets.CF_DOMAIN_NONPROD }}
           DEPLOY_VERSION: ${{ needs.prepare.outputs.version }}
+          DB_SERVICE: cf-llama-chat-db
         run: |
           set -e
 
@@ -144,6 +145,13 @@ jobs:
 
           # Check if blue app exists
           BLUE_EXISTS=$(cf apps | grep -c "^${BLUE_APP} " || echo "0")
+
+          # Check for apps bound to the database service to avoid conflicts
+          echo "Checking for apps bound to ${DB_SERVICE}..."
+          BOUND_APPS=$(cf service ${DB_SERVICE} 2>/dev/null | grep -A 100 "bound apps:" | grep -E "^\s+name:" | awk '{print $2}' || echo "")
+          if [ -n "$BOUND_APPS" ]; then
+            echo "Apps currently bound to ${DB_SERVICE}: ${BOUND_APPS}"
+          fi
 
           # Find JAR file
           JAR_FILE=$(find ./artifacts -name "*.jar" -type f | head -1)
@@ -161,6 +169,15 @@ jobs:
           # Set environment variables
           cf set-env "${GREEN_APP}" SPRING_PROFILES_ACTIVE "cloud"
           cf set-env "${GREEN_APP}" APP_VERSION "${DEPLOY_VERSION}"
+
+          # IMPORTANT: Stop blue app BEFORE starting green to avoid two apps
+          # connecting to the same PostgreSQL database simultaneously
+          if [ "$BLUE_EXISTS" -gt 0 ]; then
+            echo "Stopping blue app to release database connections..."
+            cf stop "${BLUE_APP}" || true
+            # Give the database a moment to release connections
+            sleep 5
+          fi
 
           # Start the green app
           cf start "${GREEN_APP}"
@@ -183,6 +200,11 @@ jobs:
           if [ $ATTEMPTS -eq $MAX_ATTEMPTS ]; then
             echo "Green app failed to become healthy"
             cf logs "${GREEN_APP}" --recent
+            # Attempt to restart blue app for rollback
+            if [ "$BLUE_EXISTS" -gt 0 ]; then
+              echo "Attempting to restart blue app for rollback..."
+              cf start "${BLUE_APP}" || true
+            fi
             cf delete "${GREEN_APP}" -f
             exit 1
           fi
@@ -191,13 +213,10 @@ jobs:
           echo "Mapping route to green app..."
           cf map-route "${GREEN_APP}" "${CF_DOMAIN}" --hostname "${APP_ROUTE}"
 
-          # If blue exists, unmap route and stop it
+          # If blue exists, unmap route (already stopped earlier)
           if [ "$BLUE_EXISTS" -gt 0 ]; then
             echo "Unmapping route from blue app..."
             cf unmap-route "${BLUE_APP}" "${CF_DOMAIN}" --hostname "${APP_ROUTE}" || true
-
-            echo "Stopping blue app..."
-            cf stop "${BLUE_APP}" || true
 
             # Rename blue to old for cleanup
             cf rename "${BLUE_APP}" "${BLUE_APP}-old" || true
@@ -273,6 +292,7 @@ jobs:
           APP_ROUTE: ${{ secrets.APP_ROUTE_PROD }}
           CF_DOMAIN: ${{ secrets.CF_DOMAIN_PROD }}
           DEPLOY_VERSION: ${{ needs.prepare.outputs.version }}
+          DB_SERVICE: cf-llama-chat-db
         run: |
           set -e
 
@@ -285,6 +305,13 @@ jobs:
 
           # Check if blue app exists
           BLUE_EXISTS=$(cf apps | grep -c "^${BLUE_APP} " || echo "0")
+
+          # Check for apps bound to the database service to avoid conflicts
+          echo "Checking for apps bound to ${DB_SERVICE}..."
+          BOUND_APPS=$(cf service ${DB_SERVICE} 2>/dev/null | grep -A 100 "bound apps:" | grep -E "^\s+name:" | awk '{print $2}' || echo "")
+          if [ -n "$BOUND_APPS" ]; then
+            echo "Apps currently bound to ${DB_SERVICE}: ${BOUND_APPS}"
+          fi
 
           # Find JAR file
           JAR_FILE=$(find ./artifacts -name "*.jar" -type f | head -1)
@@ -302,6 +329,15 @@ jobs:
           # Set environment variables
           cf set-env "${GREEN_APP}" SPRING_PROFILES_ACTIVE "cloud"
           cf set-env "${GREEN_APP}" APP_VERSION "${DEPLOY_VERSION}"
+
+          # IMPORTANT: Stop blue app BEFORE starting green to avoid two apps
+          # connecting to the same PostgreSQL database simultaneously
+          if [ "$BLUE_EXISTS" -gt 0 ]; then
+            echo "Stopping blue app to release database connections..."
+            cf stop "${BLUE_APP}" || true
+            # Give the database a moment to release connections
+            sleep 5
+          fi
 
           # Start the green app
           cf start "${GREEN_APP}"
@@ -324,6 +360,11 @@ jobs:
           if [ $ATTEMPTS -eq $MAX_ATTEMPTS ]; then
             echo "Green app failed to become healthy"
             cf logs "${GREEN_APP}" --recent
+            # Attempt to restart blue app for rollback
+            if [ "$BLUE_EXISTS" -gt 0 ]; then
+              echo "Attempting to restart blue app for rollback..."
+              cf start "${BLUE_APP}" || true
+            fi
             cf delete "${GREEN_APP}" -f
             exit 1
           fi
@@ -332,13 +373,10 @@ jobs:
           echo "Mapping route to green app..."
           cf map-route "${GREEN_APP}" "${CF_DOMAIN}" --hostname "${APP_ROUTE}"
 
-          # If blue exists, unmap route and stop it
+          # If blue exists, unmap route (already stopped earlier)
           if [ "$BLUE_EXISTS" -gt 0 ]; then
             echo "Unmapping route from blue app..."
             cf unmap-route "${BLUE_APP}" "${CF_DOMAIN}" --hostname "${APP_ROUTE}" || true
-
-            echo "Stopping blue app..."
-            cf stop "${BLUE_APP}" || true
 
             # Rename blue to old for cleanup
             cf rename "${BLUE_APP}" "${BLUE_APP}-old" || true
