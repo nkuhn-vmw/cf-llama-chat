@@ -1,7 +1,10 @@
 package com.example.cfchat.service;
 
+import com.example.cfchat.model.EmbeddingMetric;
+import com.example.cfchat.model.EmbeddingMetric.OperationType;
 import com.example.cfchat.model.UsageMetric;
 import com.example.cfchat.model.User;
+import com.example.cfchat.repository.EmbeddingMetricRepository;
 import com.example.cfchat.repository.UsageMetricRepository;
 import com.example.cfchat.repository.UserRepository;
 import lombok.RequiredArgsConstructor;
@@ -18,6 +21,7 @@ import java.util.*;
 public class MetricsService {
 
     private final UsageMetricRepository usageMetricRepository;
+    private final EmbeddingMetricRepository embeddingMetricRepository;
     private final UserRepository userRepository;
 
     @Transactional
@@ -283,5 +287,172 @@ public class MetricsService {
     @Transactional(readOnly = true)
     public long getTotalMetricsCount() {
         return usageMetricRepository.count();
+    }
+
+    // ==================== Embedding Metrics ====================
+
+    @Transactional
+    public EmbeddingMetric recordEmbeddingUsage(UUID userId, UUID documentId, String model,
+                                                 Integer chunkCount, Long totalCharacters,
+                                                 Long processingTimeMs, OperationType operationType) {
+        EmbeddingMetric metric = EmbeddingMetric.builder()
+                .userId(userId)
+                .documentId(documentId)
+                .model(model)
+                .chunkCount(chunkCount != null ? chunkCount : 0)
+                .totalCharacters(totalCharacters != null ? totalCharacters : 0L)
+                .processingTimeMs(processingTimeMs)
+                .operationType(operationType != null ? operationType : OperationType.DOCUMENT_UPLOAD)
+                .timestamp(LocalDateTime.now())
+                .build();
+
+        return embeddingMetricRepository.save(metric);
+    }
+
+    @Transactional(readOnly = true)
+    public Map<String, Object> getEmbeddingSummaryForUser(UUID userId) {
+        Map<String, Object> summary = new HashMap<>();
+
+        LocalDateTime now = LocalDateTime.now();
+        LocalDateTime todayStart = now.toLocalDate().atStartOfDay();
+        LocalDateTime weekStart = now.minusDays(7);
+        LocalDateTime monthStart = now.minusDays(30);
+
+        // Total chunks embedded
+        Long totalChunks = embeddingMetricRepository.sumChunksByUserId(userId);
+        Long todayChunks = embeddingMetricRepository.sumChunksByUserIdAndTimestampAfter(userId, todayStart);
+
+        summary.put("totalChunks", totalChunks != null ? totalChunks : 0);
+        summary.put("todayChunks", todayChunks != null ? todayChunks : 0);
+
+        // Total characters
+        Long totalCharacters = embeddingMetricRepository.sumCharactersByUserId(userId);
+        summary.put("totalCharacters", totalCharacters != null ? totalCharacters : 0);
+
+        // Request counts
+        summary.put("totalEmbeddingRequests", embeddingMetricRepository.countByUserId(userId));
+        summary.put("todayEmbeddingRequests", embeddingMetricRepository.countByUserIdAndTimestampAfter(userId, todayStart));
+
+        // Average processing time
+        Double avgProcessingTime = embeddingMetricRepository.avgProcessingTimeByUserId(userId);
+        summary.put("avgProcessingTimeMs", avgProcessingTime != null ? avgProcessingTime : 0.0);
+
+        // Chunks by model
+        List<Object[]> chunksByModel = embeddingMetricRepository.sumChunksByModelForUser(userId);
+        Map<String, Long> modelChunks = new LinkedHashMap<>();
+        for (Object[] row : chunksByModel) {
+            modelChunks.put((String) row[0], (Long) row[1]);
+        }
+        summary.put("chunksByModel", modelChunks);
+
+        return summary;
+    }
+
+    @Transactional(readOnly = true)
+    public Map<String, Object> getGlobalEmbeddingSummary() {
+        Map<String, Object> summary = new HashMap<>();
+
+        LocalDateTime now = LocalDateTime.now();
+        LocalDateTime todayStart = now.toLocalDate().atStartOfDay();
+        LocalDateTime weekStart = now.minusDays(7);
+        LocalDateTime monthStart = now.minusDays(30);
+
+        // Total chunks
+        Long totalChunks = embeddingMetricRepository.sumTotalChunks();
+        Long todayChunks = embeddingMetricRepository.sumChunksByTimestampAfter(todayStart);
+        Long weekChunks = embeddingMetricRepository.sumChunksByTimestampAfter(weekStart);
+        Long monthChunks = embeddingMetricRepository.sumChunksByTimestampAfter(monthStart);
+
+        summary.put("totalChunks", totalChunks != null ? totalChunks : 0);
+        summary.put("todayChunks", todayChunks != null ? todayChunks : 0);
+        summary.put("weekChunks", weekChunks != null ? weekChunks : 0);
+        summary.put("monthChunks", monthChunks != null ? monthChunks : 0);
+
+        // Total characters
+        Long totalCharacters = embeddingMetricRepository.sumTotalCharacters();
+        Long todayCharacters = embeddingMetricRepository.sumCharactersByTimestampAfter(todayStart);
+        summary.put("totalCharacters", totalCharacters != null ? totalCharacters : 0);
+        summary.put("todayCharacters", todayCharacters != null ? todayCharacters : 0);
+
+        // Request counts
+        summary.put("totalEmbeddingRequests", embeddingMetricRepository.count());
+        summary.put("todayEmbeddingRequests", embeddingMetricRepository.countByTimestampAfter(todayStart));
+
+        // Average processing time
+        Double avgProcessingTime = embeddingMetricRepository.avgProcessingTime();
+        summary.put("avgProcessingTimeMs", avgProcessingTime != null ? avgProcessingTime : 0.0);
+
+        // Chunks by model (all time)
+        List<Object[]> chunksByModel = embeddingMetricRepository.sumChunksByModel();
+        Map<String, Long> modelChunks = new LinkedHashMap<>();
+        for (Object[] row : chunksByModel) {
+            modelChunks.put((String) row[0], (Long) row[1]);
+        }
+        summary.put("chunksByModel", modelChunks);
+
+        // Chunks by model by time period
+        summary.put("chunksByModelToday", getChunksByModelMap(
+                embeddingMetricRepository.sumChunksByModelAfter(todayStart)));
+        summary.put("chunksByModelWeek", getChunksByModelMap(
+                embeddingMetricRepository.sumChunksByModelAfter(weekStart)));
+        summary.put("chunksByModelMonth", getChunksByModelMap(
+                embeddingMetricRepository.sumChunksByModelAfter(monthStart)));
+
+        // Request count by model
+        List<Object[]> requestsByModel = embeddingMetricRepository.countRequestsByModel();
+        Map<String, Long> modelRequests = new LinkedHashMap<>();
+        for (Object[] row : requestsByModel) {
+            modelRequests.put((String) row[0], (Long) row[1]);
+        }
+        summary.put("requestsByModel", modelRequests);
+
+        // Average processing time by model
+        List<Object[]> avgTimeByModel = embeddingMetricRepository.avgProcessingTimeByModelAll();
+        Map<String, Double> modelAvgTime = new LinkedHashMap<>();
+        for (Object[] row : avgTimeByModel) {
+            modelAvgTime.put((String) row[0], (Double) row[1]);
+        }
+        summary.put("avgProcessingTimeByModel", modelAvgTime);
+
+        // Usage by user
+        List<Object[]> chunksByUser = embeddingMetricRepository.sumChunksByUser();
+        List<Map<String, Object>> userUsage = new ArrayList<>();
+        for (Object[] row : chunksByUser) {
+            UUID userId = (UUID) row[0];
+            Long chunks = (Long) row[1];
+
+            Optional<User> user = userRepository.findById(userId);
+            Map<String, Object> userData = new HashMap<>();
+            userData.put("userId", userId);
+            userData.put("totalChunks", chunks);
+            user.ifPresent(u -> {
+                userData.put("username", u.getUsername());
+                userData.put("displayName", u.getDisplayName());
+            });
+            userUsage.add(userData);
+        }
+        summary.put("usageByUser", userUsage);
+
+        return summary;
+    }
+
+    private Map<String, Long> getChunksByModelMap(List<Object[]> data) {
+        Map<String, Long> result = new LinkedHashMap<>();
+        for (Object[] row : data) {
+            result.put((String) row[0], (Long) row[1]);
+        }
+        return result;
+    }
+
+    @Transactional
+    public void clearAllEmbeddingMetrics() {
+        log.info("Clearing all embedding metrics");
+        embeddingMetricRepository.deleteAll();
+        log.info("All embedding metrics cleared");
+    }
+
+    @Transactional(readOnly = true)
+    public long getTotalEmbeddingMetricsCount() {
+        return embeddingMetricRepository.count();
     }
 }

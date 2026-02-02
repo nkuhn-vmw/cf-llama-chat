@@ -1,7 +1,9 @@
 package com.example.cfchat.service;
 
+import com.example.cfchat.config.VectorStoreConfig;
 import com.example.cfchat.dto.DocumentUploadResponse;
 import com.example.cfchat.dto.UserDocumentDto;
+import com.example.cfchat.model.EmbeddingMetric.OperationType;
 import com.example.cfchat.model.User;
 import com.example.cfchat.model.UserDocument;
 import com.example.cfchat.model.UserDocument.DocumentStatus;
@@ -48,6 +50,8 @@ public class DocumentEmbeddingService {
     private final UserRepository userRepository;
     private final JdbcTemplate jdbcTemplate;
     private final DocumentStorageService storageService;
+    private final MetricsService metricsService;
+    private final VectorStoreConfig vectorStoreConfig;
 
     @Value("${app.documents.max-file-size:10485760}")  // 10MB default
     private long maxFileSize;
@@ -68,12 +72,16 @@ public class DocumentEmbeddingService {
             UserDocumentRepository documentRepository,
             UserRepository userRepository,
             JdbcTemplate jdbcTemplate,
-            DocumentStorageService storageService) {
+            DocumentStorageService storageService,
+            MetricsService metricsService,
+            @Autowired(required = false) VectorStoreConfig vectorStoreConfig) {
         this.vectorStore = vectorStore;
         this.documentRepository = documentRepository;
         this.userRepository = userRepository;
         this.jdbcTemplate = jdbcTemplate;
         this.storageService = storageService;
+        this.metricsService = metricsService;
+        this.vectorStoreConfig = vectorStoreConfig;
     }
 
     @PostConstruct
@@ -178,8 +186,15 @@ public class DocumentEmbeddingService {
                 throw new RuntimeException("No content could be extracted from the document");
             }
 
-            // Store chunks in vector store
+            // Calculate total characters for metrics
+            long totalCharacters = documents.stream()
+                    .mapToLong(doc -> doc.getText() != null ? doc.getText().length() : 0)
+                    .sum();
+
+            // Store chunks in vector store (this triggers the embedding)
+            long embeddingStartTime = System.currentTimeMillis();
             vectorStore.accept(documents);
+            long embeddingTime = System.currentTimeMillis() - embeddingStartTime;
 
             // Update document status
             document.setStatus(DocumentStatus.COMPLETED);
@@ -188,8 +203,20 @@ public class DocumentEmbeddingService {
             documentRepository.save(document);
 
             long processingTime = System.currentTimeMillis() - startTime;
-            log.info("Successfully processed document {} with {} chunks in {}ms",
-                    document.getId(), documents.size(), processingTime);
+            log.info("Successfully processed document {} with {} chunks in {}ms (embedding: {}ms)",
+                    document.getId(), documents.size(), processingTime, embeddingTime);
+
+            // Record embedding metrics
+            String embeddingModel = getEmbeddingModelName();
+            metricsService.recordEmbeddingUsage(
+                    userId,
+                    document.getId(),
+                    embeddingModel,
+                    documents.size(),
+                    totalCharacters,
+                    embeddingTime,
+                    OperationType.DOCUMENT_UPLOAD
+            );
 
             return DocumentUploadResponse.builder()
                     .documentId(document.getId())
@@ -575,5 +602,15 @@ public class DocumentEmbeddingService {
         }
         // Truncate to 1000 chars to be safe, even though column is now TEXT
         return message.length() > 1000 ? message.substring(0, 1000) + "..." : message;
+    }
+
+    /**
+     * Get the name of the active embedding model for metrics tracking.
+     */
+    private String getEmbeddingModelName() {
+        if (vectorStoreConfig != null && vectorStoreConfig.getActiveEmbeddingModel() != null) {
+            return vectorStoreConfig.getActiveEmbeddingModel().modelName();
+        }
+        return "unknown";
     }
 }

@@ -36,14 +36,21 @@ public class MetricsController {
         model.addAttribute("currentUser", user);
         model.addAttribute("isAdmin", isAdmin);
 
-        // Get user's own metrics
+        // Get user's own metrics (chat)
         Map<String, Object> userSummary = metricsService.getSummaryForUser(user.getId());
         model.addAttribute("userSummary", userSummary);
+
+        // Get user's embedding metrics
+        Map<String, Object> userEmbeddingSummary = metricsService.getEmbeddingSummaryForUser(user.getId());
+        model.addAttribute("userEmbeddingSummary", userEmbeddingSummary);
 
         // If admin, also get global metrics
         if (isAdmin) {
             Map<String, Object> globalSummary = metricsService.getGlobalSummary();
             model.addAttribute("globalSummary", globalSummary);
+
+            Map<String, Object> globalEmbeddingSummary = metricsService.getGlobalEmbeddingSummary();
+            model.addAttribute("globalEmbeddingSummary", globalEmbeddingSummary);
         }
 
         return "metrics";
@@ -101,14 +108,21 @@ public class MetricsController {
             return ResponseEntity.status(403).body(Map.of("error", "Admin access required"));
         }
 
-        long countBefore = metricsService.getTotalMetricsCount();
+        long chatCountBefore = metricsService.getTotalMetricsCount();
+        long embeddingCountBefore = metricsService.getTotalEmbeddingMetricsCount();
+
         metricsService.clearAllMetrics();
-        log.info("Admin {} cleared all metrics ({} records)", currentUser.get().getUsername(), countBefore);
+        metricsService.clearAllEmbeddingMetrics();
+
+        log.info("Admin {} cleared all metrics (chat: {}, embedding: {})",
+                currentUser.get().getUsername(), chatCountBefore, embeddingCountBefore);
 
         return ResponseEntity.ok(Map.of(
                 "success", true,
                 "message", "All metrics cleared",
-                "recordsDeleted", countBefore
+                "recordsDeleted", chatCountBefore + embeddingCountBefore,
+                "chatRecordsDeleted", chatCountBefore,
+                "embeddingRecordsDeleted", embeddingCountBefore
         ));
     }
 }

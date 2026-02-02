@@ -442,6 +442,57 @@
             </div>
         </section>
 
+        <!-- User's Embedding Metrics -->
+        <section style="margin-top: 40px;">
+            <h2 class="section-title">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                    <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"></path>
+                    <polyline points="14 2 14 8 20 8"></polyline>
+                    <line x1="16" y1="13" x2="8" y2="13"></line>
+                    <line x1="16" y1="17" x2="8" y2="17"></line>
+                </svg>
+                Your Document Embeddings
+            </h2>
+
+            <div class="stats-grid">
+                <div class="stat-card highlight">
+                    <div class="stat-value" th:text="${userEmbeddingSummary.totalChunks}">0</div>
+                    <div class="stat-label">Total Chunks Embedded</div>
+                </div>
+                <div class="stat-card">
+                    <div class="stat-value" th:text="${userEmbeddingSummary.todayChunks}">0</div>
+                    <div class="stat-label">Today</div>
+                </div>
+                <div class="stat-card">
+                    <div class="stat-value" th:text="${#numbers.formatInteger(userEmbeddingSummary.totalCharacters / 1000, 1, 'COMMA')}">0</div>
+                    <div class="stat-label">Total KB Processed</div>
+                </div>
+                <div class="stat-card">
+                    <div class="stat-value" th:text="${userEmbeddingSummary.totalEmbeddingRequests}">0</div>
+                    <div class="stat-label">Documents Processed</div>
+                </div>
+                <div class="stat-card">
+                    <div class="stat-value" th:text="${#numbers.formatDecimal(userEmbeddingSummary.avgProcessingTimeMs / 1000, 1, 1)}">0</div>
+                    <div class="stat-label">Avg Processing (sec)</div>
+                </div>
+            </div>
+
+            <div class="charts-grid" th:if="${!userEmbeddingSummary.chunksByModel.isEmpty()}">
+                <div class="chart-card">
+                    <h3>Chunks by Embedding Model</h3>
+                    <div class="bar-chart" id="userEmbeddingChart">
+                        <div th:each="entry : ${userEmbeddingSummary.chunksByModel}" class="bar-item">
+                            <span class="bar-label" th:text="${entry.key}" th:title="${entry.key}">Model</span>
+                            <div class="bar-container">
+                                <div class="bar-fill" th:data-value="${entry.value}" style="width: 0%"></div>
+                            </div>
+                            <span class="bar-value" th:text="${#numbers.formatInteger(entry.value, 1, 'COMMA')}">0</span>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </section>
+
         <!-- Admin Global Metrics -->
         <section th:if="${isAdmin}" class="admin-section">
             <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 24px;">
@@ -627,6 +678,118 @@
                     </table>
                 </div>
             </div>
+
+            <!-- Global Embedding Metrics Section -->
+            <div class="section-divider"></div>
+            <h2 class="section-title" style="margin-top: 24px;">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                    <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"></path>
+                    <polyline points="14 2 14 8 20 8"></polyline>
+                    <line x1="16" y1="13" x2="8" y2="13"></line>
+                    <line x1="16" y1="17" x2="8" y2="17"></line>
+                </svg>
+                Global Embedding Metrics
+                <span class="admin-badge">Admin</span>
+            </h2>
+
+            <div class="stats-grid">
+                <div class="stat-card highlight">
+                    <div class="stat-value" th:text="${globalEmbeddingSummary.totalChunks}">0</div>
+                    <div class="stat-label">Total Chunks</div>
+                </div>
+                <div class="stat-card">
+                    <div class="stat-value" th:text="${globalEmbeddingSummary.todayChunks}">0</div>
+                    <div class="stat-label">Today</div>
+                </div>
+                <div class="stat-card">
+                    <div class="stat-value" th:text="${globalEmbeddingSummary.weekChunks}">0</div>
+                    <div class="stat-label">This Week</div>
+                </div>
+                <div class="stat-card">
+                    <div class="stat-value" th:text="${globalEmbeddingSummary.monthChunks}">0</div>
+                    <div class="stat-label">This Month</div>
+                </div>
+                <div class="stat-card">
+                    <div class="stat-value" th:text="${globalEmbeddingSummary.totalEmbeddingRequests}">0</div>
+                    <div class="stat-label">Total Documents</div>
+                </div>
+                <div class="stat-card">
+                    <div class="stat-value" th:text="${#numbers.formatDecimal(globalEmbeddingSummary.avgProcessingTimeMs / 1000, 1, 1)}">0</div>
+                    <div class="stat-label">Avg Processing (sec)</div>
+                </div>
+            </div>
+
+            <!-- Embedding Model Performance Table -->
+            <div class="chart-card" style="margin-bottom: 24px;" th:if="${!globalEmbeddingSummary.requestsByModel.isEmpty()}">
+                <h3>Embedding Model Performance</h3>
+                <table class="model-performance-table">
+                    <thead>
+                        <tr>
+                            <th>Model</th>
+                            <th style="text-align: right;">Documents</th>
+                            <th style="text-align: right;">Total Chunks</th>
+                            <th style="text-align: right;">Avg Processing (ms)</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        <tr th:each="entry : ${globalEmbeddingSummary.requestsByModel}">
+                            <td th:text="${entry.key}">Model</td>
+                            <td class="number" th:text="${#numbers.formatInteger(entry.value, 1, 'COMMA')}">0</td>
+                            <td class="number" th:text="${globalEmbeddingSummary.chunksByModel.get(entry.key) != null ? #numbers.formatInteger(globalEmbeddingSummary.chunksByModel.get(entry.key), 1, 'COMMA') : '0'}">0</td>
+                            <td class="number" th:text="${globalEmbeddingSummary.avgProcessingTimeByModel.get(entry.key) != null ? #numbers.formatDecimal(globalEmbeddingSummary.avgProcessingTimeByModel.get(entry.key), 1, 0, 'COMMA') : '0'}">0</td>
+                        </tr>
+                    </tbody>
+                </table>
+            </div>
+
+            <div class="charts-grid" th:if="${!globalEmbeddingSummary.chunksByModel.isEmpty()}">
+                <div class="chart-card">
+                    <h3>Chunks by Embedding Model (All Time)</h3>
+                    <div class="bar-chart" id="globalEmbeddingChart">
+                        <div th:each="entry : ${globalEmbeddingSummary.chunksByModel}" class="bar-item">
+                            <span class="bar-label" th:text="${entry.key}" th:title="${entry.key}">Model</span>
+                            <div class="bar-container">
+                                <div class="bar-fill" th:data-value="${entry.value}" style="width: 0%"></div>
+                            </div>
+                            <span class="bar-value" th:text="${#numbers.formatInteger(entry.value, 1, 'COMMA')}">0</span>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="chart-card">
+                    <h3>Avg Processing Time by Model (ms)</h3>
+                    <div class="bar-chart" id="globalEmbeddingTimeChart">
+                        <div th:each="entry : ${globalEmbeddingSummary.avgProcessingTimeByModel}" class="bar-item">
+                            <span class="bar-label" th:text="${entry.key}" th:title="${entry.key}">Model</span>
+                            <div class="bar-container">
+                                <div class="bar-fill secondary" th:data-value="${entry.value}" style="width: 0%"></div>
+                            </div>
+                            <span class="bar-value" th:text="${#numbers.formatDecimal(entry.value, 1, 0, 'COMMA')} + ' ms'">0 ms</span>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Embedding Usage by User Table -->
+            <div class="chart-card" th:if="${!globalEmbeddingSummary.usageByUser.isEmpty()}">
+                <h3>Embedding Usage by User</h3>
+                <div class="user-usage-table">
+                    <table>
+                        <thead>
+                            <tr>
+                                <th>User</th>
+                                <th>Total Chunks</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            <tr th:each="userData : ${globalEmbeddingSummary.usageByUser}">
+                                <td th:text="${userData.displayName != null ? userData.displayName : userData.username}">User</td>
+                                <td th:text="${#numbers.formatInteger(userData.totalChunks, 1, 'COMMA')}">0</td>
+                            </tr>
+                        </tbody>
+                    </table>
+                </div>
+            </div>
         </section>
     </div>
 
@@ -726,12 +889,18 @@
 
         // Animate all charts on page load
         document.addEventListener('DOMContentLoaded', () => {
+            // Chat metrics charts
             animateBars('userTokensChart');
             animateBars('userResponseTimeChart');
             animateBars('userTpsChart');
             animateBars('tokensByPeriod-all');
             animateBars('globalTpsChart');
             animateBars('globalTtftChart');
+
+            // Embedding metrics charts
+            animateBars('userEmbeddingChart');
+            animateBars('globalEmbeddingChart');
+            animateBars('globalEmbeddingTimeChart');
         });
     </script>
 </body>
