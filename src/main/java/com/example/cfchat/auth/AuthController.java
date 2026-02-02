@@ -133,4 +133,68 @@ public class AuthController {
         response.put("email", email);
         return ResponseEntity.ok(response);
     }
+
+    @PostMapping("/change-password")
+    public ResponseEntity<Map<String, Object>> changePassword(@RequestBody Map<String, String> body) {
+        String currentPassword = body.get("currentPassword");
+        String newPassword = body.get("newPassword");
+
+        Map<String, Object> response = new HashMap<>();
+
+        // Validate new password
+        if (newPassword == null || newPassword.length() < 6) {
+            response.put("success", false);
+            response.put("error", "New password must be at least 6 characters");
+            return ResponseEntity.badRequest().body(response);
+        }
+
+        // Check if user can change password
+        Optional<User> userOpt = userService.getCurrentUser();
+        if (userOpt.isEmpty()) {
+            response.put("success", false);
+            response.put("error", "Not logged in");
+            return ResponseEntity.status(401).body(response);
+        }
+
+        User user = userOpt.get();
+        if (!userService.canChangePassword(user)) {
+            response.put("success", false);
+            response.put("error", "SSO users cannot change password here. Please use your SSO provider.");
+            return ResponseEntity.badRequest().body(response);
+        }
+
+        // Attempt password change
+        boolean success = userService.changePassword(currentPassword, newPassword);
+        if (success) {
+            log.info("Password changed for user: {}", user.getUsername());
+            response.put("success", true);
+            response.put("message", "Password changed successfully");
+            return ResponseEntity.ok(response);
+        } else {
+            response.put("success", false);
+            response.put("error", "Current password is incorrect");
+            return ResponseEntity.badRequest().body(response);
+        }
+    }
+
+    @GetMapping("/can-change-password")
+    public ResponseEntity<Map<String, Object>> canChangePassword() {
+        Map<String, Object> response = new HashMap<>();
+        Optional<User> userOpt = userService.getCurrentUser();
+
+        if (userOpt.isEmpty()) {
+            response.put("canChange", false);
+            response.put("reason", "Not logged in");
+        } else {
+            User user = userOpt.get();
+            boolean canChange = userService.canChangePassword(user);
+            response.put("canChange", canChange);
+            response.put("authProvider", user.getAuthProvider().name());
+            if (!canChange) {
+                response.put("reason", "SSO users cannot change password here");
+            }
+        }
+
+        return ResponseEntity.ok(response);
+    }
 }

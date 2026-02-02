@@ -29,7 +29,7 @@ public class UserService {
     @Value("${app.admin.default-username:admin}")
     private String defaultAdminUsername;
 
-    @Value("${app.admin.default-password:admin}")
+    @Value("${app.admin.default-password:Tanzu123!}")
     private String defaultAdminPassword;
 
     @PostConstruct
@@ -257,5 +257,77 @@ public class UserService {
     @Transactional(readOnly = true)
     public long getAdminCount() {
         return userRepository.countByRole(User.UserRole.ADMIN);
+    }
+
+    /**
+     * Change password for the current user (non-SSO users only).
+     * @param currentPassword The user's current password for verification
+     * @param newPassword The new password to set
+     * @return true if password was changed successfully
+     */
+    @Transactional
+    public boolean changePassword(String currentPassword, String newPassword) {
+        Optional<User> userOpt = getCurrentUser();
+        if (userOpt.isEmpty()) {
+            log.warn("Change password attempted but no user logged in");
+            return false;
+        }
+
+        User user = userOpt.get();
+
+        // SSO users cannot change password
+        if (user.getAuthProvider() == User.AuthProvider.SSO) {
+            log.warn("SSO user {} attempted to change password", user.getUsername());
+            return false;
+        }
+
+        // Verify current password
+        if (user.getPasswordHash() != null && !passwordEncoder.matches(currentPassword, user.getPasswordHash())) {
+            log.warn("Invalid current password for user: {}", user.getUsername());
+            return false;
+        }
+
+        // Set new password
+        user.setPasswordHash(passwordEncoder.encode(newPassword));
+        userRepository.save(user);
+        log.info("Password changed for user: {}", user.getUsername());
+        return true;
+    }
+
+    /**
+     * Admin: Reset password for a specific user (non-SSO users only).
+     * @param userId The user ID to reset password for
+     * @param newPassword The new password to set
+     * @return true if password was reset successfully
+     */
+    @Transactional
+    public boolean resetUserPassword(UUID userId, String newPassword) {
+        Optional<User> userOpt = userRepository.findById(userId);
+        if (userOpt.isEmpty()) {
+            log.warn("Password reset attempted for non-existent user: {}", userId);
+            return false;
+        }
+
+        User user = userOpt.get();
+
+        // SSO users cannot have password reset
+        if (user.getAuthProvider() == User.AuthProvider.SSO) {
+            log.warn("Cannot reset password for SSO user: {}", user.getUsername());
+            return false;
+        }
+
+        // Set new password
+        user.setPasswordHash(passwordEncoder.encode(newPassword));
+        userRepository.save(user);
+        log.info("Password reset by admin for user: {}", user.getUsername());
+        return true;
+    }
+
+    /**
+     * Check if a user can change their password (non-SSO users only).
+     */
+    @Transactional(readOnly = true)
+    public boolean canChangePassword(User user) {
+        return user != null && user.getAuthProvider() == User.AuthProvider.LOCAL;
     }
 }

@@ -507,4 +507,44 @@ public class AdminController {
 
         return ResponseEntity.ok(Map.of("success", true));
     }
+
+    @PostMapping("/api/admin/users/{userId}/reset-password")
+    @ResponseBody
+    public ResponseEntity<Map<String, Object>> resetUserPassword(
+            @PathVariable UUID userId,
+            @RequestBody Map<String, String> body) {
+
+        Optional<User> currentUser = userService.getCurrentUser();
+        if (currentUser.isEmpty() || currentUser.get().getRole() != User.UserRole.ADMIN) {
+            return ResponseEntity.status(403).body(Map.of("error", "Forbidden"));
+        }
+
+        Optional<User> targetUser = userService.getUserById(userId);
+        if (targetUser.isEmpty()) {
+            return ResponseEntity.notFound().build();
+        }
+
+        // Cannot reset password for SSO users
+        if (targetUser.get().getAuthProvider() == User.AuthProvider.SSO) {
+            return ResponseEntity.badRequest().body(Map.of(
+                    "error", "Cannot reset password for SSO users. They authenticate via their SSO provider."
+            ));
+        }
+
+        String newPassword = body.get("newPassword");
+        if (newPassword == null || newPassword.length() < 6) {
+            return ResponseEntity.badRequest().body(Map.of("error", "Password must be at least 6 characters"));
+        }
+
+        boolean success = userService.resetUserPassword(userId, newPassword);
+        if (success) {
+            log.info("Admin {} reset password for user {}", currentUser.get().getUsername(), userId);
+            return ResponseEntity.ok(Map.of(
+                    "success", true,
+                    "message", "Password reset successfully"
+            ));
+        } else {
+            return ResponseEntity.badRequest().body(Map.of("error", "Failed to reset password"));
+        }
+    }
 }
