@@ -23,6 +23,8 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.multipart.MultipartFile;
 
+import jakarta.annotation.PostConstruct;
+
 import java.io.IOException;
 import java.io.InputStream;
 import java.time.LocalDateTime;
@@ -59,7 +61,7 @@ public class DocumentEmbeddingService {
     @Value("${app.documents.chunk-overlap:100}")
     private int chunkOverlap;
 
-    private final TokenTextSplitter textSplitter;
+    private TokenTextSplitter textSplitter;
 
     public DocumentEmbeddingService(
             @Autowired(required = false) VectorStore vectorStore,
@@ -72,21 +74,26 @@ public class DocumentEmbeddingService {
         this.userRepository = userRepository;
         this.jdbcTemplate = jdbcTemplate;
         this.storageService = storageService;
+    }
 
-        // Initialize text splitter for chunking documents
-        // Using 400 tokens to stay safely under nomic model's 512 token limit
+    @PostConstruct
+    public void init() {
+        // Initialize text splitter with injected config values
+        // Chunk size should stay under embedding model's token limit (512 for nomic)
+        int effectiveChunkSize = Math.min(chunkSize, 450); // Leave room for overhead
         this.textSplitter = TokenTextSplitter.builder()
-                .withChunkSize(400)
-                .withMinChunkSizeChars(200)
+                .withChunkSize(effectiveChunkSize)
+                .withMinChunkSizeChars(100)  // Lower threshold to capture more content
                 .withMinChunkLengthToEmbed(5)
                 .withMaxNumChunks(10000)
                 .withKeepSeparator(true)
                 .build();
 
-        log.info("DocumentEmbeddingService initialized - vectorStore: {}",
-                vectorStore != null ? vectorStore.getClass().getSimpleName() : "null");
+        log.info("DocumentEmbeddingService initialized - vectorStore: {}, chunkSize: {}, overlap: {}",
+                vectorStore != null ? vectorStore.getClass().getSimpleName() : "null",
+                effectiveChunkSize, chunkOverlap);
 
-        // Migrate error_message column to TEXT type if needed
+        // Run database migrations
         migrateErrorMessageColumn();
     }
 
@@ -249,16 +256,13 @@ public class DocumentEmbeddingService {
                 continue;
             }
 
-            // Prepend source information
-            String contentWithSource = String.format(
-                    "[SOURCE: %s, CHUNK: %d]\n\n%s",
-                    filename, chunkIndex + 1, content);
-
-            Document enrichedDoc = new Document(contentWithSource);
+            // Store clean content without source markers - source info goes in metadata only
+            Document enrichedDoc = new Document(content);
             enrichedDoc.getMetadata().put("user_id", userId.toString());
             enrichedDoc.getMetadata().put("document_id", documentId.toString());
             enrichedDoc.getMetadata().put("filename", filename);
             enrichedDoc.getMetadata().put("chunk_index", chunkIndex);
+            enrichedDoc.getMetadata().put("chunk_total", chunkedDocuments.size());
             enrichedDoc.getMetadata().put("content_type", contentType);
 
             // Copy original metadata

@@ -96,9 +96,26 @@
                     <div class="header-model-selector">
                         <span class="model-label">Model:</span>
                         <select id="modelSelect">
-                            <optgroup th:each="provider : ${ {'openai', 'ollama', 'genai'} }" th:label="${provider}">
+                            <!-- Only show optgroups that have models -->
+                            <optgroup th:if="${#lists.size(models.?[provider == 'openai']) > 0}" label="openai">
                                 <option th:each="model : ${models}"
-                                        th:if="${model.provider == provider}"
+                                        th:if="${model.provider == 'openai'}"
+                                        th:value="${model.provider + ':' + model.id}"
+                                        th:text="${model.name}"
+                                        th:title="${model.description}">
+                                </option>
+                            </optgroup>
+                            <optgroup th:if="${#lists.size(models.?[provider == 'ollama']) > 0}" label="ollama">
+                                <option th:each="model : ${models}"
+                                        th:if="${model.provider == 'ollama'}"
+                                        th:value="${model.provider + ':' + model.id}"
+                                        th:text="${model.name}"
+                                        th:title="${model.description}">
+                                </option>
+                            </optgroup>
+                            <optgroup th:if="${#lists.size(models.?[provider == 'genai']) > 0}" label="genai">
+                                <option th:each="model : ${models}"
+                                        th:if="${model.provider == 'genai'}"
                                         th:value="${model.provider + ':' + model.id}"
                                         th:text="${model.name}"
                                         th:title="${model.description}">

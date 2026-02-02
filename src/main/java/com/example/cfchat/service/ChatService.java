@@ -386,6 +386,10 @@ public class ChatService {
 
             if (!genAiModelNames.isEmpty()) {
                 for (String modelName : genAiModelNames) {
+                    // Skip embedding models - only include chat models
+                    if (modelName.toLowerCase().contains("embed")) {
+                        continue;
+                    }
                     models.add(ModelInfo.builder()
                             .id(modelName)
                             .name(modelName)
@@ -536,7 +540,8 @@ public class ChatService {
                 systemPromptBuilder.append("\n\n");
                 systemPromptBuilder.append("You have access to the user's uploaded documents. ");
                 systemPromptBuilder.append("When answering questions, use the relevant document context provided below. ");
-                systemPromptBuilder.append("Always cite the source document when using information from it.\n\n");
+                systemPromptBuilder.append("When citing sources, refer to documents by their filename naturally (e.g., 'According to the manual...' or 'The document states...'). ");
+                systemPromptBuilder.append("Do not include internal markers like '--- From:' or section numbers in your response.\n\n");
                 systemPromptBuilder.append("DOCUMENT CONTEXT:\n");
                 systemPromptBuilder.append("---------------------\n");
                 systemPromptBuilder.append(documentContext);
@@ -565,6 +570,7 @@ public class ChatService {
 
     /**
      * Build document context by searching user's documents for relevant content.
+     * Formats context with source attribution from metadata for the LLM.
      */
     private String buildDocumentContext(UUID userId, String query) {
         if (documentEmbeddingService == null || !documentEmbeddingService.isAvailable()) {
@@ -580,7 +586,17 @@ public class ChatService {
             }
 
             StringBuilder contextBuilder = new StringBuilder();
-            for (Document doc : relevantDocs) {
+            for (int i = 0; i < relevantDocs.size(); i++) {
+                Document doc = relevantDocs.get(i);
+                String filename = (String) doc.getMetadata().getOrDefault("filename", "document");
+                Object chunkIndex = doc.getMetadata().get("chunk_index");
+
+                // Format context with clear section markers (internal, not for display)
+                contextBuilder.append("--- From: ").append(filename);
+                if (chunkIndex != null) {
+                    contextBuilder.append(" (section ").append(((Number) chunkIndex).intValue() + 1).append(")");
+                }
+                contextBuilder.append(" ---\n");
                 contextBuilder.append(doc.getText());
                 contextBuilder.append("\n\n");
             }

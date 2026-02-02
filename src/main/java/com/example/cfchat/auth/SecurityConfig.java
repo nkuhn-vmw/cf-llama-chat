@@ -11,6 +11,7 @@ import org.springframework.core.env.Environment;
 import org.springframework.security.authentication.AuthenticationManager;
 import org.springframework.security.authentication.BadCredentialsException;
 import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
+import org.springframework.security.config.annotation.authentication.builders.AuthenticationManagerBuilder;
 import org.springframework.security.config.annotation.web.builders.HttpSecurity;
 import org.springframework.security.config.annotation.web.configuration.EnableWebSecurity;
 import org.springframework.security.core.Authentication;
@@ -89,7 +90,11 @@ public class SecurityConfig {
             http.oauth2Login(oauth2 -> oauth2
                 .loginPage("/login.html")
                 .successHandler(oauth2AuthenticationSuccessHandler())
-                .failureUrl("/login.html?error=true")
+                .failureHandler((request, response, exception) -> {
+                    log.error("OAuth2 authentication failed: {}", exception.getMessage(), exception);
+                    response.sendRedirect("/login.html?error=true&oauth_error=" +
+                        java.net.URLEncoder.encode(exception.getMessage(), java.nio.charset.StandardCharsets.UTF_8));
+                })
             );
         } else {
             log.info("SSO is not configured - OAuth2 login disabled");
@@ -99,35 +104,50 @@ public class SecurityConfig {
     }
 
     @Bean
-    public AuthenticationManager authenticationManager() {
-        return authentication -> {
-            String username = authentication.getName();
-            String password = authentication.getCredentials().toString();
+    public AuthenticationManager authenticationManager(HttpSecurity http) throws Exception {
+        AuthenticationManagerBuilder authBuilder = http.getSharedObject(AuthenticationManagerBuilder.class);
+        authBuilder.authenticationProvider(formLoginAuthenticationProvider());
+        return authBuilder.build();
+    }
 
-            log.debug("Authentication attempt for user: {}", username);
+    @Bean
+    public org.springframework.security.authentication.AuthenticationProvider formLoginAuthenticationProvider() {
+        return new org.springframework.security.authentication.AuthenticationProvider() {
+            @Override
+            public Authentication authenticate(Authentication authentication) throws org.springframework.security.core.AuthenticationException {
+                String username = authentication.getName();
+                String password = authentication.getCredentials().toString();
 
-            try {
-                // Authenticate user with stored password
-                java.util.Optional<User> userOpt = userService.authenticateUser(username, password);
+                log.debug("Form login authentication attempt for user: {}", username);
 
-                if (userOpt.isEmpty()) {
-                    log.warn("Authentication failed for user: {}", username);
-                    throw new BadCredentialsException("Invalid username or password");
+                try {
+                    java.util.Optional<User> userOpt = userService.authenticateUser(username, password);
+
+                    if (userOpt.isEmpty()) {
+                        log.warn("Authentication failed for user: {}", username);
+                        throw new BadCredentialsException("Invalid username or password");
+                    }
+
+                    User user = userOpt.get();
+                    log.info("User authenticated: {} with role: {}", username, user.getRole());
+
+                    List<SimpleGrantedAuthority> authorities = Collections.singletonList(
+                        new SimpleGrantedAuthority("ROLE_" + user.getRole().name())
+                    );
+
+                    return new UsernamePasswordAuthenticationToken(username, null, authorities);
+                } catch (BadCredentialsException e) {
+                    throw e;
+                } catch (Exception e) {
+                    log.error("Error authenticating user {}: {}", username, e.getMessage());
+                    throw new BadCredentialsException("Authentication failed: " + e.getMessage());
                 }
+            }
 
-                User user = userOpt.get();
-                log.info("User authenticated: {} with role: {}", username, user.getRole());
-
-                List<SimpleGrantedAuthority> authorities = Collections.singletonList(
-                    new SimpleGrantedAuthority("ROLE_" + user.getRole().name())
-                );
-
-                return new UsernamePasswordAuthenticationToken(username, null, authorities);
-            } catch (BadCredentialsException e) {
-                throw e;
-            } catch (Exception e) {
-                log.error("Error authenticating user {}: {}", username, e.getMessage());
-                throw new BadCredentialsException("Authentication failed: " + e.getMessage());
+            @Override
+            public boolean supports(Class<?> authentication) {
+                // Only handle UsernamePasswordAuthenticationToken (form login)
+                return UsernamePasswordAuthenticationToken.class.isAssignableFrom(authentication);
             }
         };
     }
@@ -189,18 +209,25 @@ public class SecurityConfig {
             String userInfoUri = environment.getProperty("sso.user-info-uri", "");
             String redirectUri = environment.getProperty("sso.redirect-uri", "{baseUrl}/login/oauth2/code/{registrationId}");
 
+            // Derive JWK Set URI from auth base URL for JWT verification
+            String authBase = authUri.replace("/oauth/authorize", "");
+            String jwkSetUri = authBase + "/token_keys";
+
             ClientRegistration clientRegistration = ClientRegistration.withRegistrationId("sso")
                 .clientId(clientId)
                 .clientSecret(clientSecret)
                 .authorizationGrantType(AuthorizationGrantType.AUTHORIZATION_CODE)
                 .redirectUri(redirectUri)
-                .scope("openid", "profile")
+                .scope("openid")  // Only use openid scope - profile may not be available
                 .authorizationUri(authUri)
                 .tokenUri(tokenUri)
                 .userInfoUri(userInfoUri)
+                .jwkSetUri(jwkSetUri)
                 .userNameAttributeName("sub")
                 .clientName("SSO")
                 .build();
+
+            log.info("SSO Client Registration created - jwkSetUri: {}", jwkSetUri);
 
             return new InMemoryClientRegistrationRepository(clientRegistration);
         }

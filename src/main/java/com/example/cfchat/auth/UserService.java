@@ -2,8 +2,10 @@ package com.example.cfchat.auth;
 
 import com.example.cfchat.model.User;
 import com.example.cfchat.repository.UserRepository;
+import jakarta.annotation.PostConstruct;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.security.core.Authentication;
 import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.security.crypto.password.PasswordEncoder;
@@ -23,6 +25,39 @@ public class UserService {
 
     private final UserRepository userRepository;
     private final PasswordEncoder passwordEncoder;
+
+    @Value("${app.admin.default-username:admin}")
+    private String defaultAdminUsername;
+
+    @Value("${app.admin.default-password:admin}")
+    private String defaultAdminPassword;
+
+    @PostConstruct
+    public void init() {
+        createDefaultAdminIfNeeded();
+    }
+
+    /**
+     * Create a default admin user if no users exist in the database.
+     */
+    @Transactional
+    public void createDefaultAdminIfNeeded() {
+        long userCount = userRepository.count();
+        if (userCount == 0) {
+            log.info("No users found in database - creating default admin user");
+            User admin = User.builder()
+                    .username(defaultAdminUsername)
+                    .passwordHash(passwordEncoder.encode(defaultAdminPassword))
+                    .displayName("Administrator")
+                    .role(User.UserRole.ADMIN)
+                    .authProvider(User.AuthProvider.LOCAL)
+                    .build();
+            userRepository.save(admin);
+            log.info("Created default admin user: {} (please change the password!)", defaultAdminUsername);
+        } else {
+            log.debug("Database has {} users - skipping default admin creation", userCount);
+        }
+    }
 
     /**
      * Register a new local user with username and password.

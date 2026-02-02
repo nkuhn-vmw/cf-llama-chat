@@ -11,7 +11,7 @@ applications:
       SPRING_PROFILES_ACTIVE: cloud
       APP_AUTH_SECRET: changeme
     services:
-      - chat-db
-      - chat-llm
-      - gpt-oss-120b
-      - cf-llama-sso
+      - cf-llama-chat-db
+      - tanzu-nomic-embed-text-v2-moe
+      - tanzu-gpt-oss-120b
+      - cf-llama-chat-sso
