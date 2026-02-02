@@ -23,7 +23,6 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.multipart.MultipartFile;
 
-import java.io.ByteArrayInputStream;
 import java.io.IOException;
 import java.io.InputStream;
 import java.time.LocalDateTime;
@@ -182,23 +181,23 @@ public class DocumentEmbeddingService {
 
     /**
      * Read a document and split it into chunks.
+     * Uses streaming to avoid loading large files entirely into memory.
      */
     private List<Document> readAndChunkDocument(MultipartFile file, UUID documentId, UUID userId) throws IOException {
         List<Document> documents;
-        byte[] fileBytes = file.getBytes();
 
         String contentType = file.getContentType();
         String filename = file.getOriginalFilename();
 
         if (isPdf(contentType, filename)) {
-            // Use PagePdfDocumentReader for PDF files
-            InputStreamResource resource = new InputStreamResource(new ByteArrayInputStream(fileBytes));
+            // Use PagePdfDocumentReader for PDF files - stream directly from MultipartFile
+            InputStreamResource resource = new InputStreamResource(file.getInputStream());
             PagePdfDocumentReader pdfReader = new PagePdfDocumentReader(resource);
             documents = pdfReader.read();
             log.info("Read {} pages from PDF: {}", documents.size(), filename);
         } else {
-            // Use Tika for other file types (Word, text, etc.)
-            InputStreamResource resource = new InputStreamResource(new ByteArrayInputStream(fileBytes));
+            // Use Tika for other file types (Word, text, etc.) - stream directly
+            InputStreamResource resource = new InputStreamResource(file.getInputStream());
             TikaDocumentReader tikaReader = new TikaDocumentReader(resource);
             documents = tikaReader.read();
             log.info("Read document using Tika: {}", filename);
