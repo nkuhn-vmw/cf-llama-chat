@@ -1,15 +1,7 @@
 name: Deploy to Cloud Foundry (Blue-Green)
 
 on:
-  # Trigger after successful build on main
-  workflow_run:
-    workflows: ["Build and Release"]
-    types:
-      - completed
-    branches:
-      - main
-
-  # Manual trigger for deployments
+  # Manual trigger only - use for zero-downtime deployments when needed
   workflow_dispatch:
     inputs:
       skip_nonprod:
@@ -36,13 +28,9 @@ env:
   HEALTH_CHECK_TIMEOUT: 120
 
 jobs:
-  # Build the JAR if triggered manually or get from release
+  # Build the JAR
   prepare:
     runs-on: ubuntu-latest
-    # Only run if workflow_run was successful OR manual dispatch
-    if: |
-      github.event_name == 'workflow_dispatch' ||
-      (github.event_name == 'workflow_run' && github.event.workflow_run.conclusion == 'success')
     outputs:
       version: ${{ steps.version.outputs.version }}
       jar_name: ${{ steps.version.outputs.jar_name }}
@@ -90,10 +78,8 @@ jobs:
     needs: prepare
     if: |
       needs.prepare.result == 'success' &&
-      (github.event_name == 'workflow_run' ||
-       (github.event_name == 'workflow_dispatch' &&
-        inputs.skip_nonprod != true &&
-        inputs.environment != 'prod'))
+      inputs.skip_nonprod != true &&
+      inputs.environment != 'prod'
     runs-on: ubuntu-latest
     environment: nonprod
     outputs:
@@ -249,8 +235,7 @@ jobs:
       always() &&
       needs.prepare.result == 'success' &&
       (needs.deploy-nonprod.result == 'success' || needs.deploy-nonprod.result == 'skipped') &&
-      (github.event_name == 'workflow_run' ||
-       (github.event_name == 'workflow_dispatch' && inputs.environment != 'nonprod'))
+      inputs.environment != 'nonprod'
     runs-on: ubuntu-latest
     environment: production
     outputs:

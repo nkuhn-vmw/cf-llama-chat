@@ -1,0 +1,251 @@
+name: Deploy to Cloud Foundry
+
+on:
+  # Trigger after successful build on main
+  workflow_run:
+    workflows: ["Build and Release"]
+    types:
+      - completed
+    branches:
+      - main
+
+  # Manual trigger for deployments
+  workflow_dispatch:
+    inputs:
+      environment:
+        description: 'Target environment'
+        required: true
+        type: choice
+        options:
+          - nonprod
+          - prod
+          - both
+        default: both
+
+permissions:
+  contents: write
+
+env:
+  CF_CLI_VERSION: "8"
+  APP_NAME: cf-llama-chat
+  DB_SERVICE: cf-llama-chat-db
+
+jobs:
+  # Build the JAR
+  prepare:
+    runs-on: ubuntu-latest
+    if: |
+      github.event_name == 'workflow_dispatch' ||
+      (github.event_name == 'workflow_run' && github.event.workflow_run.conclusion == 'success')
+    outputs:
+      version: ${{ steps.version.outputs.version }}
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Set up JDK 21
+        uses: actions/setup-java@v4
+        with:
+          java-version: '21'
+          distribution: 'temurin'
+          cache: maven
+
+      - name: Build JAR
+        run: mvn -B clean package -DskipTests
+
+      - name: Get version
+        id: version
+        run: |
+          VERSION=$(mvn help:evaluate -Dexpression=project.version -q -DforceStdout)
+          SHORT_SHA=$(git rev-parse --short HEAD)
+          DEPLOY_VERSION="${VERSION}-${SHORT_SHA}"
+          echo "version=${DEPLOY_VERSION}" >> $GITHUB_OUTPUT
+          echo "Deployment version: ${DEPLOY_VERSION}"
+
+      - name: Upload JAR artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: app-jar
+          path: target/*.jar
+          retention-days: 1
+
+  # Deploy to nonprod
+  deploy-nonprod:
+    needs: prepare
+    if: |
+      needs.prepare.result == 'success' &&
+      (github.event_name == 'workflow_run' ||
+       (github.event_name == 'workflow_dispatch' && inputs.environment != 'prod'))
+    runs-on: ubuntu-latest
+    environment: nonprod
+
+    steps:
+      - name: Download JAR
+        uses: actions/download-artifact@v4
+        with:
+          name: app-jar
+          path: ./artifacts
+
+      - name: Install CF CLI
+        run: |
+          wget -q "https://packages.cloudfoundry.org/stable?release=linux64-binary&version=v${{ env.CF_CLI_VERSION }}&source=github" -O cf-cli.tgz
+          tar -xzf cf-cli.tgz
+          sudo mv cf8 /usr/local/bin/cf
+          cf version
+
+      - name: Login to Cloud Foundry (Nonprod)
+        run: |
+          cf api "${{ secrets.CF_API_NONPROD }}"
+          cf auth "${{ secrets.CF_USERNAME_NONPROD }}" "${{ secrets.CF_PASSWORD_NONPROD }}"
+          cf target -o "${{ secrets.CF_ORG_NONPROD }}" -s "${{ secrets.CF_SPACE_NONPROD }}"
+
+      - name: Deploy to Nonprod
+        env:
+          DEPLOY_VERSION: ${{ needs.prepare.outputs.version }}
+        run: |
+          set -e
+
+          # Find JAR file
+          JAR_FILE=$(find ./artifacts -name "*.jar" -type f | head -1)
+          echo "Deploying JAR: ${JAR_FILE}"
+
+          # Check current app status
+          echo "Checking current app status..."
+          cf apps || true
+
+          # Stop existing app if running (to release DB connections)
+          echo "Stopping existing app if present..."
+          cf stop "${{ env.APP_NAME }}" || echo "App not running or doesn't exist"
+
+          # Push the app (will restart it)
+          echo "Pushing app..."
+          cf push "${{ env.APP_NAME }}" \
+            -p "${JAR_FILE}" \
+            -m 1G \
+            -b java_buildpack_offline \
+            --no-start
+
+          # Set environment variables
+          cf set-env "${{ env.APP_NAME }}" SPRING_PROFILES_ACTIVE "cloud"
+          cf set-env "${{ env.APP_NAME }}" APP_VERSION "${DEPLOY_VERSION}"
+          cf set-env "${{ env.APP_NAME }}" JBP_CONFIG_OPEN_JDK_JRE '{ jre: { version: 21.+ } }'
+
+          # Bind services if not already bound
+          echo "Binding services..."
+          cf bind-service "${{ env.APP_NAME }}" "${{ env.DB_SERVICE }}" || echo "DB service already bound or not available"
+          cf bind-service "${{ env.APP_NAME }}" tanzu-nomic-embed-text-v2-moe || echo "Embedding service already bound or not available"
+          cf bind-service "${{ env.APP_NAME }}" tanzu-gpt-oss-120b || echo "Chat service already bound or not available"
+          cf bind-service "${{ env.APP_NAME }}" tanzu-Qwen3-Coder-30B || echo "Qwen service already bound or not available"
+          cf bind-service "${{ env.APP_NAME }}" cf-llama-chat-sso || echo "SSO service already bound or not available"
+
+          # Start the app
+          echo "Starting app..."
+          cf start "${{ env.APP_NAME }}"
+
+          echo "Deployment to nonprod complete!"
+
+      - name: Deployment Summary
+        run: |
+          echo "## Nonprod Deployment Complete" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "**Version:** ${{ needs.prepare.outputs.version }}" >> $GITHUB_STEP_SUMMARY
+          echo "**App:** ${{ env.APP_NAME }}" >> $GITHUB_STEP_SUMMARY
+          echo "**Route:** https://${{ secrets.APP_ROUTE_NONPROD }}.${{ secrets.CF_DOMAIN_NONPROD }}" >> $GITHUB_STEP_SUMMARY
+
+  # Deploy to production
+  deploy-prod:
+    needs: [prepare, deploy-nonprod]
+    if: |
+      always() &&
+      needs.prepare.result == 'success' &&
+      (needs.deploy-nonprod.result == 'success' || needs.deploy-nonprod.result == 'skipped') &&
+      (github.event_name == 'workflow_run' ||
+       (github.event_name == 'workflow_dispatch' && inputs.environment != 'nonprod'))
+    runs-on: ubuntu-latest
+    environment: production
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Download JAR
+        uses: actions/download-artifact@v4
+        with:
+          name: app-jar
+          path: ./artifacts
+
+      - name: Install CF CLI
+        run: |
+          wget -q "https://packages.cloudfoundry.org/stable?release=linux64-binary&version=v${{ env.CF_CLI_VERSION }}&source=github" -O cf-cli.tgz
+          tar -xzf cf-cli.tgz
+          sudo mv cf8 /usr/local/bin/cf
+          cf version
+
+      - name: Login to Cloud Foundry (Prod)
+        run: |
+          cf api "${{ secrets.CF_API_PROD }}"
+          cf auth "${{ secrets.CF_USERNAME_PROD }}" "${{ secrets.CF_PASSWORD_PROD }}"
+          cf target -o "${{ secrets.CF_ORG_PROD }}" -s "${{ secrets.CF_SPACE_PROD }}"
+
+      - name: Deploy to Production
+        env:
+          DEPLOY_VERSION: ${{ needs.prepare.outputs.version }}
+        run: |
+          set -e
+
+          # Find JAR file
+          JAR_FILE=$(find ./artifacts -name "*.jar" -type f | head -1)
+          echo "Deploying JAR: ${JAR_FILE}"
+
+          # Check current app status
+          echo "Checking current app status..."
+          cf apps || true
+
+          # Stop existing app if running (to release DB connections)
+          echo "Stopping existing app if present..."
+          cf stop "${{ env.APP_NAME }}" || echo "App not running or doesn't exist"
+
+          # Push the app (will restart it)
+          echo "Pushing app..."
+          cf push "${{ env.APP_NAME }}" \
+            -p "${JAR_FILE}" \
+            -m 1G \
+            -b java_buildpack_offline \
+            --no-start
+
+          # Set environment variables
+          cf set-env "${{ env.APP_NAME }}" SPRING_PROFILES_ACTIVE "cloud"
+          cf set-env "${{ env.APP_NAME }}" APP_VERSION "${DEPLOY_VERSION}"
+          cf set-env "${{ env.APP_NAME }}" JBP_CONFIG_OPEN_JDK_JRE '{ jre: { version: 21.+ } }'
+
+          # Bind services if not already bound
+          echo "Binding services..."
+          cf bind-service "${{ env.APP_NAME }}" "${{ env.DB_SERVICE }}" || echo "DB service already bound or not available"
+          cf bind-service "${{ env.APP_NAME }}" tanzu-nomic-embed-text-v2-moe || echo "Embedding service already bound or not available"
+          cf bind-service "${{ env.APP_NAME }}" tanzu-gpt-oss-120b || echo "Chat service already bound or not available"
+          cf bind-service "${{ env.APP_NAME }}" tanzu-Qwen3-Coder-30B || echo "Qwen service already bound or not available"
+          cf bind-service "${{ env.APP_NAME }}" cf-llama-chat-sso || echo "SSO service already bound or not available"
+
+          # Start the app
+          echo "Starting app..."
+          cf start "${{ env.APP_NAME }}"
+
+          echo "Deployment to production complete!"
+
+      - name: Record deployed version
+        run: |
+          echo "${{ needs.prepare.outputs.version }}" > .last-deployed-version
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          git add .last-deployed-version
+          git diff --cached --quiet || git commit -m "Record deployment of ${{ needs.prepare.outputs.version }}"
+          git push || echo "Could not push version record"
+
+      - name: Deployment Summary
+        run: |
+          echo "## Production Deployment Complete" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "**Version:** ${{ needs.prepare.outputs.version }}" >> $GITHUB_STEP_SUMMARY
+          echo "**App:** ${{ env.APP_NAME }}" >> $GITHUB_STEP_SUMMARY
+          echo "**Route:** https://${{ secrets.APP_ROUTE_PROD }}.${{ secrets.CF_DOMAIN_PROD }}" >> $GITHUB_STEP_SUMMARY
