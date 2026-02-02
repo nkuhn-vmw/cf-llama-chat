@@ -195,6 +195,15 @@
                                     </svg>
                                     Admin Portal
                                 </a>
+                                <button th:if="${currentUser.authProvider.name() == 'LOCAL'}"
+                                        type="button" class="user-menu-item"
+                                        onclick="showChangePasswordModal()">
+                                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                        <rect x="3" y="11" width="18" height="11" rx="2" ry="2"></rect>
+                                        <path d="M7 11V7a5 5 0 0 1 10 0v4"></path>
+                                    </svg>
+                                    Change Password
+                                </button>
                                 <form action="/logout" method="post" style="margin: 0;">
                                     <button type="submit" class="user-menu-item logout">
                                         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
@@ -350,6 +359,25 @@
                 </div>
                 <div class="documents-list" id="documentsList">
                     <p class="no-documents" id="noDocuments">No documents uploaded yet</p>
+                </div>
+            </div>
+        </div>
+
+        <!-- Change Password Modal -->
+        <div class="modal-overlay" id="changePasswordModal">
+            <div class="modal">
+                <h3>Change Password</h3>
+                <div class="modal-form">
+                    <label class="modal-label" for="currentPassword">Current Password</label>
+                    <input type="password" class="modal-input" id="currentPassword" placeholder="Enter current password">
+                    <label class="modal-label" for="newPasswordInput">New Password</label>
+                    <input type="password" class="modal-input" id="newPasswordInput" placeholder="Enter new password (min 6 characters)">
+                    <label class="modal-label" for="confirmPasswordInput">Confirm New Password</label>
+                    <input type="password" class="modal-input" id="confirmPasswordInput" placeholder="Confirm new password">
+                </div>
+                <div class="modal-actions">
+                    <button class="modal-btn cancel" onclick="closeChangePasswordModal()">Cancel</button>
+                    <button class="modal-btn primary" id="confirmChangePasswordBtn">Change Password</button>
                 </div>
             </div>
         </div>

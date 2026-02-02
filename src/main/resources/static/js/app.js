@@ -1114,7 +1114,85 @@ class ChatApp {
     }
 }
 
+// Change Password Modal Functions
+function showChangePasswordModal() {
+    const modal = document.getElementById('changePasswordModal');
+    if (modal) {
+        document.getElementById('currentPassword').value = '';
+        document.getElementById('newPasswordInput').value = '';
+        document.getElementById('confirmPasswordInput').value = '';
+        modal.classList.add('open');
+        document.getElementById('currentPassword').focus();
+    }
+}
+
+function closeChangePasswordModal() {
+    const modal = document.getElementById('changePasswordModal');
+    if (modal) {
+        modal.classList.remove('open');
+    }
+}
+
 // Initialize app when DOM is ready
 document.addEventListener('DOMContentLoaded', () => {
     window.chatApp = new ChatApp();
+
+    // Change Password Modal Handler
+    const changePasswordModal = document.getElementById('changePasswordModal');
+    const confirmChangePasswordBtn = document.getElementById('confirmChangePasswordBtn');
+
+    if (confirmChangePasswordBtn) {
+        confirmChangePasswordBtn.addEventListener('click', async () => {
+            const currentPassword = document.getElementById('currentPassword').value;
+            const newPassword = document.getElementById('newPasswordInput').value;
+            const confirmPassword = document.getElementById('confirmPasswordInput').value;
+
+            if (!currentPassword) {
+                alert('Please enter your current password');
+                return;
+            }
+
+            if (!newPassword || newPassword.length < 6) {
+                alert('New password must be at least 6 characters');
+                return;
+            }
+
+            if (newPassword !== confirmPassword) {
+                alert('Passwords do not match');
+                return;
+            }
+
+            try {
+                const response = await fetch('/auth/change-password', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json'
+                    },
+                    body: JSON.stringify({
+                        currentPassword: currentPassword,
+                        newPassword: newPassword
+                    })
+                });
+
+                const data = await response.json();
+                if (data.success) {
+                    alert('Password changed successfully');
+                    closeChangePasswordModal();
+                } else {
+                    alert(data.error || 'Failed to change password');
+                }
+            } catch (error) {
+                console.error('Error changing password:', error);
+                alert('Failed to change password');
+            }
+        });
+    }
+
+    if (changePasswordModal) {
+        changePasswordModal.addEventListener('click', (e) => {
+            if (e.target === changePasswordModal) {
+                closeChangePasswordModal();
+            }
+        });
+    }
 });

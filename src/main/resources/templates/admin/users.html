@@ -266,6 +266,43 @@
             margin-bottom: 16px;
             font-size: 0.9rem;
         }
+
+        .modal-btn.primary {
+            background-color: var(--accent-color);
+            color: white;
+        }
+
+        .modal-input {
+            width: 100%;
+            padding: 10px 12px;
+            border: 1px solid var(--border-color);
+            border-radius: 8px;
+            background-color: var(--bg-tertiary);
+            color: var(--text-primary);
+            font-size: 0.95rem;
+            margin-bottom: 16px;
+        }
+
+        .modal-input:focus {
+            outline: none;
+            border-color: var(--accent-color);
+        }
+
+        .modal-label {
+            display: block;
+            font-size: 0.9rem;
+            color: var(--text-secondary);
+            margin-bottom: 6px;
+        }
+
+        .action-btn.reset {
+            color: var(--accent-color);
+            border-color: var(--accent-color);
+        }
+
+        .action-btn.reset:hover {
+            background-color: rgba(16, 163, 127, 0.1);
+        }
     </style>
 </head>
 <body>
@@ -344,6 +381,13 @@
                                 <span th:if="${userData.user.lastLoginAt == null}">Never</span>
                             </td>
                             <td>
+                                <button th:if="${userData.user.authProvider.name() == 'LOCAL'}"
+                                        class="action-btn reset"
+                                        th:data-user-id="${userData.user.id}"
+                                        th:data-username="${userData.user.displayName != null ? userData.user.displayName : userData.user.username}"
+                                        onclick="showResetPasswordModal(this)">
+                                    Reset Password
+                                </button>
                                 <button class="action-btn danger"
                                         th:data-user-id="${userData.user.id}"
                                         th:data-username="${userData.user.displayName != null ? userData.user.displayName : userData.user.username}"
@@ -371,6 +415,22 @@
             <div class="modal-actions">
                 <button class="modal-btn cancel" onclick="closeDeleteModal()">Cancel</button>
                 <button class="modal-btn confirm" id="confirmDeleteBtn">Delete</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Reset Password Modal -->
+    <div class="modal-overlay" id="resetPasswordModal">
+        <div class="modal">
+            <h3>Reset Password</h3>
+            <p>Reset password for <strong id="resetUsername"></strong></p>
+            <label class="modal-label" for="newPassword">New Password</label>
+            <input type="password" class="modal-input" id="newPassword" placeholder="Enter new password (min 6 characters)">
+            <label class="modal-label" for="confirmNewPassword">Confirm Password</label>
+            <input type="password" class="modal-input" id="confirmNewPassword" placeholder="Confirm new password">
+            <div class="modal-actions">
+                <button class="modal-btn cancel" onclick="closeResetPasswordModal()">Cancel</button>
+                <button class="modal-btn primary" id="confirmResetBtn">Reset Password</button>
             </div>
         </div>
     </div>
@@ -447,6 +507,67 @@
         document.getElementById('deleteModal').addEventListener('click', function(e) {
             if (e.target === this) {
                 closeDeleteModal();
+            }
+        });
+
+        // Reset Password Modal
+        let resetPasswordUserId = null;
+
+        function showResetPasswordModal(btn) {
+            resetPasswordUserId = btn.dataset.userId;
+            document.getElementById('resetUsername').textContent = btn.dataset.username;
+            document.getElementById('newPassword').value = '';
+            document.getElementById('confirmNewPassword').value = '';
+            document.getElementById('resetPasswordModal').classList.add('open');
+            document.getElementById('newPassword').focus();
+        }
+
+        function closeResetPasswordModal() {
+            document.getElementById('resetPasswordModal').classList.remove('open');
+            resetPasswordUserId = null;
+        }
+
+        document.getElementById('confirmResetBtn').addEventListener('click', function() {
+            if (!resetPasswordUserId) return;
+
+            const newPassword = document.getElementById('newPassword').value;
+            const confirmPassword = document.getElementById('confirmNewPassword').value;
+
+            if (!newPassword || newPassword.length < 6) {
+                alert('Password must be at least 6 characters');
+                return;
+            }
+
+            if (newPassword !== confirmPassword) {
+                alert('Passwords do not match');
+                return;
+            }
+
+            fetch(`/api/admin/users/${resetPasswordUserId}/reset-password`, {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json'
+                },
+                body: JSON.stringify({ newPassword: newPassword })
+            })
+            .then(response => response.json())
+            .then(data => {
+                if (data.success) {
+                    alert('Password reset successfully');
+                    closeResetPasswordModal();
+                } else {
+                    alert(data.error || 'Failed to reset password');
+                }
+            })
+            .catch(error => {
+                console.error('Error resetting password:', error);
+                alert('Failed to reset password');
+            });
+        });
+
+        document.getElementById('resetPasswordModal').addEventListener('click', function(e) {
+            if (e.target === this) {
+                closeResetPasswordModal();
             }
         });
     </script>
