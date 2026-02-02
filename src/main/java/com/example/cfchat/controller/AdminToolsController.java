@@ -24,6 +24,28 @@ public class AdminToolsController {
     private final ToolService toolService;
     private final McpService mcpService;
 
+    /**
+     * Public endpoint to check if any MCP tools are available for the current user.
+     * This is used by the frontend to show/hide the "Use Tools" toggle.
+     */
+    @GetMapping("/api/admin/tools/available")
+    @ResponseBody
+    public ResponseEntity<Map<String, Object>> checkToolsAvailable() {
+        Optional<User> currentUser = userService.getCurrentUser();
+        if (currentUser.isEmpty()) {
+            return ResponseEntity.ok(Map.of("available", false, "count", 0));
+        }
+
+        // Get tools accessible to the user (respects user access permissions)
+        List<Tool> tools = toolService.getAccessibleTools(currentUser.get().getId());
+        long enabledCount = tools.stream().filter(Tool::isEnabled).count();
+
+        return ResponseEntity.ok(Map.of(
+                "available", enabledCount > 0,
+                "count", enabledCount
+        ));
+    }
+
     @GetMapping("/admin/tools")
     public String toolsPage(Model model) {
         Optional<User> currentUser = userService.getCurrentUser();

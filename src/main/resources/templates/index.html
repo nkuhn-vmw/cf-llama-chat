@@ -64,7 +64,16 @@
             </div>
 
             <div class="sidebar-footer">
-                <div class="powered-by" style="text-align: center; font-size: 0.8rem; color: var(--text-muted);">
+                <button class="clear-history-btn" id="clearHistoryBtn" title="Clear all chat history">
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                        <polyline points="3 6 5 6 21 6"></polyline>
+                        <path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"></path>
+                        <line x1="10" y1="11" x2="10" y2="17"></line>
+                        <line x1="14" y1="11" x2="14" y2="17"></line>
+                    </svg>
+                    Clear All History
+                </button>
+                <div class="powered-by" style="text-align: center; font-size: 0.8rem; color: var(--text-muted); margin-top: 12px;">
                     Powered by Spring AI
                 </div>
             </div>
@@ -267,6 +276,10 @@
                                 <label class="doc-toggle" id="docToggleLabel" style="display: none;">
                                     <input type="checkbox" id="useDocumentsToggle">
                                     <span>Use My Docs</span>
+                                </label>
+                                <label class="tools-toggle" id="toolsToggleLabel" style="display: none;">
+                                    <input type="checkbox" id="useToolsToggle" checked>
+                                    <span>Use Tools</span>
                                 </label>
                                 <button type="button" class="docs-btn" id="docsBtn" title="Manage Documents">
                                     <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="16" height="16">

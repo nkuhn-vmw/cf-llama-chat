@@ -9,12 +9,15 @@ class ChatApp {
         this.isWaiting = false;
         this.useDocumentContext = false;
         this.documentsAvailable = false;
+        this.useTools = true;
+        this.toolsAvailable = false;
 
         this.initElements();
         this.initEventListeners();
         this.initMarkdown();
         this.initTheme();
         this.initDocuments();
+        this.initTools();
         this.scrollToBottom();
     }
 
@@ -39,6 +42,7 @@ class ChatApp {
         this.documentsPanel = document.getElementById('documentsPanel');
         this.docsBtn = document.getElementById('docsBtn');
         this.closePanelBtn = document.getElementById('closePanelBtn');
+        this.clearHistoryBtn = document.getElementById('clearHistoryBtn');
         this.uploadArea = document.getElementById('uploadArea');
         this.fileInput = document.getElementById('fileInput');
         this.uploadProgress = document.getElementById('uploadProgress');
@@ -50,6 +54,10 @@ class ChatApp {
         this.noDocuments = document.getElementById('noDocuments');
         this.useDocumentsToggle = document.getElementById('useDocumentsToggle');
         this.docToggleLabel = document.getElementById('docToggleLabel');
+
+        // Tools elements
+        this.useToolsToggle = document.getElementById('useToolsToggle');
+        this.toolsToggleLabel = document.getElementById('toolsToggleLabel');
     }
 
     initEventListeners() {
@@ -138,6 +146,13 @@ class ChatApp {
                 if (!this.userMenuDropdown.contains(e.target) && !this.userMenuBtn.contains(e.target)) {
                     this.userMenuDropdown.classList.remove('open');
                 }
+            });
+        }
+
+        // Clear all history button
+        if (this.clearHistoryBtn) {
+            this.clearHistoryBtn.addEventListener('click', () => {
+                this.clearAllHistory();
             });
         }
     }
@@ -264,17 +279,50 @@ class ChatApp {
     }
 
     initMarkdown() {
-        // Configure marked for code highlighting
+        // Configure marked for enhanced code highlighting and GFM features
         marked.setOptions({
             highlight: function(code, lang) {
                 if (lang && hljs.getLanguage(lang)) {
-                    return hljs.highlight(code, { language: lang }).value;
+                    try {
+                        return hljs.highlight(code, { language: lang, ignoreIllegals: true }).value;
+                    } catch (e) {
+                        console.warn('Highlight error for language:', lang, e);
+                    }
                 }
-                return hljs.highlightAuto(code).value;
+                try {
+                    return hljs.highlightAuto(code).value;
+                } catch (e) {
+                    return code;
+                }
             },
             breaks: true,
-            gfm: true
+            gfm: true,
+            headerIds: true,
+            mangle: false,
+            pedantic: false,
+            smartLists: true,
+            smartypants: true
         });
+
+        // Custom renderer for enhanced output
+        const renderer = new marked.Renderer();
+
+        // Enhanced code block rendering with language class
+        renderer.code = function(code, language) {
+            const validLang = language && hljs.getLanguage(language) ? language : '';
+            const langClass = validLang ? `language-${validLang}` : '';
+            const highlighted = validLang
+                ? hljs.highlight(code, { language: validLang, ignoreIllegals: true }).value
+                : hljs.highlightAuto(code).value;
+            return `<pre><code class="hljs ${langClass}">${highlighted}</code></pre>`;
+        };
+
+        // Enhanced table rendering
+        renderer.table = function(header, body) {
+            return `<div class="table-wrapper"><table class="markdown-table"><thead>${header}</thead><tbody>${body}</tbody></table></div>`;
+        };
+
+        marked.use({ renderer });
     }
 
     autoResizeTextarea() {
@@ -319,7 +367,8 @@ class ChatApp {
                 message: message,
                 provider: provider,
                 model: model,
-                useDocumentContext: this.useDocumentContext && this.documentsAvailable
+                useDocumentContext: this.useDocumentContext && this.documentsAvailable,
+                useTools: this.useTools && this.toolsAvailable
             };
 
             if (this.isStreaming) {
@@ -521,7 +570,87 @@ class ChatApp {
 
     highlightCode(element) {
         element.querySelectorAll('pre code').forEach((block) => {
+            // Apply syntax highlighting
             hljs.highlightElement(block);
+
+            // Get the pre element (parent of code)
+            const pre = block.parentElement;
+            if (!pre || pre.querySelector('.code-block-header')) {
+                return; // Already enhanced
+            }
+
+            // Detect language from hljs classes
+            const classes = block.className.split(' ');
+            let language = 'code';
+            for (const cls of classes) {
+                if (cls.startsWith('language-')) {
+                    language = cls.replace('language-', '');
+                    break;
+                } else if (cls.startsWith('hljs-')) {
+                    continue;
+                } else if (cls && cls !== 'hljs') {
+                    language = cls;
+                    break;
+                }
+            }
+
+            // Create header with language label and copy button
+            const header = document.createElement('div');
+            header.className = 'code-block-header';
+            header.innerHTML = `
+                <span class="code-language">${this.escapeHtml(language)}</span>
+                <button class="copy-code-btn" title="Copy code">
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                        <rect x="9" y="9" width="13" height="13" rx="2" ry="2"></rect>
+                        <path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"></path>
+                    </svg>
+                    <span>Copy</span>
+                </button>
+            `;
+
+            // Insert header before the pre content
+            pre.insertBefore(header, pre.firstChild);
+
+            // Add copy functionality
+            const copyBtn = header.querySelector('.copy-code-btn');
+            copyBtn.addEventListener('click', async () => {
+                const code = block.textContent;
+                try {
+                    await navigator.clipboard.writeText(code);
+                    copyBtn.classList.add('copied');
+                    copyBtn.querySelector('span').textContent = 'Copied!';
+                    copyBtn.querySelector('svg').innerHTML = `
+                        <polyline points="20 6 9 17 4 12"></polyline>
+                    `;
+                    setTimeout(() => {
+                        copyBtn.classList.remove('copied');
+                        copyBtn.querySelector('span').textContent = 'Copy';
+                        copyBtn.querySelector('svg').innerHTML = `
+                            <rect x="9" y="9" width="13" height="13" rx="2" ry="2"></rect>
+                            <path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"></path>
+                        `;
+                    }, 2000);
+                } catch (err) {
+                    console.error('Failed to copy code:', err);
+                }
+            });
+
+            // Add line numbers for longer code blocks (more than 3 lines)
+            const lines = block.textContent.split('\n');
+            if (lines.length > 3) {
+                const lineNumbersDiv = document.createElement('div');
+                lineNumbersDiv.className = 'line-numbers';
+                lineNumbersDiv.innerHTML = lines.map((_, i) => `<span>${i + 1}</span>`).join('');
+
+                // Wrap in a container for proper positioning
+                const wrapper = document.createElement('div');
+                wrapper.className = 'code-block-wrapper with-line-numbers';
+                pre.parentNode.insertBefore(wrapper, pre);
+                wrapper.appendChild(pre);
+
+                // Insert line numbers after header
+                pre.insertBefore(lineNumbersDiv, block);
+            }
         });
     }
 
@@ -624,6 +753,42 @@ class ChatApp {
         } catch (error) {
             console.error('Error deleting conversation:', error);
             alert('Failed to delete conversation.');
+        }
+    }
+
+    async clearAllHistory() {
+        const conversationCount = this.conversationsList?.querySelectorAll('.conversation-item').length || 0;
+        if (conversationCount === 0) {
+            alert('No conversations to clear.');
+            return;
+        }
+
+        if (!confirm(`Are you sure you want to delete ALL ${conversationCount} conversation(s)? This action cannot be undone.`)) {
+            return;
+        }
+
+        try {
+            const response = await fetch('/api/conversations/clear-all', {
+                method: 'DELETE'
+            });
+
+            if (!response.ok) throw new Error('Failed to clear history');
+
+            const data = await response.json();
+
+            // Clear the conversations list
+            if (this.conversationsList) {
+                this.conversationsList.innerHTML = '';
+            }
+
+            // Start a new chat
+            this.startNewChat();
+
+            // Show success message
+            alert(`Successfully deleted ${data.deletedCount} conversation(s).`);
+        } catch (error) {
+            console.error('Error clearing history:', error);
+            alert('Failed to clear chat history.');
         }
     }
 
@@ -732,6 +897,14 @@ class ChatApp {
                 this.useDocumentContext = e.target.checked;
             });
         }
+
+        // Use tools toggle
+        if (this.useToolsToggle) {
+            this.useToolsToggle.addEventListener('change', (e) => {
+                this.useTools = e.target.checked;
+                localStorage.setItem('useTools', this.useTools);
+            });
+        }
     }
 
     toggleDocumentsPanel() {
@@ -771,6 +944,37 @@ class ChatApp {
             }
         } catch (error) {
             console.error('Error loading documents:', error);
+        }
+    }
+
+    async initTools() {
+        // Check if MCP tools are available
+        try {
+            const response = await fetch('/api/admin/tools/available');
+            if (response.ok) {
+                const data = await response.json();
+                this.toolsAvailable = data.available && data.count > 0;
+
+                // Show "Use Tools" toggle if tools are available
+                if (this.toolsToggleLabel) {
+                    this.toolsToggleLabel.style.display = this.toolsAvailable ? 'flex' : 'none';
+                }
+
+                // Set initial toggle state from saved preference
+                const savedPref = localStorage.getItem('useTools');
+                if (savedPref !== null) {
+                    this.useTools = savedPref === 'true';
+                    if (this.useToolsToggle) {
+                        this.useToolsToggle.checked = this.useTools;
+                    }
+                }
+            }
+        } catch (error) {
+            console.warn('Could not check tools availability:', error);
+            // Hide the toggle if we can't determine availability
+            if (this.toolsToggleLabel) {
+                this.toolsToggleLabel.style.display = 'none';
+            }
         }
     }
 

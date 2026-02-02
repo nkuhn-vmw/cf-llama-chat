@@ -138,13 +138,15 @@ public class ChatService {
         // Build the chat request with optional MCP tools
         var promptSpec = chatClient.prompt().messages(messages);
 
-        // Add MCP tools if available
-        if (mcpToolCallbackCacheService != null) {
+        // Add MCP tools if available and enabled
+        if (request.isUseTools() && mcpToolCallbackCacheService != null) {
             ToolCallbackProvider[] toolProviders = mcpToolCallbackCacheService.getToolCallbackProviders();
             if (toolProviders.length > 0) {
                 log.debug("Adding {} MCP tool callback providers to chat request", toolProviders.length);
                 promptSpec = promptSpec.toolCallbacks(toolProviders);
             }
+        } else if (!request.isUseTools()) {
+            log.debug("MCP tools disabled by user preference");
         }
 
         String response = promptSpec.call().content();
@@ -241,12 +243,16 @@ public class ChatService {
 
         Flux<ChatResponse> responseFlux;
 
-        // Check if we have MCP tools available
-        ToolCallbackProvider[] toolProviders = mcpToolCallbackCacheService != null
+        // Check if we have MCP tools available and user has enabled them
+        ToolCallbackProvider[] toolProviders = (request.isUseTools() && mcpToolCallbackCacheService != null)
                 ? mcpToolCallbackCacheService.getToolCallbackProviders()
                 : new ToolCallbackProvider[0];
 
-        // If we have tools, use ChatClient for streaming (supports tool callbacks)
+        if (!request.isUseTools()) {
+            log.debug("MCP tools disabled by user preference for streaming request");
+        }
+
+        // If we have tools and user enabled them, use ChatClient for streaming (supports tool callbacks)
         // Otherwise, use ChatModel directly for better compatibility
         if (toolProviders.length > 0) {
             ChatClient chatClient = getChatClient(provider, model);
