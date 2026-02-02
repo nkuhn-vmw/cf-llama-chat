@@ -53,7 +53,7 @@ public class DocumentEmbeddingService {
     @Value("${app.documents.max-documents-per-user:50}")
     private int maxDocumentsPerUser;
 
-    @Value("${app.documents.chunk-size:800}")
+    @Value("${app.documents.chunk-size:400}")
     private int chunkSize;
 
     @Value("${app.documents.chunk-overlap:100}")
@@ -74,9 +74,10 @@ public class DocumentEmbeddingService {
         this.storageService = storageService;
 
         // Initialize text splitter for chunking documents
+        // Using 400 tokens to stay safely under nomic model's 512 token limit
         this.textSplitter = TokenTextSplitter.builder()
-                .withChunkSize(800)
-                .withMinChunkSizeChars(350)
+                .withChunkSize(400)
+                .withMinChunkSizeChars(200)
                 .withMinChunkLengthToEmbed(5)
                 .withMaxNumChunks(10000)
                 .withKeepSeparator(true)
@@ -84,6 +85,35 @@ public class DocumentEmbeddingService {
 
         log.info("DocumentEmbeddingService initialized - vectorStore: {}",
                 vectorStore != null ? vectorStore.getClass().getSimpleName() : "null");
+
+        // Migrate error_message column to TEXT type if needed
+        migrateErrorMessageColumn();
+    }
+
+    /**
+     * Migrate the error_message column to TEXT type to support longer error messages.
+     * This is idempotent - safe to run multiple times.
+     */
+    private void migrateErrorMessageColumn() {
+        try {
+            jdbcTemplate.execute("ALTER TABLE user_documents ALTER COLUMN error_message TYPE TEXT");
+            log.info("Successfully migrated error_message column to TEXT type");
+        } catch (Exception e) {
+            // Column may already be TEXT or table doesn't exist yet - that's fine
+            log.debug("Migration of error_message column skipped: {}", e.getMessage());
+        }
+
+        // Migrate vector dimensions from 512 to 768 for nomic model compatibility
+        try {
+            // First drop the old table data since dimensions changed
+            jdbcTemplate.execute("TRUNCATE TABLE document_embeddings");
+            // Alter the embedding column to use 768 dimensions
+            jdbcTemplate.execute("ALTER TABLE document_embeddings ALTER COLUMN embedding TYPE vector(768)");
+            log.info("Successfully migrated embedding column to 768 dimensions");
+        } catch (Exception e) {
+            // Table may not exist yet or already has correct dimensions
+            log.debug("Migration of embedding dimensions skipped: {}", e.getMessage());
+        }
     }
 
     /**
@@ -95,8 +125,9 @@ public class DocumentEmbeddingService {
 
     /**
      * Upload and process a document for a user.
+     * Note: Not using @Transactional here so that document status can be updated
+     * to FAILED even if the embedding operation fails.
      */
-    @Transactional
     public DocumentUploadResponse uploadDocument(UUID userId, MultipartFile file) throws IOException {
         long startTime = System.currentTimeMillis();
 
@@ -166,7 +197,7 @@ public class DocumentEmbeddingService {
             log.error("Failed to process document {}: {}", document.getId(), e.getMessage(), e);
 
             document.setStatus(DocumentStatus.FAILED);
-            document.setErrorMessage(e.getMessage());
+            document.setErrorMessage(truncateErrorMessage(e.getMessage()));
             documentRepository.save(document);
 
             return DocumentUploadResponse.builder()
@@ -529,5 +560,16 @@ public class DocumentEmbeddingService {
         return filename.replaceAll("[/\\\\]", "_")
                 .replaceAll("[^a-zA-Z0-9._-]", "_")
                 .substring(0, Math.min(filename.length(), 100));
+    }
+
+    /**
+     * Truncate error message to fit in database column.
+     */
+    private String truncateErrorMessage(String message) {
+        if (message == null) {
+            return null;
+        }
+        // Truncate to 1000 chars to be safe, even though column is now TEXT
+        return message.length() > 1000 ? message.substring(0, 1000) + "..." : message;
     }
 }

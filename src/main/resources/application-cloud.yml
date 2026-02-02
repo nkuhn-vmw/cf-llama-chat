@@ -27,7 +27,7 @@ spring:
         initialize-schema: true
         index-type: HNSW
         distance-type: COSINE_DISTANCE
-        dimensions: ${EMBEDDING_DIMENSIONS:512}
+        dimensions: ${EMBEDDING_DIMENSIONS:768}
 
   servlet:
     multipart:
@@ -46,7 +46,7 @@ app:
     default-provider: genai
   # Document embedding configuration for cloud
   embedding:
-    dimensions: ${EMBEDDING_DIMENSIONS:512}
+    dimensions: ${EMBEDDING_DIMENSIONS:768}
   documents:
     max-file-size: ${MAX_DOCUMENT_SIZE:104857600}
     max-documents-per-user: ${MAX_DOCUMENTS_PER_USER:100}

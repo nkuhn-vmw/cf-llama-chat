@@ -51,7 +51,7 @@ public class UserDocument {
     @Builder.Default
     private DocumentStatus status = DocumentStatus.PENDING;
 
-    @Column(name = "error_message")
+    @Column(name = "error_message", columnDefinition = "TEXT")
     private String errorMessage;
 
     /**
