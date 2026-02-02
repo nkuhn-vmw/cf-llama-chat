@@ -82,7 +82,7 @@ jobs:
         uses: actions/upload-artifact@v4
         with:
           name: manifest
-          path: manifest.yml
+          path: manifest-ci.yml
           retention-days: 1
 
   # Deploy to nonprod using blue-green strategy
@@ -150,9 +150,10 @@ jobs:
           echo "Deploying JAR: ${JAR_FILE}"
 
           # Deploy green (new version) without route
+          # Using manifest-ci.yml which excludes SSO to avoid OAuth client registration issues
           echo "Deploying green instance..."
           cf push "${GREEN_APP}" \
-            -f manifest.yml \
+            -f manifest-ci.yml \
             -p "${JAR_FILE}" \
             --no-route \
             --no-start
@@ -206,6 +207,10 @@ jobs:
           # Rename green to blue (becomes the new production)
           echo "Promoting green to blue..."
           cf rename "${GREEN_APP}" "${BLUE_APP}"
+
+          # Bind SSO service if not already bound (it may carry over from the old app)
+          echo "Ensuring SSO service is bound..."
+          cf bind-service "${BLUE_APP}" cf-llama-chat-sso || echo "SSO service already bound or not available"
 
           echo "new_app=${BLUE_APP}" >> $GITHUB_OUTPUT
           echo "Blue-green deployment to nonprod complete!"
@@ -286,9 +291,10 @@ jobs:
           echo "Deploying JAR: ${JAR_FILE}"
 
           # Deploy green (new version) without route
+          # Using manifest-ci.yml which excludes SSO to avoid OAuth client registration issues
           echo "Deploying green instance..."
           cf push "${GREEN_APP}" \
-            -f manifest.yml \
+            -f manifest-ci.yml \
             -p "${JAR_FILE}" \
             --no-route \
             --no-start
@@ -342,6 +348,10 @@ jobs:
           # Rename green to blue (becomes the new production)
           echo "Promoting green to blue..."
           cf rename "${GREEN_APP}" "${BLUE_APP}"
+
+          # Bind SSO service if not already bound (it may carry over from the old app)
+          echo "Ensuring SSO service is bound..."
+          cf bind-service "${BLUE_APP}" cf-llama-chat-sso || echo "SSO service already bound or not available"
 
           echo "new_app=${BLUE_APP}" >> $GITHUB_OUTPUT
           echo "Blue-green deployment to production complete!"

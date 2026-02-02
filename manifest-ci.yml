@@ -1,0 +1,20 @@
+---
+# CI/CD manifest - excludes SSO service to avoid OAuth client registration issues during blue-green deployment
+# The SSO binding is preserved when the app is renamed from green to blue
+applications:
+  - name: cf-llama-chat
+    memory: 1G
+    instances: 1
+    path: target/cf-llama-chat-1.0.0-SNAPSHOT.jar
+    buildpacks:
+      - java_buildpack_offline
+    env:
+      JBP_CONFIG_OPEN_JDK_JRE: '{ jre: { version: 21.+ } }'
+      SPRING_PROFILES_ACTIVE: cloud
+      APP_AUTH_SECRET: changeme
+    services:
+      - cf-llama-chat-db
+      - tanzu-nomic-embed-text-v2-moe
+      - tanzu-gpt-oss-120b
+      - tanzu-Qwen3-Coder-30B
+      # SSO service is NOT included here - it's bound manually to avoid OAuth client issues during blue-green
