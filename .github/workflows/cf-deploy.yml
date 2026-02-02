@@ -31,7 +31,7 @@ permissions:
   contents: write
 
 env:
-  CF_CLI_VERSION: "v8"
+  CF_CLI_VERSION: "8"
   APP_NAME: cf-llama-chat
   HEALTH_CHECK_TIMEOUT: 120
 
@@ -39,7 +39,10 @@ jobs:
   # Build the JAR if triggered manually or get from release
   prepare:
     runs-on: ubuntu-latest
-    if: ${{ github.event.workflow_run.conclusion == 'success' || github.event_name == 'workflow_dispatch' }}
+    # Only run if workflow_run was successful OR manual dispatch
+    if: |
+      github.event_name == 'workflow_dispatch' ||
+      (github.event_name == 'workflow_run' && github.event.workflow_run.conclusion == 'success')
     outputs:
       version: ${{ steps.version.outputs.version }}
       jar_name: ${{ steps.version.outputs.jar_name }}
@@ -86,10 +89,11 @@ jobs:
   deploy-nonprod:
     needs: prepare
     if: |
+      needs.prepare.result == 'success' &&
       (github.event_name == 'workflow_run' ||
        (github.event_name == 'workflow_dispatch' &&
-        github.event.inputs.skip_nonprod != 'true' &&
-        github.event.inputs.environment != 'prod'))
+        inputs.skip_nonprod != true &&
+        inputs.environment != 'prod'))
     runs-on: ubuntu-latest
     environment: nonprod
     outputs:
@@ -101,7 +105,7 @@ jobs:
         uses: actions/download-artifact@v4
         with:
           name: app-jar
-          path: ./
+          path: ./artifacts
 
       - name: Download manifest
         uses: actions/download-artifact@v4
@@ -111,9 +115,10 @@ jobs:
 
       - name: Install CF CLI
         run: |
-          curl -sL "https://packages.cloudfoundry.org/stable?release=linux64-binary&version=${{ env.CF_CLI_VERSION }}&source=github" | tar -zx
-          chmod +x cf8
+          wget -q "https://packages.cloudfoundry.org/stable?release=linux64-binary&version=v${{ env.CF_CLI_VERSION }}&source=github" -O cf-cli.tgz
+          tar -xzf cf-cli.tgz
           sudo mv cf8 /usr/local/bin/cf
+          cf version
 
       - name: Login to Cloud Foundry (Nonprod)
         run: |
@@ -125,9 +130,11 @@ jobs:
         id: deploy
         env:
           APP_ROUTE: ${{ secrets.APP_ROUTE_NONPROD }}
+          CF_DOMAIN: ${{ secrets.CF_DOMAIN_NONPROD }}
           DEPLOY_VERSION: ${{ needs.prepare.outputs.version }}
         run: |
-          # Determine app names
+          set -e
+
           GREEN_APP="${{ env.APP_NAME }}-green"
           BLUE_APP="${{ env.APP_NAME }}"
 
@@ -136,143 +143,10 @@ jobs:
           echo "Blue (current): ${BLUE_APP}"
 
           # Check if blue app exists
-          BLUE_EXISTS=$(cf apps | grep -c "^${BLUE_APP} " || true)
+          BLUE_EXISTS=$(cf apps | grep -c "^${BLUE_APP} " || echo "0")
 
           # Find JAR file
-          JAR_FILE=$(ls *.jar | head -1)
-          echo "Deploying JAR: ${JAR_FILE}"
-
-          # Deploy green (new version) without route
-          echo "Deploying green instance..."
-          cf push "${GREEN_APP}" \
-            -f manifest.yml \
-            -p "${JAR_FILE}" \
-            --no-route \
-            --no-start
-
-          # Set environment variables if needed
-          cf set-env "${GREEN_APP}" SPRING_PROFILES_ACTIVE "cloud"
-          cf set-env "${GREEN_APP}" APP_VERSION "${DEPLOY_VERSION}"
-
-          # Start the green app
-          cf start "${GREEN_APP}"
-
-          # Wait for green app to be healthy
-          echo "Waiting for green app to be healthy..."
-          ATTEMPTS=0
-          MAX_ATTEMPTS=30
-          while [ $ATTEMPTS -lt $MAX_ATTEMPTS ]; do
-            STATUS=$(cf app "${GREEN_APP}" | grep -E "^#0" | awk '{print $2}' || echo "unknown")
-            if [ "$STATUS" = "running" ]; then
-              echo "Green app is healthy!"
-              break
-            fi
-            echo "Waiting for app to start... (attempt $((ATTEMPTS+1))/${MAX_ATTEMPTS})"
-            sleep 10
-            ATTEMPTS=$((ATTEMPTS+1))
-          done
-
-          if [ $ATTEMPTS -eq $MAX_ATTEMPTS ]; then
-            echo "Green app failed to become healthy"
-            cf logs "${GREEN_APP}" --recent
-            cf delete "${GREEN_APP}" -f
-            exit 1
-          fi
-
-          # Map route to green app
-          echo "Mapping route to green app..."
-          cf map-route "${GREEN_APP}" "${{ secrets.CF_DOMAIN_NONPROD }}" --hostname "${APP_ROUTE}"
-
-          # If blue exists, unmap route and stop it
-          if [ "$BLUE_EXISTS" -gt 0 ]; then
-            echo "Unmapping route from blue app..."
-            cf unmap-route "${BLUE_APP}" "${{ secrets.CF_DOMAIN_NONPROD }}" --hostname "${APP_ROUTE}" || true
-
-            echo "Stopping blue app..."
-            cf stop "${BLUE_APP}" || true
-
-            # Rename blue to old for cleanup
-            cf rename "${BLUE_APP}" "${BLUE_APP}-old" || true
-            echo "old_app=${BLUE_APP}-old" >> $GITHUB_OUTPUT
-          fi
-
-          # Rename green to blue (becomes the new production)
-          echo "Promoting green to blue..."
-          cf rename "${GREEN_APP}" "${BLUE_APP}"
-
-          echo "new_app=${BLUE_APP}" >> $GITHUB_OUTPUT
-          echo "Blue-green deployment to nonprod complete!"
-
-      - name: Deployment Summary
-        run: |
-          echo "## Nonprod Deployment Complete" >> $GITHUB_STEP_SUMMARY
-          echo "" >> $GITHUB_STEP_SUMMARY
-          echo "**Version:** ${{ needs.prepare.outputs.version }}" >> $GITHUB_STEP_SUMMARY
-          echo "**App:** ${{ env.APP_NAME }}" >> $GITHUB_STEP_SUMMARY
-          echo "**Route:** https://${{ secrets.APP_ROUTE_NONPROD }}.${{ secrets.CF_DOMAIN_NONPROD }}" >> $GITHUB_STEP_SUMMARY
-
-  # Deploy to production using blue-green strategy
-  deploy-prod:
-    needs: [prepare, deploy-nonprod]
-    if: |
-      always() &&
-      needs.prepare.result == 'success' &&
-      (needs.deploy-nonprod.result == 'success' || needs.deploy-nonprod.result == 'skipped') &&
-      (github.event_name == 'workflow_run' ||
-       (github.event_name == 'workflow_dispatch' && github.event.inputs.environment != 'nonprod'))
-    runs-on: ubuntu-latest
-    environment: production
-    outputs:
-      old_app: ${{ steps.deploy.outputs.old_app }}
-      new_app: ${{ steps.deploy.outputs.new_app }}
-
-    steps:
-      - name: Checkout code
-        uses: actions/checkout@v4
-
-      - name: Download JAR
-        uses: actions/download-artifact@v4
-        with:
-          name: app-jar
-          path: ./
-
-      - name: Download manifest
-        uses: actions/download-artifact@v4
-        with:
-          name: manifest
-          path: ./
-
-      - name: Install CF CLI
-        run: |
-          curl -sL "https://packages.cloudfoundry.org/stable?release=linux64-binary&version=${{ env.CF_CLI_VERSION }}&source=github" | tar -zx
-          chmod +x cf8
-          sudo mv cf8 /usr/local/bin/cf
-
-      - name: Login to Cloud Foundry (Prod)
-        run: |
-          cf api "${{ secrets.CF_API_PROD }}"
-          cf auth "${{ secrets.CF_USERNAME_PROD }}" "${{ secrets.CF_PASSWORD_PROD }}"
-          cf target -o "${{ secrets.CF_ORG_PROD }}" -s "${{ secrets.CF_SPACE_PROD }}"
-
-      - name: Blue-Green Deploy
-        id: deploy
-        env:
-          APP_ROUTE: ${{ secrets.APP_ROUTE_PROD }}
-          DEPLOY_VERSION: ${{ needs.prepare.outputs.version }}
-        run: |
-          # Determine app names
-          GREEN_APP="${{ env.APP_NAME }}-green"
-          BLUE_APP="${{ env.APP_NAME }}"
-
-          echo "Starting blue-green deployment to PRODUCTION..."
-          echo "Green (new): ${GREEN_APP}"
-          echo "Blue (current): ${BLUE_APP}"
-
-          # Check if blue app exists
-          BLUE_EXISTS=$(cf apps | grep -c "^${BLUE_APP} " || true)
-
-          # Find JAR file
-          JAR_FILE=$(ls *.jar | head -1)
+          JAR_FILE=$(find ./artifacts -name "*.jar" -type f | head -1)
           echo "Deploying JAR: ${JAR_FILE}"
 
           # Deploy green (new version) without route
@@ -314,12 +188,148 @@ jobs:
 
           # Map route to green app
           echo "Mapping route to green app..."
-          cf map-route "${GREEN_APP}" "${{ secrets.CF_DOMAIN_PROD }}" --hostname "${APP_ROUTE}"
+          cf map-route "${GREEN_APP}" "${CF_DOMAIN}" --hostname "${APP_ROUTE}"
 
           # If blue exists, unmap route and stop it
           if [ "$BLUE_EXISTS" -gt 0 ]; then
             echo "Unmapping route from blue app..."
-            cf unmap-route "${BLUE_APP}" "${{ secrets.CF_DOMAIN_PROD }}" --hostname "${APP_ROUTE}" || true
+            cf unmap-route "${BLUE_APP}" "${CF_DOMAIN}" --hostname "${APP_ROUTE}" || true
+
+            echo "Stopping blue app..."
+            cf stop "${BLUE_APP}" || true
+
+            # Rename blue to old for cleanup
+            cf rename "${BLUE_APP}" "${BLUE_APP}-old" || true
+            echo "old_app=${BLUE_APP}-old" >> $GITHUB_OUTPUT
+          fi
+
+          # Rename green to blue (becomes the new production)
+          echo "Promoting green to blue..."
+          cf rename "${GREEN_APP}" "${BLUE_APP}"
+
+          echo "new_app=${BLUE_APP}" >> $GITHUB_OUTPUT
+          echo "Blue-green deployment to nonprod complete!"
+
+      - name: Deployment Summary
+        run: |
+          echo "## Nonprod Deployment Complete" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "**Version:** ${{ needs.prepare.outputs.version }}" >> $GITHUB_STEP_SUMMARY
+          echo "**App:** ${{ env.APP_NAME }}" >> $GITHUB_STEP_SUMMARY
+          echo "**Route:** https://${{ secrets.APP_ROUTE_NONPROD }}.${{ secrets.CF_DOMAIN_NONPROD }}" >> $GITHUB_STEP_SUMMARY
+
+  # Deploy to production using blue-green strategy
+  deploy-prod:
+    needs: [prepare, deploy-nonprod]
+    if: |
+      always() &&
+      needs.prepare.result == 'success' &&
+      (needs.deploy-nonprod.result == 'success' || needs.deploy-nonprod.result == 'skipped') &&
+      (github.event_name == 'workflow_run' ||
+       (github.event_name == 'workflow_dispatch' && inputs.environment != 'nonprod'))
+    runs-on: ubuntu-latest
+    environment: production
+    outputs:
+      old_app: ${{ steps.deploy.outputs.old_app }}
+      new_app: ${{ steps.deploy.outputs.new_app }}
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Download JAR
+        uses: actions/download-artifact@v4
+        with:
+          name: app-jar
+          path: ./artifacts
+
+      - name: Download manifest
+        uses: actions/download-artifact@v4
+        with:
+          name: manifest
+          path: ./
+
+      - name: Install CF CLI
+        run: |
+          wget -q "https://packages.cloudfoundry.org/stable?release=linux64-binary&version=v${{ env.CF_CLI_VERSION }}&source=github" -O cf-cli.tgz
+          tar -xzf cf-cli.tgz
+          sudo mv cf8 /usr/local/bin/cf
+          cf version
+
+      - name: Login to Cloud Foundry (Prod)
+        run: |
+          cf api "${{ secrets.CF_API_PROD }}"
+          cf auth "${{ secrets.CF_USERNAME_PROD }}" "${{ secrets.CF_PASSWORD_PROD }}"
+          cf target -o "${{ secrets.CF_ORG_PROD }}" -s "${{ secrets.CF_SPACE_PROD }}"
+
+      - name: Blue-Green Deploy
+        id: deploy
+        env:
+          APP_ROUTE: ${{ secrets.APP_ROUTE_PROD }}
+          CF_DOMAIN: ${{ secrets.CF_DOMAIN_PROD }}
+          DEPLOY_VERSION: ${{ needs.prepare.outputs.version }}
+        run: |
+          set -e
+
+          GREEN_APP="${{ env.APP_NAME }}-green"
+          BLUE_APP="${{ env.APP_NAME }}"
+
+          echo "Starting blue-green deployment to PRODUCTION..."
+          echo "Green (new): ${GREEN_APP}"
+          echo "Blue (current): ${BLUE_APP}"
+
+          # Check if blue app exists
+          BLUE_EXISTS=$(cf apps | grep -c "^${BLUE_APP} " || echo "0")
+
+          # Find JAR file
+          JAR_FILE=$(find ./artifacts -name "*.jar" -type f | head -1)
+          echo "Deploying JAR: ${JAR_FILE}"
+
+          # Deploy green (new version) without route
+          echo "Deploying green instance..."
+          cf push "${GREEN_APP}" \
+            -f manifest.yml \
+            -p "${JAR_FILE}" \
+            --no-route \
+            --no-start
+
+          # Set environment variables
+          cf set-env "${GREEN_APP}" SPRING_PROFILES_ACTIVE "cloud"
+          cf set-env "${GREEN_APP}" APP_VERSION "${DEPLOY_VERSION}"
+
+          # Start the green app
+          cf start "${GREEN_APP}"
+
+          # Wait for green app to be healthy
+          echo "Waiting for green app to be healthy..."
+          ATTEMPTS=0
+          MAX_ATTEMPTS=30
+          while [ $ATTEMPTS -lt $MAX_ATTEMPTS ]; do
+            STATUS=$(cf app "${GREEN_APP}" | grep -E "^#0" | awk '{print $2}' || echo "unknown")
+            if [ "$STATUS" = "running" ]; then
+              echo "Green app is healthy!"
+              break
+            fi
+            echo "Waiting for app to start... (attempt $((ATTEMPTS+1))/${MAX_ATTEMPTS})"
+            sleep 10
+            ATTEMPTS=$((ATTEMPTS+1))
+          done
+
+          if [ $ATTEMPTS -eq $MAX_ATTEMPTS ]; then
+            echo "Green app failed to become healthy"
+            cf logs "${GREEN_APP}" --recent
+            cf delete "${GREEN_APP}" -f
+            exit 1
+          fi
+
+          # Map route to green app
+          echo "Mapping route to green app..."
+          cf map-route "${GREEN_APP}" "${CF_DOMAIN}" --hostname "${APP_ROUTE}"
+
+          # If blue exists, unmap route and stop it
+          if [ "$BLUE_EXISTS" -gt 0 ]; then
+            echo "Unmapping route from blue app..."
+            cf unmap-route "${BLUE_APP}" "${CF_DOMAIN}" --hostname "${APP_ROUTE}" || true
 
             echo "Stopping blue app..."
             cf stop "${BLUE_APP}" || true
@@ -356,15 +366,18 @@ jobs:
   # Cleanup old app instances
   cleanup:
     needs: [deploy-nonprod, deploy-prod]
-    if: always() && (needs.deploy-nonprod.result == 'success' || needs.deploy-prod.result == 'success')
+    if: |
+      always() &&
+      (needs.deploy-nonprod.result == 'success' || needs.deploy-prod.result == 'success')
     runs-on: ubuntu-latest
 
     steps:
       - name: Install CF CLI
         run: |
-          curl -sL "https://packages.cloudfoundry.org/stable?release=linux64-binary&version=${{ env.CF_CLI_VERSION }}&source=github" | tar -zx
-          chmod +x cf8
+          wget -q "https://packages.cloudfoundry.org/stable?release=linux64-binary&version=v${{ env.CF_CLI_VERSION }}&source=github" -O cf-cli.tgz
+          tar -xzf cf-cli.tgz
           sudo mv cf8 /usr/local/bin/cf
+          cf version
 
       - name: Cleanup nonprod old apps
         if: needs.deploy-nonprod.outputs.old_app != ''
