@@ -172,6 +172,15 @@ cf create-service genai multi-model tanzu-all-models
 cf push
 ```
 
+### Default Credentials
+
+| | |
+|---|---|
+| **Username** | `admin` |
+| **Password** | `Tanzu123!` |
+
+> ⚠️ **Change the default password after first login!** Override via `app.admin.default-username` and `app.admin.default-password` properties.
+
 ### Service Bindings
 
 | Service | Plan | Purpose |
