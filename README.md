@@ -103,6 +103,28 @@
 - **🔙 Backward Compatible**: Still supports individual model service bindings
 - **🧠 Smart Routing**: Automatically routes to correct model based on capability (CHAT vs EMBEDDING)
 
+### 🔌 External API Bindings
+
+| Model Configuration | Add Binding |
+|:---:|:---:|
+| ![External Models](docs/screenshots/external-model-admin-page.png) | ![Add Binding](docs/screenshots/external-binding-config-box.png) |
+
+Connect external OpenAI-compatible APIs through the admin portal. Models from external bindings appear alongside bound services in the chat interface.
+
+- **🌐 OpenAI-Compatible**: Works with any API following the OpenAI chat completions spec
+- **🔍 Auto-Discovery**: Optional Config URL enables GenAI Locator for automatic model discovery
+- **🔑 Secure Storage**: API keys stored securely, never exposed in responses
+- **⚡ Hot Reload**: Add, edit, or remove bindings without restarting the application
+- **🎯 Unified Interface**: External models appear in the same dropdown as bound services
+
+**Configuration Fields:**
+| Field | Required | Description |
+|-------|----------|-------------|
+| Name | ✅ | Display name for the binding |
+| API Base URL | ✅ | Base URL for the OpenAI-compatible API |
+| API Key | ✅ | API key or JWT token for authentication |
+| Config URL | ❌ | GenAI Locator endpoint for automatic model discovery |
+
 ### 📄 Document RAG (Retrieval-Augmented Generation)
 
 ```
@@ -303,13 +325,14 @@ applications:
 |  +-----------+ +-----------+ +-----------+ +-----------+  |
 |                                                           |
 |  +-----------+ +-----------+ +-----------+ +-----------+  |
-|  |    MCP    | |   Orgs    | |  Storage  | |  Metrics  |  |
+|  |    MCP    | | External  | |   Orgs    | |  Metrics  |  |
+|  |  Servers  | | Bindings  | |           | |           |  |
 |  +-----------+ +-----------+ +-----------+ +-----------+  |
 |                                                           |
 +-----------------------------------------------------------+
 ```
 
-👥 **Users** • 🤖 **Models** • 🛠️ **Tools** • 💡 **Skills** • 🔌 **MCP** • 🏢 **Orgs** • 📦 **Storage** • 📊 **Metrics**
+👥 **Users** • 🤖 **Models** • 🛠️ **Tools** • 💡 **Skills** • 🔌 **MCP** • 🔗 **External Bindings** • 🏢 **Orgs** • 📊 **Metrics**
 
 ---
 
@@ -372,6 +395,19 @@ applications:
 | `POST` | `/api/admin/mcp/servers` | Create MCP server |
 | `GET` | `/api/admin/tools` | List tools |
 | `POST` | `/api/admin/skills` | Create skill |
+</details>
+
+<details>
+<summary>🔌 External Bindings APIs</summary>
+
+| Method | Endpoint | Description |
+|--------|----------|-------------|
+| `GET` | `/api/admin/external-bindings` | List all bindings |
+| `POST` | `/api/admin/external-bindings` | Create new binding |
+| `PUT` | `/api/admin/external-bindings/{id}` | Update binding |
+| `DELETE` | `/api/admin/external-bindings/{id}` | Delete binding |
+| `PUT` | `/api/admin/external-bindings/{id}/enabled` | Toggle enabled |
+| `POST` | `/api/admin/external-bindings/{id}/reload` | Force reload models |
 </details>
 
 ---
@@ -438,12 +474,18 @@ src/main/java/com/example/cfchat/
 │   ├── ChatController.java
 │   ├── DocumentController.java
 │   ├── AdminController.java
+│   ├── AdminExternalBindingController.java  # External API bindings
 │   └── ...
 ├── 📦 model/
+│   ├── ExternalBinding.java      # External API binding entity
+│   └── ...
 ├── 🗄️ repository/
+│   ├── ExternalBindingRepository.java
+│   └── ...
 └── 🔧 service/
     ├── ChatService.java
     ├── DocumentEmbeddingService.java
+    ├── ExternalBindingService.java  # External binding management
     └── ...
 ```
 
