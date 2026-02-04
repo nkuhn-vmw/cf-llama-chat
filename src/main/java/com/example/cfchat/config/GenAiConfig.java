@@ -75,6 +75,12 @@ public class GenAiConfig {
                             serviceName, modelName, apiUrl != null ? apiUrl : "not set");
 
                     if (apiUrl != null && apiKey != null) {
+                        // Skip embedding models - they can't handle chat completions
+                        if (isEmbeddingModel(modelName) || isEmbeddingModel(serviceName)) {
+                            log.info("Skipping embedding model for chat: {} (service: {})", modelName, serviceName);
+                            continue;
+                        }
+
                         // Create OpenAI API client pointing to the GenAI service
                         OpenAiApi openAiApi = OpenAiApi.builder()
                                 .baseUrl(apiUrl)
@@ -149,8 +155,14 @@ public class GenAiConfig {
     public ChatModel getChatModelByName(String modelName) {
         ChatModel model = chatModels.get(modelName);
         if (model == null) {
-            log.warn("ChatModel not found for name: {}, using default", modelName);
-            return chatModels.isEmpty() ? null : chatModels.values().iterator().next();
+            if (chatModels.isEmpty()) {
+                log.error("No ChatModels available - check VCAP_SERVICES bindings");
+                return null;
+            }
+            String defaultModel = chatModels.keySet().iterator().next();
+            log.warn("ChatModel not found for name: '{}', available models: {}, using default: {}",
+                    modelName, chatModels.keySet(), defaultModel);
+            return chatModels.get(defaultModel);
         }
         return model;
     }
@@ -185,6 +197,21 @@ public class GenAiConfig {
      */
     public int getModelCount() {
         return chatModels.size();
+    }
+
+    /**
+     * Checks if a model name indicates an embedding model (not suitable for chat).
+     */
+    private boolean isEmbeddingModel(String name) {
+        if (name == null) {
+            return false;
+        }
+        String lowerName = name.toLowerCase();
+        return lowerName.contains("embed") ||
+               lowerName.contains("embedding") ||
+               lowerName.contains("nomic-embed") ||
+               lowerName.contains("text-embedding") ||
+               lowerName.contains("ada-002");
     }
 
     /**
