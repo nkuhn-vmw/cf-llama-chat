@@ -77,6 +77,6 @@ app:
   documents:
     max-file-size: ${MAX_DOCUMENT_SIZE:104857600}
     max-documents-per-user: ${MAX_DOCUMENTS_PER_USER:50}
-    chunk-size: ${DOCUMENT_CHUNK_SIZE:800}
+    chunk-size: ${DOCUMENT_CHUNK_SIZE:350}  # Keep under 512 tokens for nomic embedding model
     chunk-overlap: ${DOCUMENT_CHUNK_OVERLAP:100}
     rag-top-k: ${RAG_TOP_K:5}

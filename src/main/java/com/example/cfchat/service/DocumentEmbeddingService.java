@@ -88,7 +88,8 @@ public class DocumentEmbeddingService {
     public void init() {
         // Initialize text splitter with injected config values
         // Chunk size should stay under embedding model's token limit (512 for nomic)
-        int effectiveChunkSize = Math.min(chunkSize, 450); // Leave room for overhead
+        // Use 350 to leave room for overhead and special tokens
+        int effectiveChunkSize = Math.min(chunkSize, 350);
         this.textSplitter = TokenTextSplitter.builder()
                 .withChunkSize(effectiveChunkSize)
                 .withMinChunkSizeChars(100)  // Lower threshold to capture more content

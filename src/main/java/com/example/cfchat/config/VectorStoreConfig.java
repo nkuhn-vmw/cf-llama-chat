@@ -1,5 +1,6 @@
 package com.example.cfchat.config;
 
+import io.pivotal.cfenv.boot.genai.GenaiLocator;
 import io.pivotal.cfenv.core.CfCredentials;
 import io.pivotal.cfenv.core.CfEnv;
 import io.pivotal.cfenv.core.CfService;
@@ -13,6 +14,7 @@ import org.springframework.ai.openai.api.OpenAiApi;
 import org.springframework.ai.retry.RetryUtils;
 import org.springframework.ai.vectorstore.pgvector.PgVectorStore;
 import org.springframework.ai.vectorstore.VectorStore;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.context.annotation.Bean;
@@ -29,9 +31,9 @@ import java.util.Map;
  * Configuration for Vector Store and Embedding Model.
  * Supports both local development (OpenAI/Ollama) and Cloud Foundry (GenAI) deployments.
  *
- * For Tanzu GenAI, supports both single-model and multi-model binding formats:
- * - Single model: One service instance per model
- * - Multi-model: Multiple models exposed through a single service with model_capabilities
+ * For Tanzu GenAI, supports both:
+ * - GenAI Locator pattern (tanzu-all-models): single binding with endpoint containing config_url
+ * - Direct binding pattern: individual service bindings with api_base, api_key, model_name
  */
 @Configuration
 @Slf4j
@@ -48,6 +50,9 @@ public class VectorStoreConfig {
 
     @Getter
     private EmbeddingModelInfo activeEmbeddingModel;
+
+    @Autowired(required = false)
+    private GenAiConfig genAiConfig;
 
     /**
      * Creates an EmbeddingModel for local development using OpenAI.
@@ -86,13 +91,7 @@ public class VectorStoreConfig {
 
     /**
      * Creates an EmbeddingModel for Cloud Foundry using GenAI service.
-     * Supports both single-model and multi-model Tanzu GenAI binding formats.
-     *
-     * Looks for embedding models in the following order:
-     * 1. Services with model_capabilities containing "embedding"
-     * 2. Services with model_type = "embedding"
-     * 3. Services with model_name containing "embed"
-     * 4. Fallback to first available GenAI service
+     * Supports both GenAI Locator pattern and direct service bindings.
      */
     @Bean("documentEmbeddingModel")
     @Profile("cloud")
@@ -100,17 +99,74 @@ public class VectorStoreConfig {
     public EmbeddingModel cloudEmbeddingModel() {
         log.info("Creating GenAI EmbeddingModel from VCAP_SERVICES");
 
+        // First try GenAI Locator pattern (from GenAiConfig)
+        EmbeddingModel locatorModel = tryGenaiLocatorEmbedding();
+        if (locatorModel != null) {
+            return locatorModel;
+        }
+
+        // Fall back to direct binding pattern
+        return tryDirectBindingEmbedding();
+    }
+
+    /**
+     * Try to get an EmbeddingModel from GenAI Locators.
+     */
+    private EmbeddingModel tryGenaiLocatorEmbedding() {
+        if (genAiConfig == null || genAiConfig.getGenaiLocators().isEmpty()) {
+            log.debug("No GenAI Locators available for embedding model");
+            return null;
+        }
+
+        for (GenaiLocator locator : genAiConfig.getGenaiLocators()) {
+            try {
+                // Get available embedding models from locator
+                List<String> embeddingModelNames = locator.getModelNamesByCapability("EMBEDDING");
+                log.info("GenAI Locator provides {} embedding model(s): {}",
+                        embeddingModelNames != null ? embeddingModelNames.size() : 0, embeddingModelNames);
+
+                if (embeddingModelNames != null && !embeddingModelNames.isEmpty()) {
+                    String modelName = embeddingModelNames.get(0);
+                    EmbeddingModel embeddingModel = locator.getEmbeddingModelByName(modelName);
+
+                    if (embeddingModel != null) {
+                        activeEmbeddingModel = new EmbeddingModelInfo(
+                                modelName,
+                                "genai-locator",
+                                "GenAI Locator"
+                        );
+                        log.info("Using EmbeddingModel from GenAI Locator: {}", modelName);
+                        return embeddingModel;
+                    }
+                }
+            } catch (Exception e) {
+                log.warn("Failed to get EmbeddingModel from GenAI Locator: {}", e.getMessage());
+            }
+        }
+
+        return null;
+    }
+
+    /**
+     * Try to get an EmbeddingModel from direct service bindings.
+     */
+    private EmbeddingModel tryDirectBindingEmbedding() {
         try {
             CfEnv cfEnv = new CfEnv();
             List<CfService> genaiServices = cfEnv.findServicesByLabel("genai");
 
-            log.info("Found {} GenAI service(s) in VCAP_SERVICES", genaiServices.size());
+            log.info("Found {} GenAI service(s) in VCAP_SERVICES for embedding", genaiServices.size());
 
             // Collect all potential embedding models
             List<EmbeddingCandidate> embeddingCandidates = new ArrayList<>();
 
             for (CfService service : genaiServices) {
                 try {
+                    // Skip GenAI Locator services (they're handled separately)
+                    if (isGenaiLocatorService(service)) {
+                        continue;
+                    }
+
                     String serviceName = service.getName();
                     CfCredentials credentials = service.getCredentials();
                     Map<String, Object> credMap = credentials.getMap();
@@ -205,6 +261,22 @@ public class VectorStoreConfig {
     }
 
     /**
+     * Checks if a service is a GenAI Locator service (has endpoint with config_url).
+     */
+    private boolean isGenaiLocatorService(CfService service) {
+        Map<String, Object> credentials = service.getCredentials().getMap();
+        if (credentials.containsKey("endpoint")) {
+            Object endpoint = credentials.get("endpoint");
+            if (endpoint instanceof Map) {
+                @SuppressWarnings("unchecked")
+                Map<String, Object> endpointMap = (Map<String, Object>) endpoint;
+                return endpointMap.containsKey("config_url");
+            }
+        }
+        return false;
+    }
+
+    /**
      * Creates a PgVector store for document embeddings.
      * Uses the same PostgreSQL database as the application.
      */
@@ -212,7 +284,7 @@ public class VectorStoreConfig {
     @Profile("!test")
     @Primary
     public VectorStore documentVectorStore(JdbcTemplate jdbcTemplate,
-                                   @org.springframework.beans.factory.annotation.Autowired(required = false) EmbeddingModel embeddingModel) {
+                                   @Autowired(required = false) EmbeddingModel embeddingModel) {
         if (embeddingModel == null) {
             log.warn("No EmbeddingModel available - VectorStore will not be created");
             return null;
