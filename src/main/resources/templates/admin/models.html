@@ -234,6 +234,298 @@
             font-weight: 500;
         }
 
+        /* External Bindings Section */
+        .section-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 16px;
+        }
+
+        .section-header h2 {
+            font-size: 1.3rem;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+
+        .section-header h2 svg {
+            width: 22px;
+            height: 22px;
+            color: var(--accent-color);
+        }
+
+        .add-btn {
+            padding: 10px 20px;
+            background-color: var(--accent-color);
+            color: white;
+            border: none;
+            border-radius: 8px;
+            cursor: pointer;
+            font-size: 0.95rem;
+            font-weight: 500;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+
+        .add-btn:hover {
+            background-color: var(--accent-hover);
+        }
+
+        .add-btn svg {
+            width: 18px;
+            height: 18px;
+        }
+
+        .data-table {
+            width: 100%;
+            background-color: var(--bg-secondary);
+            border: 1px solid var(--border-color);
+            border-radius: 12px;
+            overflow: hidden;
+        }
+
+        .data-table table {
+            width: 100%;
+            border-collapse: collapse;
+        }
+
+        .data-table th,
+        .data-table td {
+            padding: 14px 16px;
+            text-align: left;
+            border-bottom: 1px solid var(--border-color);
+        }
+
+        .data-table th {
+            background-color: var(--bg-tertiary);
+            font-weight: 600;
+            font-size: 0.85rem;
+            text-transform: uppercase;
+            color: var(--text-secondary);
+        }
+
+        .data-table tr:last-child td {
+            border-bottom: none;
+        }
+
+        .data-table tr:hover td {
+            background-color: var(--bg-hover);
+        }
+
+        .type-badge {
+            display: inline-block;
+            padding: 4px 8px;
+            border-radius: 4px;
+            font-size: 0.75rem;
+            background-color: var(--bg-tertiary);
+            color: var(--text-secondary);
+        }
+
+        .toggle-switch {
+            position: relative;
+            width: 50px;
+            height: 28px;
+        }
+
+        .toggle-switch input {
+            opacity: 0;
+            width: 0;
+            height: 0;
+        }
+
+        .toggle-slider {
+            position: absolute;
+            cursor: pointer;
+            top: 0;
+            left: 0;
+            right: 0;
+            bottom: 0;
+            background-color: #dc3545;
+            border: 2px solid #dc3545;
+            border-radius: 28px;
+            transition: 0.3s;
+        }
+
+        .toggle-slider:before {
+            position: absolute;
+            content: "";
+            height: 20px;
+            width: 20px;
+            left: 2px;
+            bottom: 2px;
+            background-color: white;
+            border-radius: 50%;
+            transition: 0.3s;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.2);
+        }
+
+        .toggle-switch input:checked + .toggle-slider {
+            background-color: #10a37f;
+            border-color: #10a37f;
+        }
+
+        .toggle-switch input:checked + .toggle-slider:before {
+            transform: translateX(22px);
+        }
+
+        .action-btn {
+            padding: 6px 12px;
+            border: 1px solid var(--border-color);
+            border-radius: 6px;
+            background: none;
+            color: var(--text-primary);
+            cursor: pointer;
+            font-size: 0.85rem;
+            margin-right: 8px;
+            transition: background-color 0.2s, border-color 0.2s;
+        }
+
+        .action-btn:hover {
+            background-color: var(--bg-hover);
+            border-color: var(--accent-color);
+        }
+
+        .action-btn.danger {
+            color: var(--error-color);
+            border-color: var(--error-color);
+        }
+
+        .action-btn.danger:hover {
+            background-color: rgba(239, 68, 68, 0.1);
+        }
+
+        .action-btn.primary {
+            color: var(--accent-color);
+            border-color: var(--accent-color);
+        }
+
+        .action-btn.primary:hover {
+            background-color: rgba(16, 163, 127, 0.1);
+        }
+
+        .modal-overlay {
+            display: none;
+            position: fixed;
+            top: 0;
+            left: 0;
+            right: 0;
+            bottom: 0;
+            background-color: rgba(0, 0, 0, 0.5);
+            z-index: 1000;
+            align-items: center;
+            justify-content: center;
+        }
+
+        .modal-overlay.open {
+            display: flex;
+        }
+
+        .modal {
+            background-color: var(--bg-secondary);
+            border: 1px solid var(--border-color);
+            border-radius: 16px;
+            padding: 24px;
+            max-width: 500px;
+            width: 90%;
+            max-height: 90vh;
+            overflow-y: auto;
+        }
+
+        .modal h3 {
+            margin-bottom: 20px;
+        }
+
+        .form-group {
+            margin-bottom: 16px;
+        }
+
+        .form-group label {
+            display: block;
+            margin-bottom: 6px;
+            font-size: 0.9rem;
+            font-weight: 500;
+        }
+
+        .form-group input,
+        .form-group textarea {
+            width: 100%;
+            padding: 10px 12px;
+            background-color: var(--bg-tertiary);
+            border: 1px solid var(--border-color);
+            border-radius: 8px;
+            color: var(--text-primary);
+            font-size: 0.95rem;
+        }
+
+        .form-group input:focus,
+        .form-group textarea:focus {
+            outline: none;
+            border-color: var(--accent-color);
+        }
+
+        .form-group textarea {
+            min-height: 100px;
+            resize: vertical;
+            font-family: monospace;
+        }
+
+        .form-group small {
+            display: block;
+            margin-top: 4px;
+            font-size: 0.8rem;
+            color: var(--text-muted);
+        }
+
+        .modal-actions {
+            display: flex;
+            gap: 12px;
+            justify-content: flex-end;
+            margin-top: 24px;
+        }
+
+        .modal-btn {
+            padding: 10px 20px;
+            border-radius: 8px;
+            border: none;
+            cursor: pointer;
+            font-size: 0.95rem;
+            font-weight: 500;
+        }
+
+        .modal-btn.cancel {
+            background-color: var(--bg-tertiary);
+            color: var(--text-primary);
+        }
+
+        .modal-btn.save {
+            background-color: var(--accent-color);
+            color: white;
+        }
+
+        .modal-btn.confirm {
+            background-color: var(--error-color);
+            color: white;
+        }
+
+        .empty-state {
+            text-align: center;
+            padding: 48px 24px;
+            color: var(--text-secondary);
+        }
+
+        .empty-state svg {
+            width: 64px;
+            height: 64px;
+            margin-bottom: 16px;
+            opacity: 0.5;
+        }
+
+        .external-section {
+            margin-top: 32px;
+        }
+
         @media (max-width: 768px) {
             .models-table {
                 overflow-x: auto;
@@ -359,6 +651,52 @@
             </div>
         </section>
 
+        <!-- External API Bindings Section -->
+        <section class="external-section">
+            <div class="section-header">
+                <h2>
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                        <path d="M10 13a5 5 0 0 0 7.54.54l3-3a5 5 0 0 0-7.07-7.07l-1.72 1.71"></path>
+                        <path d="M14 11a5 5 0 0 0-7.54-.54l-3 3a5 5 0 0 0 7.07 7.07l1.71-1.71"></path>
+                    </svg>
+                    External API Bindings
+                </h2>
+                <button class="add-btn" onclick="showAddBindingModal()">
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                        <line x1="12" y1="5" x2="12" y2="19"></line>
+                        <line x1="5" y1="12" x2="19" y2="12"></line>
+                    </svg>
+                    Add Binding
+                </button>
+            </div>
+
+            <div id="bindingsTable" class="data-table" style="display: none;">
+                <table>
+                    <thead>
+                        <tr>
+                            <th>Name</th>
+                            <th>API Base</th>
+                            <th>Type</th>
+                            <th>Models</th>
+                            <th>Enabled</th>
+                            <th>Actions</th>
+                        </tr>
+                    </thead>
+                    <tbody id="bindingsTableBody">
+                    </tbody>
+                </table>
+            </div>
+
+            <div id="bindingsEmptyState" class="empty-state">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                    <path d="M10 13a5 5 0 0 0 7.54.54l3-3a5 5 0 0 0-7.07-7.07l-1.72 1.71"></path>
+                    <path d="M14 11a5 5 0 0 0-7.54-.54l-3 3a5 5 0 0 0 7.07 7.07l1.71-1.71"></path>
+                </svg>
+                <h3>No External Bindings Configured</h3>
+                <p>Add external OpenAI-compatible API bindings to access additional models.</p>
+            </div>
+        </section>
+
         <div class="environment-info">
             <h3>
                 <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
@@ -374,10 +712,302 @@
         </div>
     </div>
 
+    <!-- Add/Edit Binding Modal -->
+    <div class="modal-overlay" id="bindingModal">
+        <div class="modal">
+            <h3 id="bindingModalTitle">Add External Binding</h3>
+            <form id="bindingForm">
+                <input type="hidden" id="bindingId">
+                <div class="form-group">
+                    <label for="bindingName">Name *</label>
+                    <input type="text" id="bindingName" required placeholder="e.g., my-openai-proxy">
+                </div>
+                <div class="form-group">
+                    <label for="bindingDescription">Description</label>
+                    <input type="text" id="bindingDescription" placeholder="What does this binding provide?">
+                </div>
+                <div class="form-group">
+                    <label for="bindingApiBase">API Base URL *</label>
+                    <input type="text" id="bindingApiBase" required placeholder="https://api.example.com/v1">
+                    <small>The base URL for the OpenAI-compatible API</small>
+                </div>
+                <div class="form-group">
+                    <label for="bindingApiKey">API Key *</label>
+                    <textarea id="bindingApiKey" required placeholder="Your API key or JWT token"></textarea>
+                    <small>Supports long JWT tokens. This will be stored securely.</small>
+                </div>
+                <div class="form-group">
+                    <label for="bindingConfigUrl">Config URL (optional)</label>
+                    <input type="text" id="bindingConfigUrl" placeholder="https://api.example.com/config/v1/endpoint">
+                    <small>If provided, uses GenAI Locator for automatic model discovery</small>
+                </div>
+                <div class="modal-actions">
+                    <button type="button" class="modal-btn cancel" onclick="closeBindingModal()">Cancel</button>
+                    <button type="submit" class="modal-btn save">Save</button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <!-- Delete Confirmation Modal -->
+    <div class="modal-overlay" id="deleteBindingModal">
+        <div class="modal">
+            <h3>Delete External Binding</h3>
+            <p>Are you sure you want to delete <strong id="deleteBindingName"></strong>?</p>
+            <p style="color: var(--text-muted); font-size: 0.9rem;">This will also unload all models from this binding.</p>
+            <div class="modal-actions">
+                <button class="modal-btn cancel" onclick="closeDeleteBindingModal()">Cancel</button>
+                <button class="modal-btn confirm" id="confirmDeleteBindingBtn">Delete</button>
+            </div>
+        </div>
+    </div>
+
     <script>
         // Apply saved theme
         const savedTheme = localStorage.getItem('theme') || 'dark';
         document.body.setAttribute('data-theme', savedTheme);
+
+        let deleteBindingId = null;
+        let bindingsData = [];
+
+        // Load bindings on page load
+        document.addEventListener('DOMContentLoaded', loadBindings);
+
+        function loadBindings() {
+            fetch('/api/admin/external-bindings')
+                .then(response => response.json())
+                .then(bindings => {
+                    bindingsData = bindings;
+                    renderBindings(bindings);
+                })
+                .catch(error => {
+                    console.error('Error loading bindings:', error);
+                });
+        }
+
+        function renderBindings(bindings) {
+            const table = document.getElementById('bindingsTable');
+            const emptyState = document.getElementById('bindingsEmptyState');
+            const tbody = document.getElementById('bindingsTableBody');
+
+            if (bindings.length === 0) {
+                table.style.display = 'none';
+                emptyState.style.display = 'block';
+                return;
+            }
+
+            table.style.display = 'block';
+            emptyState.style.display = 'none';
+
+            tbody.innerHTML = bindings.map(binding => `
+                <tr>
+                    <td>
+                        <div style="font-weight: 500;">${escapeHtml(binding.name)}</div>
+                        <div style="font-size: 0.8rem; color: var(--text-muted);">${escapeHtml(binding.description || '')}</div>
+                    </td>
+                    <td style="max-width: 200px; overflow: hidden; text-overflow: ellipsis;">
+                        ${escapeHtml(binding.apiBase)}
+                    </td>
+                    <td>
+                        <span class="type-badge">${binding.type}</span>
+                    </td>
+                    <td>
+                        <span title="${binding.modelNames ? Array.from(binding.modelNames).join(', ') : ''}">${binding.modelCount}</span>
+                    </td>
+                    <td>
+                        <label class="toggle-switch">
+                            <input type="checkbox"
+                                   ${binding.enabled ? 'checked' : ''}
+                                   data-binding-id="${binding.id}"
+                                   onchange="toggleBindingEnabled(this)">
+                            <span class="toggle-slider"></span>
+                        </label>
+                    </td>
+                    <td>
+                        <button class="action-btn primary"
+                                data-binding-id="${binding.id}"
+                                onclick="reloadBinding(this)">Reload</button>
+                        <button class="action-btn"
+                                data-binding-id="${binding.id}"
+                                onclick="showEditBindingModal('${binding.id}')">Edit</button>
+                        <button class="action-btn danger"
+                                data-binding-id="${binding.id}"
+                                data-binding-name="${escapeHtml(binding.name)}"
+                                onclick="showDeleteBindingModal(this)">Delete</button>
+                    </td>
+                </tr>
+            `).join('');
+        }
+
+        function escapeHtml(text) {
+            if (!text) return '';
+            const div = document.createElement('div');
+            div.textContent = text;
+            return div.innerHTML;
+        }
+
+        function showAddBindingModal() {
+            document.getElementById('bindingModalTitle').textContent = 'Add External Binding';
+            document.getElementById('bindingForm').reset();
+            document.getElementById('bindingId').value = '';
+            document.getElementById('bindingModal').classList.add('open');
+        }
+
+        function showEditBindingModal(bindingId) {
+            const binding = bindingsData.find(b => b.id === bindingId);
+            if (!binding) return;
+
+            document.getElementById('bindingModalTitle').textContent = 'Edit External Binding';
+            document.getElementById('bindingId').value = binding.id;
+            document.getElementById('bindingName').value = binding.name || '';
+            document.getElementById('bindingDescription').value = binding.description || '';
+            document.getElementById('bindingApiBase').value = binding.apiBase || '';
+            document.getElementById('bindingApiKey').value = ''; // Don't show existing key
+            document.getElementById('bindingApiKey').placeholder = 'Leave blank to keep existing key';
+            document.getElementById('bindingApiKey').required = false;
+            document.getElementById('bindingConfigUrl').value = binding.configUrl || '';
+            document.getElementById('bindingModal').classList.add('open');
+        }
+
+        function closeBindingModal() {
+            document.getElementById('bindingModal').classList.remove('open');
+            document.getElementById('bindingApiKey').required = true;
+            document.getElementById('bindingApiKey').placeholder = 'Your API key or JWT token';
+        }
+
+        document.getElementById('bindingForm').addEventListener('submit', function(e) {
+            e.preventDefault();
+
+            const bindingId = document.getElementById('bindingId').value;
+            const data = {
+                name: document.getElementById('bindingName').value,
+                description: document.getElementById('bindingDescription').value,
+                apiBase: document.getElementById('bindingApiBase').value,
+                configUrl: document.getElementById('bindingConfigUrl').value
+            };
+
+            // Only include apiKey if it's provided (for edits, allow empty to keep existing)
+            const apiKey = document.getElementById('bindingApiKey').value;
+            if (apiKey) {
+                data.apiKey = apiKey;
+            }
+
+            const url = bindingId ? `/api/admin/external-bindings/${bindingId}` : '/api/admin/external-bindings';
+            const method = bindingId ? 'PUT' : 'POST';
+
+            fetch(url, {
+                method: method,
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify(data)
+            })
+            .then(response => response.json())
+            .then(result => {
+                if (result.error) {
+                    alert(result.error);
+                } else {
+                    closeBindingModal();
+                    loadBindings();
+                    // Reload the page to update the models table
+                    setTimeout(() => location.reload(), 500);
+                }
+            })
+            .catch(error => {
+                console.error('Error:', error);
+                alert('Failed to save binding');
+            });
+        });
+
+        function toggleBindingEnabled(checkbox) {
+            const bindingId = checkbox.dataset.bindingId;
+            const enabled = checkbox.checked;
+
+            fetch(`/api/admin/external-bindings/${bindingId}/enabled`, {
+                method: 'PUT',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ enabled })
+            })
+            .then(response => response.json())
+            .then(result => {
+                if (result.error) {
+                    alert(result.error);
+                    checkbox.checked = !enabled;
+                } else {
+                    loadBindings();
+                    // Reload after short delay to update models
+                    setTimeout(() => location.reload(), 500);
+                }
+            })
+            .catch(error => {
+                console.error('Error:', error);
+                checkbox.checked = !enabled;
+            });
+        }
+
+        function reloadBinding(btn) {
+            const bindingId = btn.dataset.bindingId;
+            btn.disabled = true;
+            btn.textContent = 'Reloading...';
+
+            fetch(`/api/admin/external-bindings/${bindingId}/reload`, { method: 'POST' })
+                .then(response => response.json())
+                .then(result => {
+                    if (result.error) {
+                        alert(result.error);
+                    } else {
+                        alert(`Reloaded ${result.reloadedModelCount} model(s)`);
+                        loadBindings();
+                        // Reload to update models
+                        setTimeout(() => location.reload(), 500);
+                    }
+                })
+                .catch(error => {
+                    console.error('Error:', error);
+                    alert('Failed to reload binding');
+                    btn.disabled = false;
+                    btn.textContent = 'Reload';
+                });
+        }
+
+        function showDeleteBindingModal(btn) {
+            deleteBindingId = btn.dataset.bindingId;
+            document.getElementById('deleteBindingName').textContent = btn.dataset.bindingName;
+            document.getElementById('deleteBindingModal').classList.add('open');
+        }
+
+        function closeDeleteBindingModal() {
+            document.getElementById('deleteBindingModal').classList.remove('open');
+            deleteBindingId = null;
+        }
+
+        document.getElementById('confirmDeleteBindingBtn').addEventListener('click', function() {
+            if (!deleteBindingId) return;
+
+            fetch(`/api/admin/external-bindings/${deleteBindingId}`, { method: 'DELETE' })
+                .then(response => response.json())
+                .then(result => {
+                    if (result.error) {
+                        alert(result.error);
+                    } else {
+                        closeDeleteBindingModal();
+                        loadBindings();
+                        // Reload to update models
+                        setTimeout(() => location.reload(), 500);
+                    }
+                })
+                .catch(error => {
+                    console.error('Error:', error);
+                    alert('Failed to delete binding');
+                });
+        });
+
+        // Close modals when clicking outside
+        document.querySelectorAll('.modal-overlay').forEach(modal => {
+            modal.addEventListener('click', function(e) {
+                if (e.target === this) {
+                    this.classList.remove('open');
+                }
+            });
+        });
     </script>
 </body>
 </html>

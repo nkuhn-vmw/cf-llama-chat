@@ -28,6 +28,7 @@ import org.springframework.stereotype.Service;
 import reactor.core.publisher.Flux;
 
 import com.example.cfchat.config.GenAiConfig;
+import com.example.cfchat.service.ExternalBindingService;
 
 import java.util.ArrayList;
 import java.util.List;
@@ -53,6 +54,7 @@ public class ChatService {
     private final SkillService skillService;
     private final McpToolCallbackCacheService mcpToolCallbackCacheService;
     private final DocumentEmbeddingService documentEmbeddingService;
+    private final ExternalBindingService externalBindingService;
 
     @Value("${spring.profiles.active:default}")
     private String activeProfile;
@@ -73,7 +75,8 @@ public class ChatService {
             @Autowired(required = false) GenAiConfig genAiConfig,
             @Autowired(required = false) SkillService skillService,
             @Autowired(required = false) McpToolCallbackCacheService mcpToolCallbackCacheService,
-            @Autowired(required = false) DocumentEmbeddingService documentEmbeddingService) {
+            @Autowired(required = false) DocumentEmbeddingService documentEmbeddingService,
+            @Autowired(required = false) ExternalBindingService externalBindingService) {
         this.primaryChatClient = primaryChatClient;
         // Use OpenAI model as primary for streaming
         this.primaryChatModel = openAiChatModel;
@@ -88,12 +91,14 @@ public class ChatService {
         this.skillService = skillService;
         this.mcpToolCallbackCacheService = mcpToolCallbackCacheService;
         this.documentEmbeddingService = documentEmbeddingService;
+        this.externalBindingService = externalBindingService;
 
-        log.info("ChatService initialized - primaryChatClient: {}, ollamaChatClient: {}, primaryChatModel: {}, mcpTools: {}, documentEmbedding: {}",
+        log.info("ChatService initialized - primaryChatClient: {}, ollamaChatClient: {}, primaryChatModel: {}, mcpTools: {}, documentEmbedding: {}, externalBindings: {}",
                 primaryChatClient != null, ollamaChatClient != null,
                 openAiChatModel != null ? openAiChatModel.getClass().getSimpleName() : "null",
                 mcpToolCallbackCacheService != null ? mcpToolCallbackCacheService.getMcpServerServices().size() : 0,
-                documentEmbeddingService != null && documentEmbeddingService.isAvailable());
+                documentEmbeddingService != null && documentEmbeddingService.isAvailable(),
+                externalBindingService != null);
     }
 
     public ChatResponse chat(ChatRequest request) {
@@ -459,6 +464,26 @@ public class ChatService {
                     .build());
         }
 
+        // Add external binding models
+        if (externalBindingService != null) {
+            for (String modelName : externalBindingService.getAvailableModelNames()) {
+                // Skip embedding models
+                if (modelName.toLowerCase().contains("embed")) {
+                    continue;
+                }
+                ExternalBindingService.ExternalModelMetadata metadata =
+                        externalBindingService.getModelMetadata().get(modelName);
+                String bindingName = metadata != null ? metadata.bindingName() : "External";
+                models.add(ModelInfo.builder()
+                        .id(modelName)
+                        .name(modelName)
+                        .provider("external")
+                        .description("External API: " + bindingName)
+                        .available(true)
+                        .build());
+            }
+        }
+
         return models;
     }
 
@@ -469,6 +494,17 @@ public class ChatService {
     private ChatClient getChatClient(String provider, String modelName) {
         if ("ollama".equalsIgnoreCase(provider)) {
             return ollamaChatClient;
+        }
+
+        // Check external bindings first if provider is "external" or if model exists in external bindings
+        if (externalBindingService != null && modelName != null) {
+            if ("external".equalsIgnoreCase(provider) || externalBindingService.hasModel(modelName)) {
+                ChatModel externalModel = externalBindingService.getChatModelByName(modelName);
+                if (externalModel != null) {
+                    log.debug("Using external binding model: {}", modelName);
+                    return ChatClient.builder(externalModel).build();
+                }
+            }
         }
 
         // For GenAI, try to get the specific model if provided
@@ -487,6 +523,17 @@ public class ChatService {
     private ChatModel getStreamingModel(String provider, String modelName) {
         if ("ollama".equalsIgnoreCase(provider)) {
             return ollamaChatModel;
+        }
+
+        // Check external bindings first if provider is "external" or if model exists in external bindings
+        if (externalBindingService != null && modelName != null) {
+            if ("external".equalsIgnoreCase(provider) || externalBindingService.hasModel(modelName)) {
+                ChatModel externalModel = externalBindingService.getChatModelByName(modelName);
+                if (externalModel != null) {
+                    log.debug("Using external binding streaming model: {}", modelName);
+                    return externalModel;
+                }
+            }
         }
 
         // For GenAI, try to get the specific model if provided

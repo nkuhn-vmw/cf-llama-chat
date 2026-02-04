@@ -1,5 +1,6 @@
 package com.example.cfchat.config;
 
+import com.example.cfchat.service.ExternalBindingService;
 import io.pivotal.cfenv.boot.genai.GenaiLocator;
 import io.pivotal.cfenv.core.CfCredentials;
 import io.pivotal.cfenv.core.CfEnv;
@@ -53,6 +54,9 @@ public class VectorStoreConfig {
 
     @Autowired(required = false)
     private GenAiConfig genAiConfig;
+
+    @Autowired(required = false)
+    private ExternalBindingService externalBindingService;
 
     /**
      * Creates an EmbeddingModel for local development using OpenAI.
@@ -110,40 +114,79 @@ public class VectorStoreConfig {
     }
 
     /**
-     * Try to get an EmbeddingModel from GenAI Locators.
+     * Try to get an EmbeddingModel from GenAI Locators (both VCAP_SERVICES and external bindings).
      */
     private EmbeddingModel tryGenaiLocatorEmbedding() {
-        if (genAiConfig == null || genAiConfig.getGenaiLocators().isEmpty()) {
-            log.debug("No GenAI Locators available for embedding model");
-            return null;
-        }
-
-        for (GenaiLocator locator : genAiConfig.getGenaiLocators()) {
-            try {
-                // Get available embedding models from locator
-                List<String> embeddingModelNames = locator.getModelNamesByCapability("EMBEDDING");
-                log.info("GenAI Locator provides {} embedding model(s): {}",
-                        embeddingModelNames != null ? embeddingModelNames.size() : 0, embeddingModelNames);
-
-                if (embeddingModelNames != null && !embeddingModelNames.isEmpty()) {
-                    String modelName = embeddingModelNames.get(0);
-                    EmbeddingModel embeddingModel = locator.getEmbeddingModelByName(modelName);
-
-                    if (embeddingModel != null) {
-                        activeEmbeddingModel = new EmbeddingModelInfo(
-                                modelName,
-                                "genai-locator",
-                                "GenAI Locator"
-                        );
-                        log.info("Using EmbeddingModel from GenAI Locator: {}", modelName);
-                        return embeddingModel;
-                    }
+        // First check VCAP_SERVICES GenAI Locators
+        if (genAiConfig != null && !genAiConfig.getGenaiLocators().isEmpty()) {
+            for (GenaiLocator locator : genAiConfig.getGenaiLocators()) {
+                EmbeddingModel model = tryLocatorForEmbedding(locator, "GenAI Locator (VCAP)");
+                if (model != null) {
+                    return model;
                 }
-            } catch (Exception e) {
-                log.warn("Failed to get EmbeddingModel from GenAI Locator: {}", e.getMessage());
             }
         }
 
+        // Then check external bindings GenAI Locators
+        if (externalBindingService != null && !externalBindingService.getGenaiLocators().isEmpty()) {
+            for (GenaiLocator locator : externalBindingService.getGenaiLocators()) {
+                EmbeddingModel model = tryLocatorForEmbedding(locator, "GenAI Locator (External)");
+                if (model != null) {
+                    return model;
+                }
+            }
+        }
+
+        // Also check if ExternalBindingService already has embedding models loaded
+        if (externalBindingService != null && externalBindingService.hasAnyEmbeddingModels()) {
+            List<String> embeddingNames = externalBindingService.getAvailableEmbeddingModelNames();
+            if (!embeddingNames.isEmpty()) {
+                String modelName = embeddingNames.get(0);
+                EmbeddingModel model = externalBindingService.getEmbeddingModelByName(modelName);
+                if (model != null) {
+                    ExternalBindingService.ExternalModelMetadata metadata =
+                            externalBindingService.getEmbeddingModelMetadata().get(modelName);
+                    activeEmbeddingModel = new EmbeddingModelInfo(
+                            modelName,
+                            "external",
+                            metadata != null ? metadata.bindingName() : "External Binding"
+                    );
+                    log.info("Using EmbeddingModel from External Binding: {}", modelName);
+                    return model;
+                }
+            }
+        }
+
+        log.debug("No GenAI Locators available for embedding model");
+        return null;
+    }
+
+    /**
+     * Try to get an embedding model from a specific locator.
+     */
+    private EmbeddingModel tryLocatorForEmbedding(GenaiLocator locator, String source) {
+        try {
+            List<String> embeddingModelNames = locator.getModelNamesByCapability("EMBEDDING");
+            log.info("{} provides {} embedding model(s): {}",
+                    source, embeddingModelNames != null ? embeddingModelNames.size() : 0, embeddingModelNames);
+
+            if (embeddingModelNames != null && !embeddingModelNames.isEmpty()) {
+                String modelName = embeddingModelNames.get(0);
+                EmbeddingModel embeddingModel = locator.getEmbeddingModelByName(modelName);
+
+                if (embeddingModel != null) {
+                    activeEmbeddingModel = new EmbeddingModelInfo(
+                            modelName,
+                            "genai-locator",
+                            source
+                    );
+                    log.info("Using EmbeddingModel from {}: {}", source, modelName);
+                    return embeddingModel;
+                }
+            }
+        } catch (Exception e) {
+            log.warn("Failed to get EmbeddingModel from {}: {}", source, e.getMessage());
+        }
         return null;
     }
 

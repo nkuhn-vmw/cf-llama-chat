@@ -552,17 +552,12 @@
                     <button class="time-period-tab" onclick="showTimePeriod('today')">Today</button>
                 </div>
                 <div id="tokensByPeriod-all" class="bar-chart">
-                    <div th:if="${globalSummary.tokensByModel.isEmpty()}" class="empty-state">
-                        <p>No usage data yet</p>
-                    </div>
-                    <div th:unless="${globalSummary.tokensByModel.isEmpty()}">
-                        <div th:each="entry : ${globalSummary.tokensByModel}" class="bar-item">
-                            <span class="bar-label" th:text="${entry.key}" th:title="${entry.key}">Model</span>
-                            <div class="bar-container">
-                                <div class="bar-fill" th:data-value="${entry.value}" style="width: 0%"></div>
-                            </div>
-                            <span class="bar-value" th:text="${#numbers.formatInteger(entry.value, 1, 'COMMA')}">0</span>
+                    <div th:each="entry : ${globalSummary.tokensByModel}" class="bar-item">
+                        <span class="bar-label" th:text="${entry.key}" th:title="${entry.key}">Model</span>
+                        <div class="bar-container">
+                            <div class="bar-fill" th:data-value="${entry.value}" style="width: 0%"></div>
                         </div>
+                        <span class="bar-value" th:text="${#numbers.formatInteger(entry.value, 1, 'COMMA')}">0</span>
                     </div>
                 </div>
                 <div id="tokensByPeriod-month" class="bar-chart" style="display: none;">

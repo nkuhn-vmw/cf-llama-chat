@@ -121,6 +121,14 @@
                                         th:title="${model.description}">
                                 </option>
                             </optgroup>
+                            <optgroup th:if="${#lists.size(models.?[provider == 'external']) > 0}" label="external">
+                                <option th:each="model : ${models}"
+                                        th:if="${model.provider == 'external'}"
+                                        th:value="${model.provider + ':' + model.id}"
+                                        th:text="${model.name}"
+                                        th:title="${model.description}">
+                                </option>
+                            </optgroup>
                         </select>
                     </div>
                 </div>
