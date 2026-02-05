@@ -59,9 +59,6 @@ jobs:
           distribution: 'temurin'
           cache: maven
 
-      - name: Build release artifact
-        run: mvn -B clean package -DskipTests
-
       - name: Generate incremental release version
         id: release_tag
         run: |
@@ -76,8 +73,13 @@ jobs:
             NEXT_MINOR=20
           fi
           TAG="v1.${NEXT_MINOR}.0"
+          VERSION="1.${NEXT_MINOR}.0"
           echo "tag=$TAG" >> $GITHUB_OUTPUT
-          echo "Generated tag: $TAG"
+          echo "version=$VERSION" >> $GITHUB_OUTPUT
+          echo "Generated tag: $TAG (version: $VERSION)"
+
+      - name: Build release artifact
+        run: mvn -B clean package -DskipTests -Drevision=${{ steps.release_tag.outputs.version }}
 
       - name: Generate changelog
         id: changelog
