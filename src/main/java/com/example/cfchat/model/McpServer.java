@@ -43,6 +43,9 @@ public class McpServer {
     @Column(name = "env_vars", columnDefinition = "TEXT")
     private String envVars;
 
+    @Column(columnDefinition = "TEXT")
+    private String headers;
+
     @Column(nullable = false)
     @Builder.Default
     private boolean enabled = true;

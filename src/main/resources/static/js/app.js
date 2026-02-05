@@ -11,6 +11,8 @@ class ChatApp {
         this.documentsAvailable = false;
         this.useTools = true;
         this.toolsAvailable = false;
+        this.tools = [];
+        this.toolPreferences = {};
 
         this.initElements();
         this.initEventListeners();
@@ -58,6 +60,12 @@ class ChatApp {
         // Tools elements
         this.useToolsToggle = document.getElementById('useToolsToggle');
         this.toolsToggleLabel = document.getElementById('toolsToggleLabel');
+        this.toolsPanel = document.getElementById('toolsPanel');
+        this.toolsBtn = document.getElementById('toolsBtn');
+        this.closeToolsPanelBtn = document.getElementById('closeToolsPanelBtn');
+        this.toolsList = document.getElementById('toolsList');
+        this.toolCount = document.getElementById('toolCount');
+        this.enabledToolCount = document.getElementById('enabledToolCount');
     }
 
     initEventListeners() {
@@ -362,14 +370,19 @@ class ChatApp {
         const typingIndicator = this.showTypingIndicator();
 
         try {
+            // Read toggle state directly from DOM for reliability
+            const toolsEnabled = this.useToolsToggle ? this.useToolsToggle.checked : this.useTools;
+
             const request = {
                 conversationId: this.conversationId,
                 message: message,
                 provider: provider,
                 model: model,
                 useDocumentContext: this.useDocumentContext && this.documentsAvailable,
-                useTools: this.useTools && this.toolsAvailable
+                useTools: toolsEnabled && this.toolsAvailable
             };
+
+            console.debug('Chat request - useTools:', request.useTools, '(toggle:', toolsEnabled, ', available:', this.toolsAvailable, ')');
 
             if (this.isStreaming) {
                 await this.sendStreamingMessage(request, typingIndicator);
@@ -429,6 +442,7 @@ class ChatApp {
         this.messages.appendChild(messageEl);
         const textEl = messageEl.querySelector('.message-text');
         let fullContent = '';
+        let streamComplete = false;
 
         const reader = response.body.getReader();
         const decoder = new TextDecoder();
@@ -456,10 +470,9 @@ class ChatApp {
                             this.updateURL(data.conversationId);
                         }
 
-                        // Debug: log final response to see metrics
                         if (data.complete) {
-                            console.log('Final streaming response:', JSON.stringify(data, null, 2));
-                            // Final message with full HTML content
+                            streamComplete = true;
+                            // Final message with full HTML content from backend
                             if (data.htmlContent) {
                                 textEl.innerHTML = data.htmlContent;
                             }
@@ -506,6 +519,13 @@ class ChatApp {
                     }
                 }
             }
+        }
+
+        // Fallback: only re-render if stream ended without a complete event
+        if (fullContent && !streamComplete) {
+            textEl.innerHTML = marked.parse(fullContent);
+            this.highlightCode(textEl);
+            this.scrollToBottom();
         }
     }
 
@@ -898,17 +918,12 @@ class ChatApp {
             });
         }
 
-        // Use tools toggle
-        if (this.useToolsToggle) {
-            this.useToolsToggle.addEventListener('change', (e) => {
-                this.useTools = e.target.checked;
-                localStorage.setItem('useTools', this.useTools);
-            });
-        }
     }
 
     toggleDocumentsPanel() {
         if (this.documentsPanel) {
+            // Close tools panel if open
+            this.closeToolsPanel();
             this.documentsPanel.classList.toggle('open');
             if (this.documentsPanel.classList.contains('open')) {
                 this.loadDocuments();
@@ -948,16 +963,24 @@ class ChatApp {
     }
 
     async initTools() {
-        // Check if MCP tools are available
+        // Load tool preferences from localStorage
+        this.loadToolPreferences();
+
+        // Check if MCP tools are available using the chat endpoint (accessible to all users)
         try {
-            const response = await fetch('/api/admin/tools/available');
+            const response = await fetch('/api/chat/available-tools');
             if (response.ok) {
-                const data = await response.json();
-                this.toolsAvailable = data.available && data.count > 0;
+                this.tools = await response.json();
+                this.toolsAvailable = this.tools.length > 0;
 
                 // Show "Use Tools" toggle if tools are available
                 if (this.toolsToggleLabel) {
                     this.toolsToggleLabel.style.display = this.toolsAvailable ? 'flex' : 'none';
+                }
+
+                // Show Tools button if tools are available
+                if (this.toolsBtn) {
+                    this.toolsBtn.style.display = this.toolsAvailable ? 'flex' : 'none';
                 }
 
                 // Set initial toggle state from saved preference
@@ -968,14 +991,169 @@ class ChatApp {
                         this.useToolsToggle.checked = this.useTools;
                     }
                 }
+
+                // Set up tools panel if tools are available
+                if (this.toolsAvailable) {
+                    this.initToolsEventListeners();
+                    this.renderTools();
+                    this.updateToolStats();
+                }
             }
         } catch (error) {
             console.warn('Could not check tools availability:', error);
-            // Hide the toggle if we can't determine availability
+            // Hide the toggle and button if we can't determine availability
             if (this.toolsToggleLabel) {
                 this.toolsToggleLabel.style.display = 'none';
             }
+            if (this.toolsBtn) {
+                this.toolsBtn.style.display = 'none';
+            }
         }
+    }
+
+    initToolsEventListeners() {
+        // Tools button
+        if (this.toolsBtn) {
+            this.toolsBtn.addEventListener('click', () => {
+                this.toggleToolsPanel();
+            });
+        }
+
+        // Close tools panel button
+        if (this.closeToolsPanelBtn) {
+            this.closeToolsPanelBtn.addEventListener('click', () => {
+                this.closeToolsPanel();
+            });
+        }
+
+        // Use tools toggle
+        if (this.useToolsToggle) {
+            this.useToolsToggle.addEventListener('change', (e) => {
+                this.useTools = e.target.checked;
+                localStorage.setItem('useTools', this.useTools);
+            });
+        }
+    }
+
+    toggleToolsPanel() {
+        if (this.toolsPanel) {
+            // Close documents panel if open
+            this.closeDocumentsPanel();
+            this.toolsPanel.classList.toggle('open');
+            if (this.toolsPanel.classList.contains('open')) {
+                this.loadTools();
+            }
+        }
+    }
+
+    closeToolsPanel() {
+        if (this.toolsPanel) {
+            this.toolsPanel.classList.remove('open');
+        }
+    }
+
+    async loadTools() {
+        try {
+            const response = await fetch('/api/chat/available-tools');
+            if (response.ok) {
+                this.tools = await response.json();
+                this.renderTools();
+                this.updateToolStats();
+            }
+        } catch (error) {
+            console.error('Error loading tools:', error);
+        }
+    }
+
+    renderTools() {
+        if (!this.toolsList) return;
+
+        if (this.tools.length === 0) {
+            this.toolsList.innerHTML = '<p class="no-tools">No tools available</p>';
+            return;
+        }
+
+        this.toolsList.innerHTML = this.tools.map(tool => {
+            const isEnabled = this.isToolEnabled(tool.id);
+            const badgeClass = tool.type === 'MCP' ? 'mcp' : 'custom';
+            const serverInfo = tool.mcpServerName ? `<div class="tool-server">Server: ${this.escapeHtml(tool.mcpServerName)}</div>` : '';
+
+            return `
+                <div class="tool-item" data-id="${tool.id}">
+                    <div class="tool-icon">
+                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="20" height="20">
+                            <path d="M14.7 6.3a1 1 0 0 0 0 1.4l1.6 1.6a1 1 0 0 0 1.4 0l3.77-3.77a6 6 0 0 1-7.94 7.94l-6.91 6.91a2.12 2.12 0 0 1-3-3l6.91-6.91a6 6 0 0 1 7.94-7.94l-3.76 3.76z"></path>
+                        </svg>
+                    </div>
+                    <div class="tool-info">
+                        <div class="tool-header">
+                            <span class="tool-name" title="${this.escapeHtml(tool.displayName || tool.name)}">${this.escapeHtml(tool.displayName || tool.name)}</span>
+                            <span class="tool-badge ${badgeClass}">${tool.type}</span>
+                        </div>
+                        ${tool.description ? `<div class="tool-description" title="${this.escapeHtml(tool.description)}">${this.escapeHtml(tool.description)}</div>` : ''}
+                        ${serverInfo}
+                    </div>
+                    <div class="tool-toggle">
+                        <input type="checkbox" ${isEnabled ? 'checked' : ''}
+                               data-tool-id="${tool.id}"
+                               title="${isEnabled ? 'Disable tool' : 'Enable tool'}"
+                               onchange="window.chatApp.toggleToolEnabled(this)">
+                    </div>
+                </div>
+            `;
+        }).join('');
+    }
+
+    updateToolStats() {
+        const enabledCount = this.tools.filter(tool => this.isToolEnabled(tool.id)).length;
+
+        if (this.toolCount) {
+            this.toolCount.textContent = `${this.tools.length} tool${this.tools.length !== 1 ? 's' : ''}`;
+        }
+        if (this.enabledToolCount) {
+            this.enabledToolCount.textContent = `${enabledCount} enabled`;
+        }
+    }
+
+    loadToolPreferences() {
+        try {
+            const saved = localStorage.getItem('toolPreferences');
+            if (saved) {
+                this.toolPreferences = JSON.parse(saved);
+            }
+        } catch (error) {
+            console.warn('Error loading tool preferences:', error);
+            this.toolPreferences = {};
+        }
+    }
+
+    saveToolPreferences() {
+        try {
+            localStorage.setItem('toolPreferences', JSON.stringify(this.toolPreferences));
+        } catch (error) {
+            console.warn('Error saving tool preferences:', error);
+        }
+    }
+
+    isToolEnabled(toolId) {
+        // Default to enabled if no preference is set
+        if (this.toolPreferences[toolId] === undefined) {
+            return true;
+        }
+        return this.toolPreferences[toolId];
+    }
+
+    toggleToolEnabled(checkbox) {
+        const toolId = checkbox.dataset.toolId;
+        this.toolPreferences[toolId] = checkbox.checked;
+        this.saveToolPreferences();
+        this.updateToolStats();
+    }
+
+    getEnabledToolIds() {
+        return this.tools
+            .filter(tool => this.isToolEnabled(tool.id))
+            .map(tool => tool.id);
     }
 
     renderDocuments(documents) {

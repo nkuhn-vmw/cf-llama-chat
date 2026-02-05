@@ -62,18 +62,20 @@ jobs:
       - name: Build release artifact
         run: mvn -B clean package -DskipTests
 
-      - name: Get version from pom.xml
-        id: get_version
-        run: |
-          VERSION=$(mvn help:evaluate -Dexpression=project.version -q -DforceStdout)
-          echo "version=$VERSION" >> $GITHUB_OUTPUT
-
-      - name: Generate release tag
+      - name: Generate incremental release version
         id: release_tag
         run: |
-          VERSION=${{ steps.get_version.outputs.version }}
-          SHORT_SHA=$(git rev-parse --short HEAD)
-          TAG="v${VERSION}-${SHORT_SHA}"
+          # Get the latest release tag and increment
+          LATEST_TAG=$(git tag --sort=-v:refname | grep -E '^v[0-9]+\.[0-9]+\.[0-9]+$' | head -1)
+          if [ -n "$LATEST_TAG" ]; then
+            # Extract minor version and increment
+            MINOR=$(echo "$LATEST_TAG" | sed 's/v1\.\([0-9]*\)\..*/\1/')
+            NEXT_MINOR=$((MINOR + 1))
+          else
+            # First incremental release starts at v1.20.0 (after 19 existing pre-releases)
+            NEXT_MINOR=20
+          fi
+          TAG="v1.${NEXT_MINOR}.0"
           echo "tag=$TAG" >> $GITHUB_OUTPUT
           echo "Generated tag: $TAG"
 
@@ -96,7 +98,7 @@ jobs:
           name: Release ${{ steps.release_tag.outputs.tag }}
           body_path: changelog.txt
           draft: false
-          prerelease: ${{ contains(steps.get_version.outputs.version, 'SNAPSHOT') }}
+          prerelease: false
           files: |
             target/*.jar
           generate_release_notes: false
@@ -106,7 +108,6 @@ jobs:
           echo "## Release Summary" >> $GITHUB_STEP_SUMMARY
           echo "" >> $GITHUB_STEP_SUMMARY
           echo "**Tag:** ${{ steps.release_tag.outputs.tag }}" >> $GITHUB_STEP_SUMMARY
-          echo "**Version:** ${{ steps.get_version.outputs.version }}" >> $GITHUB_STEP_SUMMARY
           echo "" >> $GITHUB_STEP_SUMMARY
           echo "### Artifacts" >> $GITHUB_STEP_SUMMARY
           echo "- cf-llama-chat JAR file" >> $GITHUB_STEP_SUMMARY

@@ -8,6 +8,7 @@ import com.example.cfchat.model.Skill;
 import com.example.cfchat.model.Tool;
 import com.example.cfchat.model.User;
 import com.example.cfchat.service.ChatService;
+import com.example.cfchat.service.McpService;
 import com.example.cfchat.service.SkillService;
 import com.example.cfchat.service.ToolService;
 import jakarta.validation.Valid;
@@ -30,6 +31,7 @@ public class ChatController {
     private final UserService userService;
     private final ToolService toolService;
     private final SkillService skillService;
+    private final McpService mcpService;
 
     @PostMapping
     public ResponseEntity<ChatResponse> chat(@Valid @RequestBody ChatRequest request) {
@@ -66,6 +68,13 @@ public class ChatController {
             toolData.put("displayName", tool.getDisplayName() != null ? tool.getDisplayName() : tool.getName());
             toolData.put("description", tool.getDescription());
             toolData.put("type", tool.getType().name());
+
+            // Include MCP server name if this is an MCP tool
+            if (tool.getMcpServerId() != null) {
+                mcpService.getServerById(tool.getMcpServerId())
+                    .ifPresent(server -> toolData.put("mcpServerName", server.getName()));
+            }
+
             result.add(toolData);
         }
 

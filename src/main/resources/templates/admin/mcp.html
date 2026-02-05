@@ -468,6 +468,7 @@
                             </td>
                             <td style="max-width: 200px; overflow: hidden; text-overflow: ellipsis;">
                                 <span th:if="${data.server.transportType.name() == 'SSE'}" th:text="${data.server.url}">URL</span>
+                                <span th:if="${data.server.transportType.name() == 'STREAMABLE_HTTP'}" th:text="${data.server.url}">URL</span>
                                 <span th:if="${data.server.transportType.name() == 'STDIO'}" th:text="${data.server.command}">Command</span>
                             </td>
                             <td>
@@ -545,6 +546,7 @@
                     <label for="transportType">Transport Type *</label>
                     <select id="transportType" required onchange="updateTransportFields()">
                         <option value="SSE">SSE (Server-Sent Events)</option>
+                        <option value="STREAMABLE_HTTP">Streamable HTTP</option>
                         <option value="STDIO">STDIO (Standard I/O)</option>
                     </select>
                 </div>
@@ -565,6 +567,11 @@
                     <label for="envVars">Environment Variables (JSON)</label>
                     <textarea id="envVars" placeholder='{"API_KEY": "your-key"}'></textarea>
                     <small>JSON object of environment variables</small>
+                </div>
+                <div class="form-group" id="headersGroup">
+                    <label for="serverHeaders">HTTP Headers (JSON)</label>
+                    <textarea id="serverHeaders" placeholder='{"Authorization": "Bearer your-jwt-token"}'></textarea>
+                    <small>JSON object of HTTP headers for authentication</small>
                 </div>
                 <div class="modal-actions">
                     <button type="button" class="modal-btn cancel" onclick="closeServerModal()">Cancel</button>
@@ -598,17 +605,20 @@
             const urlGroup = document.getElementById('urlGroup');
             const commandGroup = document.getElementById('commandGroup');
             const argsGroup = document.getElementById('argsGroup');
+            const headersGroup = document.getElementById('headersGroup');
 
-            if (transportType === 'SSE') {
+            if (transportType === 'SSE' || transportType === 'STREAMABLE_HTTP') {
                 urlGroup.style.display = 'block';
                 commandGroup.style.display = 'none';
                 argsGroup.style.display = 'none';
+                headersGroup.style.display = 'block';
                 document.getElementById('serverUrl').required = true;
                 document.getElementById('serverCommand').required = false;
             } else {
                 urlGroup.style.display = 'none';
                 commandGroup.style.display = 'block';
                 argsGroup.style.display = 'block';
+                headersGroup.style.display = 'none';
                 document.getElementById('serverUrl').required = false;
                 document.getElementById('serverCommand').required = true;
             }
@@ -639,6 +649,7 @@
                         document.getElementById('serverCommand').value = server.command || '';
                         document.getElementById('serverArgs').value = server.args || '';
                         document.getElementById('envVars').value = server.envVars || '';
+                        document.getElementById('serverHeaders').value = server.headers || '';
                         updateTransportFields();
                         document.getElementById('serverModal').classList.add('open');
                     }
@@ -653,6 +664,9 @@
             e.preventDefault();
 
             const serverId = document.getElementById('serverId').value;
+            // Strip newlines and extra whitespace from headers (long tokens can wrap)
+            const headersRaw = document.getElementById('serverHeaders').value;
+            const headersCleaned = headersRaw.replace(/[\r\n]+/g, '').trim();
             const data = {
                 name: document.getElementById('serverName').value,
                 description: document.getElementById('serverDescription').value,
@@ -660,7 +674,8 @@
                 url: document.getElementById('serverUrl').value,
                 command: document.getElementById('serverCommand').value,
                 args: document.getElementById('serverArgs').value,
-                envVars: document.getElementById('envVars').value
+                envVars: document.getElementById('envVars').value,
+                headers: headersCleaned
             };
 
             const url = serverId ? `/api/admin/mcp/servers/${serverId}` : '/api/admin/mcp/servers';

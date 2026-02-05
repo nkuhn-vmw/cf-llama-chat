@@ -98,7 +98,8 @@ public class ToolService {
 
         List<UUID> allowedToolIds = userAccessRepository.findAllowedResourceIds(userId, AccessType.TOOL);
         if (allowedToolIds.isEmpty()) {
-            return List.of();
+            // No explicit access configured for this user - fall back to all enabled tools
+            return toolRepository.findByEnabled(true);
         }
 
         return toolRepository.findEnabledByIds(allowedToolIds);

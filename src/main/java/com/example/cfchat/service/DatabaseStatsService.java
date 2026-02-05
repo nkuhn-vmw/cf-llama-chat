@@ -4,7 +4,6 @@ import jakarta.persistence.EntityManager;
 import jakarta.persistence.PersistenceContext;
 import jakarta.persistence.Query;
 import lombok.extern.slf4j.Slf4j;
-import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -19,11 +18,24 @@ public class DatabaseStatsService {
     @PersistenceContext
     private EntityManager entityManager;
 
-    @Value("${spring.profiles.active:default}")
-    private String activeProfile;
+    private volatile Boolean postgresDetected = null;
 
+    @Transactional(readOnly = true)
     public boolean isPostgres() {
-        return activeProfile != null && activeProfile.contains("cloud");
+        if (postgresDetected != null) {
+            return postgresDetected;
+        }
+        try {
+            Object result = entityManager.createNativeQuery("SELECT version()").getSingleResult();
+            String version = result != null ? result.toString().toLowerCase() : "";
+            postgresDetected = version.contains("postgresql");
+            log.info("Database type detected: {}", postgresDetected ? "PostgreSQL" : "Non-PostgreSQL (" + result + ")");
+            return postgresDetected;
+        } catch (Exception e) {
+            postgresDetected = false;
+            log.info("Database type detected: H2/other (not PostgreSQL)");
+            return false;
+        }
     }
 
     @Transactional(readOnly = true)

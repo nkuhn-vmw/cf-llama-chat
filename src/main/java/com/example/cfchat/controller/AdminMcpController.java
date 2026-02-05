@@ -1,6 +1,7 @@
 package com.example.cfchat.controller;
 
 import com.example.cfchat.auth.UserService;
+import com.example.cfchat.mcp.McpToolCallbackCacheService;
 import com.example.cfchat.model.McpServer;
 import com.example.cfchat.model.McpTransportType;
 import com.example.cfchat.model.Tool;
@@ -24,6 +25,7 @@ public class AdminMcpController {
     private final UserService userService;
     private final McpService mcpService;
     private final ToolService toolService;
+    private final McpToolCallbackCacheService mcpToolCallbackCacheService;
 
     @GetMapping("/admin/mcp")
     public String mcpPage(Model model) {
@@ -71,6 +73,7 @@ public class AdminMcpController {
             serverData.put("command", server.getCommand());
             serverData.put("args", server.getArgs());
             serverData.put("envVars", server.getEnvVars());
+            serverData.put("headers", server.getHeaders());
             serverData.put("enabled", server.isEnabled());
             serverData.put("requiresAuth", server.isRequiresAuth());
             serverData.put("createdAt", server.getCreatedAt());
@@ -103,6 +106,7 @@ public class AdminMcpController {
             String command = (String) body.get("command");
             String args = (String) body.get("args");
             String envVars = (String) body.get("envVars");
+            String headers = (String) body.get("headers");
             Boolean requiresAuth = (Boolean) body.getOrDefault("requiresAuth", false);
             String oauthConfig = (String) body.get("oauthConfig");
 
@@ -112,8 +116,9 @@ public class AdminMcpController {
 
             McpTransportType transportType = McpTransportType.valueOf(transportTypeStr);
 
-            if (transportType == McpTransportType.SSE && (url == null || url.isBlank())) {
-                return ResponseEntity.badRequest().body(Map.of("error", "URL is required for SSE transport"));
+            if ((transportType == McpTransportType.SSE || transportType == McpTransportType.STREAMABLE_HTTP)
+                    && (url == null || url.isBlank())) {
+                return ResponseEntity.badRequest().body(Map.of("error", "URL is required for " + transportType + " transport"));
             }
 
             if (transportType == McpTransportType.STDIO && (command == null || command.isBlank())) {
@@ -128,6 +133,7 @@ public class AdminMcpController {
                 .command(command)
                 .args(args)
                 .envVars(envVars)
+                .headers(headers)
                 .requiresAuth(requiresAuth != null && requiresAuth)
                 .oauthConfig(oauthConfig)
                 .enabled(true)
@@ -166,6 +172,7 @@ public class AdminMcpController {
                 .command((String) body.get("command"))
                 .args((String) body.get("args"))
                 .envVars((String) body.get("envVars"))
+                .headers((String) body.get("headers"))
                 .oauthConfig((String) body.get("oauthConfig"))
                 .build();
 
@@ -244,6 +251,7 @@ public class AdminMcpController {
         try {
             McpService.McpConnectionState state = mcpService.connect(id);
             log.info("Admin {} connected MCP server: {}", currentUser.get().getUsername(), id);
+            mcpToolCallbackCacheService.invalidateCache();
 
             return ResponseEntity.ok(Map.of(
                 "success", state.status() == McpService.ConnectionStatus.CONNECTED,
@@ -267,6 +275,7 @@ public class AdminMcpController {
         try {
             McpService.McpConnectionState state = mcpService.disconnect(id);
             log.info("Admin {} disconnected MCP server: {}", currentUser.get().getUsername(), id);
+            mcpToolCallbackCacheService.invalidateCache();
 
             return ResponseEntity.ok(Map.of(
                 "success", true,
@@ -289,6 +298,7 @@ public class AdminMcpController {
             List<Tool> tools = mcpService.syncTools(id);
             log.info("Admin {} synced tools from MCP server: {}, found {} tools",
                 currentUser.get().getUsername(), id, tools.size());
+            mcpToolCallbackCacheService.invalidateCache();
 
             return ResponseEntity.ok(Map.of(
                 "success", true,

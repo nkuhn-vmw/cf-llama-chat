@@ -1,5 +1,6 @@
 package com.example.cfchat.service;
 
+import com.example.cfchat.mcp.McpClientFactory;
 import com.example.cfchat.model.McpServer;
 import com.example.cfchat.model.McpTransportType;
 import com.example.cfchat.model.Tool;
@@ -9,24 +10,54 @@ import com.example.cfchat.repository.ToolRepository;
 import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.core.type.TypeReference;
 import com.fasterxml.jackson.databind.ObjectMapper;
-import lombok.RequiredArgsConstructor;
+import io.modelcontextprotocol.client.McpSyncClient;
+import io.modelcontextprotocol.spec.McpSchema;
+import jakarta.annotation.PostConstruct;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import java.time.Duration;
 import java.util.*;
 import java.util.concurrent.ConcurrentHashMap;
 
 @Service
 @Slf4j
-@RequiredArgsConstructor
 public class McpService {
 
     private final McpServerRepository mcpServerRepository;
     private final ToolRepository toolRepository;
     private final ObjectMapper objectMapper;
+    private final McpClientFactory mcpClientFactory;
+    private final JdbcTemplate jdbcTemplate;
 
     private final Map<UUID, McpConnectionState> connectionStates = new ConcurrentHashMap<>();
+    private final Map<UUID, McpSyncClient> activeClients = new ConcurrentHashMap<>();
+
+    public McpService(McpServerRepository mcpServerRepository,
+                      ToolRepository toolRepository,
+                      ObjectMapper objectMapper,
+                      McpClientFactory mcpClientFactory,
+                      JdbcTemplate jdbcTemplate) {
+        this.mcpServerRepository = mcpServerRepository;
+        this.toolRepository = toolRepository;
+        this.objectMapper = objectMapper;
+        this.mcpClientFactory = mcpClientFactory;
+        this.jdbcTemplate = jdbcTemplate;
+    }
+
+    @PostConstruct
+    public void migrateTransportTypeConstraint() {
+        try {
+            jdbcTemplate.execute("ALTER TABLE mcp_servers DROP CONSTRAINT IF EXISTS mcp_servers_transport_type_check");
+            jdbcTemplate.execute("ALTER TABLE mcp_servers ADD CONSTRAINT mcp_servers_transport_type_check " +
+                    "CHECK (transport_type IN ('SSE', 'STDIO', 'STREAMABLE_HTTP'))");
+            log.info("Updated mcp_servers transport_type check constraint to include STREAMABLE_HTTP");
+        } catch (Exception e) {
+            log.debug("Transport type constraint migration skipped: {}", e.getMessage());
+        }
+    }
 
     public enum ConnectionStatus {
         CONNECTED,
@@ -93,6 +124,9 @@ public class McpService {
         if (updates.getEnvVars() != null) {
             server.setEnvVars(updates.getEnvVars());
         }
+        if (updates.getHeaders() != null) {
+            server.setHeaders(updates.getHeaders());
+        }
         if (updates.getOauthConfig() != null) {
             server.setOauthConfig(updates.getOauthConfig());
         }
@@ -126,29 +160,61 @@ public class McpService {
         McpServer server = mcpServerRepository.findById(serverId)
             .orElseThrow(() -> new IllegalArgumentException("MCP server not found: " + serverId));
 
+        // Disconnect existing connection if any
+        if (activeClients.containsKey(serverId)) {
+            disconnect(serverId);
+        }
+
         connectionStates.put(serverId, new McpConnectionState(ConnectionStatus.CONNECTING, null, 0));
 
         try {
-            // TODO: Implement actual MCP connection using Spring AI MCP Client
-            // For now, simulate a successful connection
             log.info("Connecting to MCP server: {} ({})", server.getName(), server.getTransportType());
 
-            if (server.getTransportType() == McpTransportType.SSE) {
-                // SSE connection would use server.getUrl()
-                log.info("SSE connection to: {}", server.getUrl());
-            } else {
-                // STDIO connection would use server.getCommand() and server.getArgs()
-                log.info("STDIO connection: {} {}", server.getCommand(), server.getArgs());
+            if (server.getTransportType() == McpTransportType.STDIO) {
+                throw new IllegalStateException("STDIO transport is not supported for admin-configured MCP servers");
             }
 
-            // Simulate connection success
-            int toolCount = toolRepository.findByMcpServerId(serverId).size();
+            String url = server.getUrl();
+            if (url == null || url.isBlank()) {
+                throw new IllegalArgumentException("URL is required for " + server.getTransportType() + " transport");
+            }
+
+            // Parse headers from the server configuration
+            Map<String, String> headers = parseHeaders(server.getHeaders());
+            log.info("{} connection to: {} with {} header(s)", server.getTransportType(), url, headers.size());
+
+            // Create the MCP client based on transport type
+            McpSyncClient client;
+            if (server.getTransportType() == McpTransportType.STREAMABLE_HTTP) {
+                client = mcpClientFactory.createStreamableClient(
+                    url, Duration.ofSeconds(30), Duration.ofMinutes(5), headers);
+            } else {
+                client = mcpClientFactory.createSseClient(
+                    url, Duration.ofSeconds(30), Duration.ofMinutes(5), headers);
+            }
+
+            // Initialize the connection
+            McpSchema.InitializeResult initResult = client.initialize();
+            String serverName = initResult.serverInfo() != null
+                ? initResult.serverInfo().name()
+                : server.getName();
+            log.info("Initialized MCP server {}: protocol version {}", serverName, initResult.protocolVersion());
+
+            // Store the active client
+            activeClients.put(serverId, client);
+
+            // Get initial tool count
+            McpSchema.ListToolsResult toolsResult = client.listTools();
+            int toolCount = toolsResult.tools() != null ? toolsResult.tools().size() : 0;
+
             McpConnectionState state = new McpConnectionState(ConnectionStatus.CONNECTED, null, toolCount);
             connectionStates.put(serverId, state);
+
+            log.info("Successfully connected to MCP server {} with {} tools available", server.getName(), toolCount);
             return state;
 
         } catch (Exception e) {
-            log.error("Failed to connect to MCP server {}: {}", server.getName(), e.getMessage());
+            log.error("Failed to connect to MCP server {}: {}", server.getName(), e.getMessage(), e);
             McpConnectionState state = new McpConnectionState(ConnectionStatus.ERROR, e.getMessage(), 0);
             connectionStates.put(serverId, state);
             return state;
@@ -158,7 +224,16 @@ public class McpService {
     public McpConnectionState disconnect(UUID serverId) {
         log.info("Disconnecting MCP server: {}", serverId);
 
-        // TODO: Implement actual MCP disconnection
+        McpSyncClient client = activeClients.remove(serverId);
+        if (client != null) {
+            try {
+                client.close();
+                log.info("Closed MCP client for server: {}", serverId);
+            } catch (Exception e) {
+                log.warn("Error closing MCP client for server {}: {}", serverId, e.getMessage());
+            }
+        }
+
         McpConnectionState state = new McpConnectionState(ConnectionStatus.DISCONNECTED, null, 0);
         connectionStates.put(serverId, state);
         return state;
@@ -169,31 +244,76 @@ public class McpService {
             new McpConnectionState(ConnectionStatus.DISCONNECTED, null, 0));
     }
 
+    /**
+     * Get the active MCP client for a server, if connected.
+     */
+    public Optional<McpSyncClient> getActiveClient(UUID serverId) {
+        return Optional.ofNullable(activeClients.get(serverId));
+    }
+
     @Transactional
     public List<Tool> syncTools(UUID serverId) {
         McpServer server = mcpServerRepository.findById(serverId)
             .orElseThrow(() -> new IllegalArgumentException("MCP server not found: " + serverId));
 
-        McpConnectionState state = connectionStates.get(serverId);
-        if (state == null || state.status() != ConnectionStatus.CONNECTED) {
+        McpSyncClient client = activeClients.get(serverId);
+        if (client == null) {
             throw new IllegalStateException("MCP server is not connected");
         }
 
         log.info("Syncing tools from MCP server: {}", server.getName());
 
-        // TODO: Implement actual tool discovery using MCP protocol
-        // For now, return existing tools or create placeholder tools for testing
+        try {
+            // Fetch tools from the MCP server
+            McpSchema.ListToolsResult toolsResult = client.listTools();
+            List<McpSchema.Tool> mcpTools = toolsResult.tools();
 
-        List<Tool> existingTools = toolRepository.findByMcpServerId(serverId);
+            if (mcpTools == null || mcpTools.isEmpty()) {
+                log.info("No tools available from MCP server: {}", server.getName());
+                // Remove any existing tools for this server
+                toolRepository.deleteByMcpServerId(serverId);
+                connectionStates.put(serverId, new McpConnectionState(ConnectionStatus.CONNECTED, null, 0));
+                return List.of();
+            }
 
-        // If no tools exist yet, we would normally fetch from the MCP server
-        // The actual implementation would call the MCP server's list_tools endpoint
+            log.info("Found {} tools from MCP server: {}", mcpTools.size(), server.getName());
 
-        // Update connection state with tool count
-        connectionStates.put(serverId, new McpConnectionState(
-            ConnectionStatus.CONNECTED, null, existingTools.size()));
+            // Delete existing tools for this server and recreate
+            toolRepository.deleteByMcpServerId(serverId);
+            toolRepository.flush();
 
-        return existingTools;
+            List<Tool> savedTools = new ArrayList<>();
+            for (McpSchema.Tool mcpTool : mcpTools) {
+                String inputSchema = null;
+                if (mcpTool.inputSchema() != null) {
+                    try {
+                        inputSchema = objectMapper.writeValueAsString(mcpTool.inputSchema());
+                    } catch (JsonProcessingException e) {
+                        log.warn("Failed to serialize input schema for tool {}: {}", mcpTool.name(), e.getMessage());
+                    }
+                }
+
+                Tool tool = addToolFromMcp(
+                    serverId,
+                    mcpTool.name(),
+                    mcpTool.name(),
+                    mcpTool.description(),
+                    inputSchema
+                );
+                savedTools.add(tool);
+                log.debug("Synced tool: {} - {}", mcpTool.name(), mcpTool.description());
+            }
+
+            // Update connection state with tool count
+            connectionStates.put(serverId, new McpConnectionState(
+                ConnectionStatus.CONNECTED, null, savedTools.size()));
+
+            return savedTools;
+
+        } catch (Exception e) {
+            log.error("Failed to sync tools from MCP server {}: {}", server.getName(), e.getMessage(), e);
+            throw new IllegalStateException("Failed to sync tools: " + e.getMessage(), e);
+        }
     }
 
     @Transactional
@@ -223,12 +343,37 @@ public class McpService {
 
         log.info("Testing connection to MCP server: {}", server.getName());
 
-        // TODO: Implement actual connection test
-        // For now, just check if the server configuration is valid
-        if (server.getTransportType() == McpTransportType.SSE) {
-            return server.getUrl() != null && !server.getUrl().isBlank();
+        if (server.getTransportType() == McpTransportType.STDIO) {
+            log.warn("STDIO transport is not supported for connection testing");
+            return false;
+        }
+
+        String url = server.getUrl();
+        if (url == null || url.isBlank()) {
+            return false;
+        }
+
+        Map<String, String> headers = parseHeaders(server.getHeaders());
+
+        McpSyncClient testClient;
+        if (server.getTransportType() == McpTransportType.STREAMABLE_HTTP) {
+            testClient = mcpClientFactory.createStreamableClient(
+                    url, Duration.ofSeconds(10), Duration.ofSeconds(10), headers);
         } else {
-            return server.getCommand() != null && !server.getCommand().isBlank();
+            testClient = mcpClientFactory.createSseClient(
+                    url, Duration.ofSeconds(10), Duration.ofSeconds(10), headers);
+        }
+
+        try (testClient) {
+
+            McpSchema.InitializeResult result = testClient.initialize();
+            log.info("Test connection successful to {}: protocol version {}",
+                server.getName(), result.protocolVersion());
+            return true;
+
+        } catch (Exception e) {
+            log.warn("Test connection failed for {}: {}", server.getName(), e.getMessage());
+            return false;
         }
     }
 
@@ -252,6 +397,18 @@ public class McpService {
             return objectMapper.readValue(envVarsJson, new TypeReference<Map<String, String>>() {});
         } catch (JsonProcessingException e) {
             log.warn("Failed to parse env vars JSON: {}", e.getMessage());
+            return Map.of();
+        }
+    }
+
+    public Map<String, String> parseHeaders(String headersJson) {
+        if (headersJson == null || headersJson.isBlank()) {
+            return Map.of();
+        }
+        try {
+            return objectMapper.readValue(headersJson, new TypeReference<Map<String, String>>() {});
+        } catch (JsonProcessingException e) {
+            log.warn("Failed to parse headers JSON: {}", e.getMessage());
             return Map.of();
         }
     }

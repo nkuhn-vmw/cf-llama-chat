@@ -2,5 +2,6 @@ package com.example.cfchat.model;
 
 public enum McpTransportType {
     SSE,
-    STDIO
+    STDIO,
+    STREAMABLE_HTTP
 }
