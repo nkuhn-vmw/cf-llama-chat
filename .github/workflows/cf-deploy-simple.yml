@@ -31,7 +31,7 @@ env:
   DB_SERVICE: cf-llama-chat-db
 
 jobs:
-  # Build the JAR
+  # Download the released JAR
   prepare:
     runs-on: ubuntu-latest
     if: |
@@ -41,33 +41,27 @@ jobs:
       version: ${{ steps.version.outputs.version }}
 
     steps:
-      - name: Checkout code
-        uses: actions/checkout@v4
-
-      - name: Set up JDK 21
-        uses: actions/setup-java@v4
-        with:
-          java-version: '21'
-          distribution: 'temurin'
-          cache: maven
-
-      - name: Build JAR
-        run: mvn -B clean package -DskipTests
-
-      - name: Get version
+      - name: Download latest release JAR
         id: version
+        env:
+          GH_TOKEN: ${{ github.token }}
         run: |
-          VERSION=$(mvn help:evaluate -Dexpression=project.version -q -DforceStdout)
-          SHORT_SHA=$(git rev-parse --short HEAD)
-          DEPLOY_VERSION="${VERSION}-${SHORT_SHA}"
-          echo "version=${DEPLOY_VERSION}" >> $GITHUB_OUTPUT
-          echo "Deployment version: ${DEPLOY_VERSION}"
+          # Get the latest release tag
+          TAG=$(gh release view --repo ${{ github.repository }} --json tagName -q '.tagName')
+          echo "Using release: ${TAG}"
+          echo "version=${TAG}" >> $GITHUB_OUTPUT
+
+          # Download the JAR asset
+          mkdir -p artifacts
+          gh release download "${TAG}" --repo ${{ github.repository }} --pattern "*.jar" --dir artifacts
+          echo "Downloaded JAR:"
+          ls -la artifacts/
 
       - name: Upload JAR artifact
         uses: actions/upload-artifact@v4
         with:
           name: app-jar
-          path: target/*.jar
+          path: artifacts/*.jar
           retention-days: 1
 
   # Deploy to nonprod
