@@ -10,7 +10,9 @@ import java.time.LocalDateTime;
 import java.util.UUID;
 
 @Entity
-@Table(name = "messages")
+@Table(name = "messages", indexes = {
+        @Index(name = "idx_messages_conversation_id", columnList = "conversation_id")
+})
 @Data
 @NoArgsConstructor
 @AllArgsConstructor

@@ -5,47 +5,10 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Document Storage - Admin Portal</title>
     <link rel="stylesheet" th:href="@{/css/style.css}">
+    <link rel="stylesheet" th:href="@{/css/admin.css}">
     <style>
         .admin-container {
             max-width: 900px;
-            margin: 0 auto;
-            padding: 24px;
-        }
-
-        .admin-header {
-            display: flex;
-            justify-content: space-between;
-            align-items: center;
-            margin-bottom: 32px;
-        }
-
-        .admin-header h1 {
-            font-size: 1.8rem;
-            font-weight: 600;
-        }
-
-        .header-nav {
-            display: flex;
-            align-items: center;
-            gap: 24px;
-        }
-
-        .back-link {
-            display: flex;
-            align-items: center;
-            gap: 8px;
-            color: var(--accent-color);
-            text-decoration: none;
-            font-size: 0.95rem;
-        }
-
-        .back-link:hover {
-            text-decoration: underline;
-        }
-
-        .back-link svg {
-            width: 18px;
-            height: 18px;
         }
 
         .status-card {
@@ -100,17 +63,6 @@
             font-size: 0.9rem;
         }
 
-        .status-badge {
-            display: inline-flex;
-            align-items: center;
-            gap: 6px;
-            padding: 8px 16px;
-            border-radius: 20px;
-            font-size: 0.85rem;
-            font-weight: 600;
-            text-transform: uppercase;
-        }
-
         .status-badge.enabled {
             background-color: rgba(16, 163, 127, 0.2);
             color: var(--accent-color);
@@ -119,13 +71,6 @@
         .status-badge.disabled {
             background-color: rgba(156, 163, 175, 0.2);
             color: var(--text-secondary);
-        }
-
-        .status-badge .dot {
-            width: 8px;
-            height: 8px;
-            border-radius: 50%;
-            background-color: currentColor;
         }
 
         .config-section {
@@ -137,9 +82,6 @@
         }
 
         .section-header {
-            display: flex;
-            justify-content: space-between;
-            align-items: center;
             margin-bottom: 20px;
             padding-bottom: 16px;
             border-bottom: 1px solid var(--border-color);
@@ -157,44 +99,9 @@
             margin-bottom: 16px;
         }
 
-        .form-group {
-            margin-bottom: 16px;
-        }
-
-        .form-group label {
-            display: block;
-            margin-bottom: 6px;
-            font-size: 0.9rem;
-            font-weight: 500;
-        }
-
-        .form-group input,
-        .form-group select {
-            width: 100%;
-            padding: 10px 12px;
-            background-color: var(--bg-tertiary);
-            border: 1px solid var(--border-color);
-            border-radius: 8px;
-            color: var(--text-primary);
-            font-size: 0.95rem;
-        }
-
-        .form-group input:focus,
-        .form-group select:focus {
-            outline: none;
-            border-color: var(--accent-color);
-        }
-
         .form-group input:disabled {
             opacity: 0.6;
             cursor: not-allowed;
-        }
-
-        .form-group small {
-            display: block;
-            margin-top: 4px;
-            font-size: 0.8rem;
-            color: var(--text-muted);
         }
 
         .checkbox-group {
@@ -261,79 +168,10 @@
             border-top: 1px solid var(--border-color);
         }
 
-        .alert {
-            padding: 12px 16px;
-            border-radius: 8px;
-            margin-bottom: 16px;
-            font-size: 0.9rem;
-        }
-
-        .alert.success {
-            background-color: rgba(16, 163, 127, 0.2);
-            color: var(--accent-color);
-            border: 1px solid var(--accent-color);
-        }
-
-        .alert.error {
-            background-color: rgba(239, 68, 68, 0.2);
-            color: var(--error-color);
-            border: 1px solid var(--error-color);
-        }
-
-        .alert.info {
-            background-color: rgba(59, 130, 246, 0.2);
-            color: #3b82f6;
-            border: 1px solid #3b82f6;
-        }
-
         .toggle-container {
             display: flex;
             align-items: center;
             gap: 12px;
-        }
-
-        .toggle-switch {
-            position: relative;
-            width: 50px;
-            height: 26px;
-        }
-
-        .toggle-switch input {
-            opacity: 0;
-            width: 0;
-            height: 0;
-        }
-
-        .toggle-slider {
-            position: absolute;
-            cursor: pointer;
-            top: 0;
-            left: 0;
-            right: 0;
-            bottom: 0;
-            background-color: var(--bg-tertiary);
-            border-radius: 26px;
-            transition: 0.3s;
-        }
-
-        .toggle-slider:before {
-            position: absolute;
-            content: "";
-            height: 20px;
-            width: 20px;
-            left: 3px;
-            bottom: 3px;
-            background-color: white;
-            border-radius: 50%;
-            transition: 0.3s;
-        }
-
-        .toggle-switch input:checked + .toggle-slider {
-            background-color: var(--accent-color);
-        }
-
-        .toggle-switch input:checked + .toggle-slider:before {
-            transform: translateX(24px);
         }
 
         .info-box {
@@ -382,8 +220,6 @@
                 </a>
             </div>
         </header>
-
-        <div id="alertContainer"></div>
 
         <div class="status-card">
             <div class="status-info">
@@ -496,20 +332,6 @@
         // Load configuration on page load
         document.addEventListener('DOMContentLoaded', loadConfiguration);
 
-        function showAlert(message, type = 'info') {
-            const container = document.getElementById('alertContainer');
-            const alert = document.createElement('div');
-            alert.className = `alert ${type}`;
-            alert.textContent = message;
-            container.innerHTML = '';
-            container.appendChild(alert);
-
-            // Auto-hide after 5 seconds
-            setTimeout(() => {
-                alert.remove();
-            }, 5000);
-        }
-
         function loadConfiguration() {
             fetch('/api/admin/storage')
                 .then(response => response.json())
@@ -519,7 +341,7 @@
                 })
                 .catch(error => {
                     console.error('Error loading config:', error);
-                    showAlert('Failed to load configuration', 'error');
+                    toast.error('Failed to load configuration');
                 });
         }
 
@@ -572,16 +394,16 @@
                 .then(response => response.json())
                 .then(result => {
                     if (result.error) {
-                        showAlert(result.message || result.error, 'error');
+                        toast.error(result.message || result.error);
                         document.getElementById('storageEnabled').checked = !enabled;
                     } else {
-                        showAlert(enabled ? 'Storage enabled' : 'Storage disabled', 'success');
+                        toast.success(enabled ? 'Storage enabled' : 'Storage disabled');
                         loadConfiguration();
                     }
                 })
                 .catch(error => {
                     console.error('Error toggling storage:', error);
-                    showAlert('Failed to toggle storage', 'error');
+                    toast.error('Failed to toggle storage');
                     document.getElementById('storageEnabled').checked = !enabled;
                 });
         }
@@ -601,14 +423,14 @@
             .then(response => response.json())
             .then(result => {
                 if (result.success) {
-                    showAlert('Connection successful!', 'success');
+                    toast.success('Connection successful!');
                 } else {
-                    showAlert(result.message || 'Connection failed', 'error');
+                    toast.error(result.message || 'Connection failed');
                 }
             })
             .catch(error => {
                 console.error('Error testing connection:', error);
-                showAlert('Failed to test connection', 'error');
+                toast.error('Failed to test connection');
             })
             .finally(() => {
                 btn.disabled = false;
@@ -633,15 +455,15 @@
             .then(response => response.json())
             .then(result => {
                 if (result.error) {
-                    showAlert(result.message || result.error, 'error');
+                    toast.error(result.message || result.error);
                 } else {
-                    showAlert('Configuration saved successfully', 'success');
+                    toast.success('Configuration saved successfully');
                     loadConfiguration();
                 }
             })
             .catch(error => {
                 console.error('Error saving config:', error);
-                showAlert('Failed to save configuration', 'error');
+                toast.error('Failed to save configuration');
             })
             .finally(() => {
                 submitBtn.disabled = false;
@@ -661,5 +483,6 @@
             };
         }
     </script>
+    <script th:src="@{/js/admin-toast.js}"></script>
 </body>
 </html>

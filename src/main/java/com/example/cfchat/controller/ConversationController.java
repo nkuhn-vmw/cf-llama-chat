@@ -72,6 +72,10 @@ public class ConversationController {
     public ResponseEntity<Void> updateConversation(
             @PathVariable UUID id,
             @RequestBody Map<String, String> body) {
+        UUID userId = userService.getCurrentUser().map(User::getId).orElse(null);
+        if (userId != null && !conversationService.isOwnedByUser(id, userId)) {
+            return ResponseEntity.status(403).build();
+        }
         String title = body.get("title");
         if (title != null) {
             conversationService.updateConversationTitle(id, title);
@@ -81,12 +85,20 @@ public class ConversationController {
 
     @DeleteMapping("/{id}")
     public ResponseEntity<Void> deleteConversation(@PathVariable UUID id) {
+        UUID userId = userService.getCurrentUser().map(User::getId).orElse(null);
+        if (userId != null && !conversationService.isOwnedByUser(id, userId)) {
+            return ResponseEntity.status(403).build();
+        }
         conversationService.deleteConversation(id);
         return ResponseEntity.noContent().build();
     }
 
     @GetMapping("/{id}/messages")
     public ResponseEntity<List<MessageDto>> getMessages(@PathVariable UUID id) {
+        UUID userId = userService.getCurrentUser().map(User::getId).orElse(null);
+        if (userId != null && !conversationService.isOwnedByUser(id, userId)) {
+            return ResponseEntity.status(403).build();
+        }
         List<MessageDto> messages = conversationService.getMessages(id).stream()
                 .map(msg -> {
                     MessageDto dto = MessageDto.fromEntity(msg);

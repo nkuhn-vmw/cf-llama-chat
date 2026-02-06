@@ -71,9 +71,12 @@ public class AuthController {
             return ResponseEntity.badRequest().body(response);
         }
 
-        if (password == null || password.length() < 6) {
+        if (password == null || password.length() < 8
+                || !password.matches(".*[A-Z].*")
+                || !password.matches(".*[a-z].*")
+                || !password.matches(".*\\d.*")) {
             response.put("success", false);
-            response.put("error", "Password must be at least 6 characters");
+            response.put("error", "Password must be at least 8 characters with uppercase, lowercase, and a number");
             return ResponseEntity.badRequest().body(response);
         }
 
@@ -86,7 +89,9 @@ public class AuthController {
 
         // Check invitation code if required
         if (securityConfig.isInvitationRequired()) {
-            if (invitationCode == null || !invitationCode.equals(securityConfig.getInvitationCode())) {
+            if (invitationCode == null || !java.security.MessageDigest.isEqual(
+                    invitationCode.getBytes(java.nio.charset.StandardCharsets.UTF_8),
+                    securityConfig.getInvitationCode().getBytes(java.nio.charset.StandardCharsets.UTF_8))) {
                 response.put("success", false);
                 response.put("error", "Invalid invitation code");
                 return ResponseEntity.badRequest().body(response);
@@ -142,9 +147,12 @@ public class AuthController {
         Map<String, Object> response = new HashMap<>();
 
         // Validate new password
-        if (newPassword == null || newPassword.length() < 6) {
+        if (newPassword == null || newPassword.length() < 8
+                || !newPassword.matches(".*[A-Z].*")
+                || !newPassword.matches(".*[a-z].*")
+                || !newPassword.matches(".*\\d.*")) {
             response.put("success", false);
-            response.put("error", "New password must be at least 6 characters");
+            response.put("error", "New password must be at least 8 characters with uppercase, lowercase, and a number");
             return ResponseEntity.badRequest().body(response);
         }
 

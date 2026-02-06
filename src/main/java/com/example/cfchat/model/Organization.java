@@ -90,6 +90,11 @@ public class Organization {
     @Builder.Default
     private Boolean active = true;
 
+    private static final java.util.regex.Pattern SAFE_COLOR = java.util.regex.Pattern.compile(
+            "^(#[0-9a-fA-F]{3,8}|[a-zA-Z]{1,30}|rgb\\(\\d{1,3},\\s*\\d{1,3},\\s*\\d{1,3}\\)|rgba\\(\\d{1,3},\\s*\\d{1,3},\\s*\\d{1,3},\\s*[0-9.]+\\))$");
+    private static final java.util.regex.Pattern SAFE_URL = java.util.regex.Pattern.compile(
+            "^(https?://|/).*$", java.util.regex.Pattern.CASE_INSENSITIVE);
+
     @PrePersist
     protected void onCreate() {
         createdAt = LocalDateTime.now();
@@ -97,11 +102,44 @@ public class Organization {
         if (slug == null || slug.isBlank()) {
             slug = name.toLowerCase().replaceAll("[^a-z0-9]+", "-");
         }
+        sanitizeThemeFields();
     }
 
     @PreUpdate
     protected void onUpdate() {
         updatedAt = LocalDateTime.now();
+        sanitizeThemeFields();
+    }
+
+    private void sanitizeThemeFields() {
+        primaryColor = sanitizeColor(primaryColor, "#10a37f");
+        secondaryColor = sanitizeColor(secondaryColor, "#1a1a1a");
+        accentColor = sanitizeColor(accentColor, "#10a37f");
+        textColor = sanitizeColor(textColor, "#ffffff");
+        backgroundColor = sanitizeColor(backgroundColor, "#0f0f0f");
+        sidebarColor = sanitizeColor(sidebarColor, "#0f0f0f");
+        logoUrl = sanitizeUrl(logoUrl);
+        faviconUrl = sanitizeUrl(faviconUrl);
+        customCss = sanitizeCss(customCss);
+    }
+
+    private static String sanitizeColor(String color, String defaultColor) {
+        if (color == null || color.isBlank()) return defaultColor;
+        return SAFE_COLOR.matcher(color.trim()).matches() ? color.trim() : defaultColor;
+    }
+
+    private static String sanitizeUrl(String url) {
+        if (url == null || url.isBlank()) return null;
+        return SAFE_URL.matcher(url.trim()).matches() ? url.trim() : null;
+    }
+
+    private static String sanitizeCss(String css) {
+        if (css == null || css.isBlank()) return null;
+        // Strip any HTML tags (prevents </style><script> breakout)
+        String sanitized = css.replaceAll("<[^>]*>", "");
+        // Strip dangerous CSS functions
+        sanitized = sanitized.replaceAll("(?i)(expression|javascript|vbscript|@import)\\s*\\(", "blocked(");
+        return sanitized;
     }
 
     public enum Theme {

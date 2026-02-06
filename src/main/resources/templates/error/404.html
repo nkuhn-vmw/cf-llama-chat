@@ -1,0 +1,61 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Page Not Found</title>
+    <style>
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+            background: #0f0f0f;
+            color: #ffffff;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            min-height: 100vh;
+            margin: 0;
+        }
+        .error-container {
+            text-align: center;
+            max-width: 480px;
+            padding: 40px;
+        }
+        .error-code {
+            font-size: 96px;
+            font-weight: 700;
+            color: #10a37f;
+            margin: 0;
+            line-height: 1;
+        }
+        .error-title {
+            font-size: 24px;
+            margin: 16px 0 8px;
+        }
+        .error-message {
+            color: #a0a0a0;
+            margin-bottom: 32px;
+        }
+        .home-link {
+            display: inline-block;
+            background: #10a37f;
+            color: white;
+            padding: 12px 24px;
+            border-radius: 8px;
+            text-decoration: none;
+            font-weight: 500;
+            transition: background 0.2s;
+        }
+        .home-link:hover {
+            background: #0d8c6d;
+        }
+    </style>
+</head>
+<body>
+    <div class="error-container">
+        <p class="error-code">404</p>
+        <h1 class="error-title">Page Not Found</h1>
+        <p class="error-message">The page you're looking for doesn't exist or has been moved.</p>
+        <a href="/" class="home-link">Back to Chat</a>
+    </div>
+</body>
+</html>

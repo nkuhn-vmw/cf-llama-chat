@@ -6,7 +6,11 @@ import com.example.cfchat.model.AccessType;
 import com.example.cfchat.model.ModelInfo;
 import com.example.cfchat.model.User;
 import com.example.cfchat.repository.ConversationRepository;
+import com.example.cfchat.repository.EmbeddingMetricRepository;
 import com.example.cfchat.repository.OrganizationRepository;
+import com.example.cfchat.repository.UsageMetricRepository;
+import com.example.cfchat.repository.UserAccessRepository;
+import com.example.cfchat.repository.UserDocumentRepository;
 import com.example.cfchat.service.ChatService;
 import com.example.cfchat.service.ConversationService;
 import com.example.cfchat.service.DatabaseStatsService;
@@ -33,6 +37,10 @@ public class AdminController {
     private final OrganizationRepository organizationRepository;
     private final UserAccessService userAccessService;
     private final DatabaseStatsService databaseStatsService;
+    private final UsageMetricRepository usageMetricRepository;
+    private final EmbeddingMetricRepository embeddingMetricRepository;
+    private final UserAccessRepository userAccessRepository;
+    private final UserDocumentRepository userDocumentRepository;
 
     @Value("${spring.profiles.active:default}")
     private String activeProfile;
@@ -45,7 +53,11 @@ public class AdminController {
             @Autowired(required = false) GenAiConfig genAiConfig,
             OrganizationRepository organizationRepository,
             UserAccessService userAccessService,
-            DatabaseStatsService databaseStatsService) {
+            DatabaseStatsService databaseStatsService,
+            UsageMetricRepository usageMetricRepository,
+            EmbeddingMetricRepository embeddingMetricRepository,
+            UserAccessRepository userAccessRepository,
+            @Autowired(required = false) UserDocumentRepository userDocumentRepository) {
         this.userService = userService;
         this.conversationService = conversationService;
         this.conversationRepository = conversationRepository;
@@ -54,6 +66,10 @@ public class AdminController {
         this.organizationRepository = organizationRepository;
         this.userAccessService = userAccessService;
         this.databaseStatsService = databaseStatsService;
+        this.usageMetricRepository = usageMetricRepository;
+        this.embeddingMetricRepository = embeddingMetricRepository;
+        this.userAccessRepository = userAccessRepository;
+        this.userDocumentRepository = userDocumentRepository;
     }
 
     @GetMapping("/admin")
@@ -289,12 +305,17 @@ public class AdminController {
             return ResponseEntity.badRequest().body(Map.of("error", "Cannot delete the last admin"));
         }
 
-        if (deleteConversations) {
-            conversationRepository.deleteByUserId(userId);
+        // Clean up all user-related data
+        conversationRepository.deleteByUserId(userId);
+        usageMetricRepository.deleteByUserId(userId);
+        embeddingMetricRepository.deleteByUserId(userId);
+        userAccessRepository.deleteByUserId(userId);
+        if (userDocumentRepository != null) {
+            userDocumentRepository.deleteByUserId(userId);
         }
 
         userService.deleteUser(userId);
-        log.info("User {} deleted by {}", userId, currentUser.get().getUsername());
+        log.info("User {} and all associated data deleted by {}", userId, currentUser.get().getUsername());
 
         return ResponseEntity.ok(Map.of("success", true));
     }

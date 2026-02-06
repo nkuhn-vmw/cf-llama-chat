@@ -1,6 +1,7 @@
 package com.example.cfchat.dto;
 
 import jakarta.validation.constraints.NotBlank;
+import jakarta.validation.constraints.Size;
 import lombok.AllArgsConstructor;
 import lombok.Builder;
 import lombok.Data;
@@ -17,6 +18,7 @@ public class ChatRequest {
     private UUID conversationId;
 
     @NotBlank(message = "Message content is required")
+    @Size(max = 100000, message = "Message must not exceed 100,000 characters")
     private String message;
 
     private String provider;

@@ -6,6 +6,12 @@ spring:
   datasource:
     url: ${vcap.services.chat-db.credentials.uri:jdbc:postgresql://localhost:5432/chatdb}
     driver-class-name: org.postgresql.Driver
+    hikari:
+      minimum-idle: 3
+      maximum-pool-size: 8
+      connection-timeout: 20000
+      idle-timeout: 300000
+      max-lifetime: 600000
 
   jpa:
     database-platform: org.hibernate.dialect.PostgreSQLDialect
@@ -32,8 +38,8 @@ spring:
   servlet:
     multipart:
       enabled: true
-      max-file-size: 100MB
-      max-request-size: 100MB
+      max-file-size: 50MB
+      max-request-size: 50MB
 
 management:
   endpoints:

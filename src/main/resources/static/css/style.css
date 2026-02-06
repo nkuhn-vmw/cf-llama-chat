@@ -778,6 +778,51 @@ body {
     background-color: var(--text-muted);
 }
 
+/* Skip to Content */
+.skip-to-content {
+    position: absolute;
+    top: -40px;
+    left: 0;
+    background: var(--accent-color);
+    color: white;
+    padding: 8px 16px;
+    z-index: 100;
+    font-size: 14px;
+    text-decoration: none;
+    border-radius: 0 0 4px 0;
+    transition: top 0.2s;
+}
+
+.skip-to-content:focus {
+    top: 0;
+}
+
+/* Sidebar Overlay (mobile) */
+.sidebar-overlay {
+    display: none;
+    position: fixed;
+    inset: 0;
+    background: rgba(0, 0, 0, 0.5);
+    z-index: 40;
+}
+
+/* Cancel button style */
+.send-btn.cancel-mode {
+    background-color: var(--error-color);
+}
+
+.send-btn.cancel-mode:hover {
+    background-color: #dc2626;
+}
+
+/* Stream error */
+.stream-error {
+    color: var(--error-color);
+    font-style: italic;
+    padding: 8px;
+    border-left: 3px solid var(--error-color);
+}
+
 /* Responsive Design */
 @media (max-width: 768px) {
     .sidebar {
@@ -791,6 +836,11 @@ body {
 
     .sidebar.open {
         transform: translateX(0);
+    }
+
+    .sidebar.open ~ .sidebar-overlay,
+    .sidebar-overlay.visible {
+        display: block;
     }
 
     .sidebar-toggle {

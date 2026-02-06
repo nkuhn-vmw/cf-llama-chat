@@ -72,8 +72,10 @@ public class AdminMcpController {
             serverData.put("url", server.getUrl());
             serverData.put("command", server.getCommand());
             serverData.put("args", server.getArgs());
-            serverData.put("envVars", server.getEnvVars());
-            serverData.put("headers", server.getHeaders());
+            serverData.put("envVars", server.getEnvVars() != null && !server.getEnvVars().isBlank() ? "****" : null);
+            serverData.put("headers", server.getHeaders() != null && !server.getHeaders().isBlank() ? "****" : null);
+            serverData.put("hasEnvVars", server.getEnvVars() != null && !server.getEnvVars().isBlank());
+            serverData.put("hasHeaders", server.getHeaders() != null && !server.getHeaders().isBlank());
             serverData.put("enabled", server.isEnabled());
             serverData.put("requiresAuth", server.isRequiresAuth());
             serverData.put("createdAt", server.getCreatedAt());

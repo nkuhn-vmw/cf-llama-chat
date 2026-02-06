@@ -120,14 +120,15 @@ public class DocumentEmbeddingService {
         }
 
         // Migrate vector dimensions from 512 to 768 for nomic model compatibility
+        // Only truncate if the ALTER TABLE actually succeeds (dimensions need changing)
         try {
-            // First drop the old table data since dimensions changed
-            jdbcTemplate.execute("TRUNCATE TABLE document_embeddings");
-            // Alter the embedding column to use 768 dimensions
             jdbcTemplate.execute("ALTER TABLE document_embeddings ALTER COLUMN embedding TYPE vector(768)");
+            // ALTER succeeded, so dimensions were different - existing embeddings are incompatible
+            log.warn("Embedding dimensions changed to 768 - clearing incompatible embeddings");
+            jdbcTemplate.execute("TRUNCATE TABLE document_embeddings");
             log.info("Successfully migrated embedding column to 768 dimensions");
         } catch (Exception e) {
-            // Table may not exist yet or already has correct dimensions
+            // Table may not exist yet or already has correct dimensions - no truncation needed
             log.debug("Migration of embedding dimensions skipped: {}", e.getMessage());
         }
     }

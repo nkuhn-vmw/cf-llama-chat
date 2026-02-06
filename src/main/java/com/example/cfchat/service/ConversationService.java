@@ -7,6 +7,7 @@ import com.example.cfchat.repository.ConversationRepository;
 import com.example.cfchat.repository.MessageRepository;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.data.domain.PageRequest;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -48,7 +49,7 @@ public class ConversationService {
 
     @Transactional(readOnly = true)
     public List<ConversationDto> getConversationsForUser(UUID userId) {
-        return conversationRepository.findByUserIdOrderByUpdatedAtDesc(userId)
+        return conversationRepository.findByUserIdOrderByUpdatedAtDesc(userId, PageRequest.of(0, 100))
                 .stream()
                 .map(c -> ConversationDto.fromEntity(c, false))
                 .toList();
@@ -79,6 +80,13 @@ public class ConversationService {
     @Transactional(readOnly = true)
     public long getConversationCountForUser(UUID userId) {
         return conversationRepository.countByUserId(userId);
+    }
+
+    @Transactional(readOnly = true)
+    public boolean isOwnedByUser(UUID conversationId, UUID userId) {
+        return conversationRepository.findById(conversationId)
+                .map(c -> userId.equals(c.getUserId()))
+                .orElse(false);
     }
 
     @Transactional

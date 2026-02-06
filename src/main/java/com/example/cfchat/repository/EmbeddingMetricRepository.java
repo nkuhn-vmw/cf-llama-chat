@@ -78,4 +78,6 @@ public interface EmbeddingMetricRepository extends JpaRepository<EmbeddingMetric
 
     // Recent metrics
     List<EmbeddingMetric> findByUserIdOrderByTimestampDesc(UUID userId);
+
+    void deleteByUserId(UUID userId);
 }

@@ -10,7 +10,10 @@ import java.time.LocalDateTime;
 import java.util.UUID;
 
 @Entity
-@Table(name = "embedding_metrics")
+@Table(name = "embedding_metrics", indexes = {
+        @Index(name = "idx_embedding_metrics_user_id", columnList = "user_id"),
+        @Index(name = "idx_embedding_metrics_timestamp", columnList = "timestamp")
+})
 @Data
 @NoArgsConstructor
 @AllArgsConstructor

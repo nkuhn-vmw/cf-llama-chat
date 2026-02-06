@@ -5,60 +5,8 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Organizations - Admin Portal</title>
     <link rel="stylesheet" th:href="@{/css/style.css}">
+    <link rel="stylesheet" th:href="@{/css/admin.css}">
     <style>
-        .admin-container {
-            max-width: 1200px;
-            margin: 0 auto;
-            padding: 24px;
-        }
-
-        .admin-header {
-            display: flex;
-            justify-content: space-between;
-            align-items: center;
-            margin-bottom: 32px;
-        }
-
-        .admin-header h1 {
-            font-size: 1.8rem;
-            font-weight: 600;
-        }
-
-        .header-nav {
-            display: flex;
-            align-items: center;
-            gap: 24px;
-        }
-
-        .back-link {
-            display: flex;
-            align-items: center;
-            gap: 8px;
-            color: var(--accent-color);
-            text-decoration: none;
-            font-size: 0.95rem;
-        }
-
-        .back-link:hover {
-            text-decoration: underline;
-        }
-
-        .back-link svg {
-            width: 18px;
-            height: 18px;
-        }
-
-        .section-header {
-            display: flex;
-            justify-content: space-between;
-            align-items: center;
-            margin-bottom: 20px;
-        }
-
-        .section-header h2 {
-            font-size: 1.3rem;
-        }
-
         .btn-primary {
             padding: 10px 20px;
             background-color: var(--accent-color);
@@ -166,42 +114,6 @@
             gap: 8px;
         }
 
-        .action-btn {
-            padding: 8px 14px;
-            border: 1px solid var(--border-color);
-            border-radius: 6px;
-            background: none;
-            color: var(--text-primary);
-            cursor: pointer;
-            font-size: 0.85rem;
-            transition: background-color 0.2s, border-color 0.2s;
-        }
-
-        .action-btn:hover {
-            background-color: var(--bg-hover);
-            border-color: var(--accent-color);
-        }
-
-        .action-btn.danger {
-            color: var(--error-color);
-            border-color: var(--error-color);
-        }
-
-        .action-btn.danger:hover {
-            background-color: rgba(239, 68, 68, 0.1);
-        }
-
-        .status-badge {
-            position: absolute;
-            top: 16px;
-            right: 16px;
-            padding: 4px 8px;
-            border-radius: 4px;
-            font-size: 0.7rem;
-            font-weight: 600;
-            text-transform: uppercase;
-        }
-
         .status-badge.active {
             background-color: rgba(16, 163, 127, 0.2);
             color: var(--accent-color);
@@ -212,38 +124,20 @@
             color: #ef4444;
         }
 
-        /* Modal Styles */
+        /* Modal overrides for organizations page */
         .modal-overlay {
-            display: none;
-            position: fixed;
-            top: 0;
-            left: 0;
-            right: 0;
-            bottom: 0;
-            background-color: rgba(0, 0, 0, 0.5);
-            z-index: 1000;
             align-items: flex-start;
-            justify-content: center;
             padding: 40px 20px;
             overflow-y: auto;
         }
 
-        .modal-overlay.open {
-            display: flex;
-        }
-
         .modal {
-            background-color: var(--bg-secondary);
-            border: 1px solid var(--border-color);
-            border-radius: 16px;
-            padding: 24px;
             max-width: 600px;
             width: 100%;
             margin: auto;
         }
 
         .modal h3 {
-            margin-bottom: 20px;
             font-size: 1.3rem;
         }
 
@@ -266,43 +160,12 @@
             gap: 12px;
         }
 
-        .form-group {
-            margin-bottom: 16px;
-        }
-
         .form-group.full-width {
             grid-column: 1 / -1;
         }
 
         .form-group label {
-            display: block;
-            margin-bottom: 6px;
-            font-size: 0.9rem;
             color: var(--text-secondary);
-        }
-
-        .form-group input,
-        .form-group textarea,
-        .form-group select {
-            width: 100%;
-            padding: 10px 12px;
-            background-color: var(--bg-tertiary);
-            border: 1px solid var(--border-color);
-            border-radius: 8px;
-            color: var(--text-primary);
-            font-size: 0.95rem;
-        }
-
-        .form-group input:focus,
-        .form-group textarea:focus,
-        .form-group select:focus {
-            outline: none;
-            border-color: var(--accent-color);
-        }
-
-        .form-group textarea {
-            min-height: 80px;
-            resize: vertical;
         }
 
         .form-group input[type="color"] {
@@ -323,26 +186,8 @@
         }
 
         .modal-actions {
-            display: flex;
-            gap: 12px;
-            justify-content: flex-end;
-            margin-top: 24px;
             padding-top: 20px;
             border-top: 1px solid var(--border-color);
-        }
-
-        .modal-btn {
-            padding: 10px 20px;
-            border-radius: 8px;
-            border: none;
-            cursor: pointer;
-            font-size: 0.95rem;
-            font-weight: 500;
-        }
-
-        .modal-btn.cancel {
-            background-color: var(--bg-tertiary);
-            color: var(--text-primary);
         }
 
         .modal-btn.confirm {
@@ -356,18 +201,9 @@
         }
 
         .empty-state {
-            text-align: center;
-            padding: 60px 20px;
             background-color: var(--bg-secondary);
             border: 1px solid var(--border-color);
             border-radius: 16px;
-        }
-
-        .empty-state svg {
-            width: 64px;
-            height: 64px;
-            color: var(--text-muted);
-            margin-bottom: 16px;
         }
 
         .empty-state h3 {
@@ -766,7 +602,7 @@
                 document.getElementById('orgModal').classList.add('open');
             } catch (error) {
                 console.error('Error:', error);
-                alert('Failed to load organization details');
+                toast.error('Failed to load organization details');
             }
         }
 
@@ -820,13 +656,13 @@
                 const result = await response.json();
 
                 if (result.error) {
-                    alert(result.error);
+                    toast.error(result.error);
                 } else {
                     location.reload();
                 }
             } catch (error) {
                 console.error('Error:', error);
-                alert('Failed to save organization');
+                toast.error('Failed to save organization');
             }
         });
 
@@ -853,13 +689,13 @@
                 const result = await response.json();
 
                 if (result.error) {
-                    alert(result.error);
+                    toast.error(result.error);
                 } else {
                     location.reload();
                 }
             } catch (error) {
                 console.error('Error:', error);
-                alert('Failed to delete organization');
+                toast.error('Failed to delete organization');
             }
 
             closeDeleteModal();
@@ -913,7 +749,7 @@
             const role = document.getElementById('addMemberRole').value;
 
             if (!userId || !membersOrgId) {
-                alert('Please select a user');
+                toast.warning('Please select a user');
                 return;
             }
 
@@ -927,14 +763,14 @@
                 const result = await response.json();
 
                 if (result.error) {
-                    alert(result.error);
+                    toast.error(result.error);
                 } else {
                     document.getElementById('addMemberUser').value = '';
                     await loadMembers();
                 }
             } catch (error) {
                 console.error('Error:', error);
-                alert('Failed to add member');
+                toast.error('Failed to add member');
             }
         }
 
@@ -949,13 +785,13 @@
                 const result = await response.json();
 
                 if (result.error) {
-                    alert(result.error);
+                    toast.error(result.error);
                 } else {
                     await loadMembers();
                 }
             } catch (error) {
                 console.error('Error:', error);
-                alert('Failed to remove member');
+                toast.error('Failed to remove member');
             }
         }
 
@@ -968,5 +804,6 @@
             });
         });
     </script>
+    <script th:src="@{/js/admin-toast.js}"></script>
 </body>
 </html>

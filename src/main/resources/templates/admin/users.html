@@ -5,116 +5,8 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>User Management - Admin Portal</title>
     <link rel="stylesheet" th:href="@{/css/style.css}">
+    <link rel="stylesheet" th:href="@{/css/admin.css}">
     <style>
-        .admin-container {
-            max-width: 1200px;
-            margin: 0 auto;
-            padding: 24px;
-        }
-
-        .admin-header {
-            display: flex;
-            justify-content: space-between;
-            align-items: center;
-            margin-bottom: 32px;
-        }
-
-        .admin-header h1 {
-            font-size: 1.8rem;
-            font-weight: 600;
-        }
-
-        .header-nav {
-            display: flex;
-            align-items: center;
-            gap: 24px;
-        }
-
-        .back-link {
-            display: flex;
-            align-items: center;
-            gap: 8px;
-            color: var(--accent-color);
-            text-decoration: none;
-            font-size: 0.95rem;
-        }
-
-        .back-link:hover {
-            text-decoration: underline;
-        }
-
-        .back-link svg {
-            width: 18px;
-            height: 18px;
-        }
-
-        .stats-cards {
-            display: grid;
-            grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
-            gap: 16px;
-            margin-bottom: 32px;
-        }
-
-        .stat-card {
-            background-color: var(--bg-secondary);
-            border: 1px solid var(--border-color);
-            border-radius: 12px;
-            padding: 20px;
-        }
-
-        .stat-card .stat-value {
-            font-size: 2rem;
-            font-weight: 700;
-            color: var(--accent-color);
-        }
-
-        .stat-card .stat-label {
-            font-size: 0.9rem;
-            color: var(--text-secondary);
-            margin-top: 4px;
-        }
-
-        .users-section h2 {
-            font-size: 1.3rem;
-            margin-bottom: 16px;
-        }
-
-        .users-table {
-            width: 100%;
-            background-color: var(--bg-secondary);
-            border: 1px solid var(--border-color);
-            border-radius: 12px;
-            overflow: hidden;
-        }
-
-        .users-table table {
-            width: 100%;
-            border-collapse: collapse;
-        }
-
-        .users-table th,
-        .users-table td {
-            padding: 14px 16px;
-            text-align: left;
-            border-bottom: 1px solid var(--border-color);
-        }
-
-        .users-table th {
-            background-color: var(--bg-tertiary);
-            font-weight: 600;
-            font-size: 0.85rem;
-            text-transform: uppercase;
-            color: var(--text-secondary);
-        }
-
-        .users-table tr:last-child td {
-            border-bottom: none;
-        }
-
-        .users-table tr:hover td {
-            background-color: var(--bg-hover);
-        }
-
         .role-badge {
             display: inline-block;
             padding: 4px 10px;
@@ -132,41 +24,6 @@
         .role-badge.user {
             background-color: rgba(16, 163, 127, 0.2);
             color: var(--accent-color);
-        }
-
-        .provider-badge {
-            display: inline-block;
-            padding: 4px 8px;
-            border-radius: 4px;
-            font-size: 0.75rem;
-            background-color: var(--bg-tertiary);
-            color: var(--text-secondary);
-        }
-
-        .action-btn {
-            padding: 6px 12px;
-            border: 1px solid var(--border-color);
-            border-radius: 6px;
-            background: none;
-            color: var(--text-primary);
-            cursor: pointer;
-            font-size: 0.85rem;
-            margin-right: 8px;
-            transition: background-color 0.2s, border-color 0.2s;
-        }
-
-        .action-btn:hover {
-            background-color: var(--bg-hover);
-            border-color: var(--accent-color);
-        }
-
-        .action-btn.danger {
-            color: var(--error-color);
-            border-color: var(--error-color);
-        }
-
-        .action-btn.danger:hover {
-            background-color: rgba(239, 68, 68, 0.1);
         }
 
         .role-select {
@@ -189,74 +46,9 @@
             color: var(--text-secondary);
         }
 
-        @media (max-width: 768px) {
-            .users-table {
-                overflow-x: auto;
-            }
-
-            .users-table table {
-                min-width: 700px;
-            }
-        }
-
-        .modal-overlay {
-            display: none;
-            position: fixed;
-            top: 0;
-            left: 0;
-            right: 0;
-            bottom: 0;
-            background-color: rgba(0, 0, 0, 0.5);
-            z-index: 1000;
-            align-items: center;
-            justify-content: center;
-        }
-
-        .modal-overlay.open {
-            display: flex;
-        }
-
-        .modal {
-            background-color: var(--bg-secondary);
-            border: 1px solid var(--border-color);
-            border-radius: 16px;
-            padding: 24px;
-            max-width: 400px;
-            width: 90%;
-        }
-
-        .modal h3 {
-            margin-bottom: 16px;
-        }
-
         .modal p {
             color: var(--text-secondary);
             margin-bottom: 20px;
-        }
-
-        .modal-actions {
-            display: flex;
-            gap: 12px;
-            justify-content: flex-end;
-        }
-
-        .modal-btn {
-            padding: 10px 20px;
-            border-radius: 8px;
-            border: none;
-            cursor: pointer;
-            font-size: 0.95rem;
-            font-weight: 500;
-        }
-
-        .modal-btn.cancel {
-            background-color: var(--bg-tertiary);
-            color: var(--text-primary);
-        }
-
-        .modal-btn.confirm {
-            background-color: var(--error-color);
-            color: white;
         }
 
         .checkbox-group {
@@ -342,9 +134,11 @@
             </div>
         </div>
 
-        <section class="users-section">
-            <h2>All Users</h2>
-            <div class="users-table">
+        <section>
+            <div class="section-header">
+                <h2>All Users</h2>
+            </div>
+            <div class="data-table">
                 <table>
                     <thead>
                         <tr>
@@ -372,7 +166,7 @@
                                 </select>
                             </td>
                             <td>
-                                <span class="provider-badge" th:text="${userData.user.authProvider}">LOCAL</span>
+                                <span class="transport-badge" th:text="${userData.user.authProvider}">LOCAL</span>
                             </td>
                             <td th:text="${userData.conversationCount}">0</td>
                             <td class="date-cell">
@@ -425,7 +219,7 @@
             <h3>Reset Password</h3>
             <p>Reset password for <strong id="resetUsername"></strong></p>
             <label class="modal-label" for="newPassword">New Password</label>
-            <input type="password" class="modal-input" id="newPassword" placeholder="Enter new password (min 6 characters)">
+            <input type="password" class="modal-input" id="newPassword" placeholder="Enter new password (min 8 characters)">
             <label class="modal-label" for="confirmNewPassword">Confirm Password</label>
             <input type="password" class="modal-input" id="confirmNewPassword" placeholder="Confirm new password">
             <div class="modal-actions">
@@ -435,6 +229,7 @@
         </div>
     </div>
 
+    <script th:src="@{/js/admin-toast.js}"></script>
     <script>
         // Apply saved theme
         const savedTheme = localStorage.getItem('theme') || 'dark';
@@ -456,13 +251,13 @@
             .then(response => response.json())
             .then(data => {
                 if (data.error) {
-                    alert(data.error);
+                    toast.error(data.error);
                     location.reload();
                 }
             })
             .catch(error => {
                 console.error('Error updating role:', error);
-                alert('Failed to update role');
+                toast.error('Failed to update role');
                 location.reload();
             });
         }
@@ -490,14 +285,14 @@
             .then(response => response.json())
             .then(data => {
                 if (data.error) {
-                    alert(data.error);
+                    toast.error(data.error);
                 } else {
                     location.reload();
                 }
             })
             .catch(error => {
                 console.error('Error deleting user:', error);
-                alert('Failed to delete user');
+                toast.error('Failed to delete user');
             });
 
             closeDeleteModal();
@@ -533,13 +328,13 @@
             const newPassword = document.getElementById('newPassword').value;
             const confirmPassword = document.getElementById('confirmNewPassword').value;
 
-            if (!newPassword || newPassword.length < 6) {
-                alert('Password must be at least 6 characters');
+            if (!newPassword || newPassword.length < 8) {
+                toast.warning('Password must be at least 8 characters with uppercase, lowercase, and a number');
                 return;
             }
 
             if (newPassword !== confirmPassword) {
-                alert('Passwords do not match');
+                toast.warning('Passwords do not match');
                 return;
             }
 
@@ -553,15 +348,15 @@
             .then(response => response.json())
             .then(data => {
                 if (data.success) {
-                    alert('Password reset successfully');
+                    toast.success('Password reset successfully');
                     closeResetPasswordModal();
                 } else {
-                    alert(data.error || 'Failed to reset password');
+                    toast.error(data.error || 'Failed to reset password');
                 }
             })
             .catch(error => {
                 console.error('Error resetting password:', error);
-                alert('Failed to reset password');
+                toast.error('Failed to reset password');
             });
         });
 

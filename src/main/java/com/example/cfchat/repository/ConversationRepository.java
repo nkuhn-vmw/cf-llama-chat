@@ -5,6 +5,8 @@ import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.jpa.repository.Query;
 import org.springframework.stereotype.Repository;
 
+import org.springframework.data.domain.Pageable;
+
 import java.util.List;
 import java.util.Optional;
 import java.util.UUID;
@@ -15,6 +17,8 @@ public interface ConversationRepository extends JpaRepository<Conversation, UUID
     List<Conversation> findAllByOrderByUpdatedAtDesc();
 
     List<Conversation> findByUserIdOrderByUpdatedAtDesc(UUID userId);
+
+    List<Conversation> findByUserIdOrderByUpdatedAtDesc(UUID userId, Pageable pageable);
 
     @Query("SELECT c FROM Conversation c LEFT JOIN FETCH c.messages WHERE c.id = :id")
     Optional<Conversation> findByIdWithMessages(UUID id);

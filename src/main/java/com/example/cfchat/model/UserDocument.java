@@ -15,7 +15,9 @@ import java.util.UUID;
  * while this entity tracks metadata about the document.
  */
 @Entity
-@Table(name = "user_documents")
+@Table(name = "user_documents", indexes = {
+        @Index(name = "idx_user_documents_user_id", columnList = "user_id")
+})
 @Data
 @NoArgsConstructor
 @AllArgsConstructor

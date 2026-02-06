@@ -5,75 +5,8 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Model Configuration - Admin Portal</title>
     <link rel="stylesheet" th:href="@{/css/style.css}">
+    <link rel="stylesheet" th:href="@{/css/admin.css}">
     <style>
-        .admin-container {
-            max-width: 1200px;
-            margin: 0 auto;
-            padding: 24px;
-        }
-
-        .admin-header {
-            display: flex;
-            justify-content: space-between;
-            align-items: center;
-            margin-bottom: 32px;
-        }
-
-        .admin-header h1 {
-            font-size: 1.8rem;
-            font-weight: 600;
-        }
-
-        .header-nav {
-            display: flex;
-            align-items: center;
-            gap: 24px;
-        }
-
-        .back-link {
-            display: flex;
-            align-items: center;
-            gap: 8px;
-            color: var(--accent-color);
-            text-decoration: none;
-            font-size: 0.95rem;
-        }
-
-        .back-link:hover {
-            text-decoration: underline;
-        }
-
-        .back-link svg {
-            width: 18px;
-            height: 18px;
-        }
-
-        .stats-cards {
-            display: grid;
-            grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
-            gap: 16px;
-            margin-bottom: 32px;
-        }
-
-        .stat-card {
-            background-color: var(--bg-secondary);
-            border: 1px solid var(--border-color);
-            border-radius: 12px;
-            padding: 20px;
-        }
-
-        .stat-card .stat-value {
-            font-size: 2rem;
-            font-weight: 700;
-            color: var(--accent-color);
-        }
-
-        .stat-card .stat-label {
-            font-size: 0.9rem;
-            color: var(--text-secondary);
-            margin-top: 4px;
-        }
-
         .models-section {
             margin-bottom: 32px;
         }
@@ -81,42 +14,6 @@
         .models-section h2 {
             font-size: 1.3rem;
             margin-bottom: 16px;
-        }
-
-        .models-table {
-            width: 100%;
-            background-color: var(--bg-secondary);
-            border: 1px solid var(--border-color);
-            border-radius: 12px;
-            overflow: hidden;
-        }
-
-        .models-table table {
-            width: 100%;
-            border-collapse: collapse;
-        }
-
-        .models-table th,
-        .models-table td {
-            padding: 14px 16px;
-            text-align: left;
-            border-bottom: 1px solid var(--border-color);
-        }
-
-        .models-table th {
-            background-color: var(--bg-tertiary);
-            font-weight: 600;
-            font-size: 0.85rem;
-            text-transform: uppercase;
-            color: var(--text-secondary);
-        }
-
-        .models-table tr:last-child td {
-            border-bottom: none;
-        }
-
-        .models-table tr:hover td {
-            background-color: var(--bg-hover);
         }
 
         .provider-badge {
@@ -234,84 +131,10 @@
             font-weight: 500;
         }
 
-        /* External Bindings Section */
-        .section-header {
-            display: flex;
-            justify-content: space-between;
-            align-items: center;
-            margin-bottom: 16px;
-        }
-
-        .section-header h2 {
-            font-size: 1.3rem;
-            display: flex;
-            align-items: center;
-            gap: 8px;
-        }
-
         .section-header h2 svg {
             width: 22px;
             height: 22px;
             color: var(--accent-color);
-        }
-
-        .add-btn {
-            padding: 10px 20px;
-            background-color: var(--accent-color);
-            color: white;
-            border: none;
-            border-radius: 8px;
-            cursor: pointer;
-            font-size: 0.95rem;
-            font-weight: 500;
-            display: flex;
-            align-items: center;
-            gap: 8px;
-        }
-
-        .add-btn:hover {
-            background-color: var(--accent-hover);
-        }
-
-        .add-btn svg {
-            width: 18px;
-            height: 18px;
-        }
-
-        .data-table {
-            width: 100%;
-            background-color: var(--bg-secondary);
-            border: 1px solid var(--border-color);
-            border-radius: 12px;
-            overflow: hidden;
-        }
-
-        .data-table table {
-            width: 100%;
-            border-collapse: collapse;
-        }
-
-        .data-table th,
-        .data-table td {
-            padding: 14px 16px;
-            text-align: left;
-            border-bottom: 1px solid var(--border-color);
-        }
-
-        .data-table th {
-            background-color: var(--bg-tertiary);
-            font-weight: 600;
-            font-size: 0.85rem;
-            text-transform: uppercase;
-            color: var(--text-secondary);
-        }
-
-        .data-table tr:last-child td {
-            border-bottom: none;
-        }
-
-        .data-table tr:hover td {
-            background-color: var(--bg-hover);
         }
 
         .type-badge {
@@ -324,40 +147,21 @@
         }
 
         .toggle-switch {
-            position: relative;
             width: 50px;
             height: 28px;
         }
 
-        .toggle-switch input {
-            opacity: 0;
-            width: 0;
-            height: 0;
-        }
-
         .toggle-slider {
-            position: absolute;
-            cursor: pointer;
-            top: 0;
-            left: 0;
-            right: 0;
-            bottom: 0;
             background-color: #dc3545;
             border: 2px solid #dc3545;
             border-radius: 28px;
-            transition: 0.3s;
         }
 
         .toggle-slider:before {
-            position: absolute;
-            content: "";
             height: 20px;
             width: 20px;
             left: 2px;
             bottom: 2px;
-            background-color: white;
-            border-radius: 50%;
-            transition: 0.3s;
             box-shadow: 0 2px 4px rgba(0,0,0,0.2);
         }
 
@@ -370,170 +174,13 @@
             transform: translateX(22px);
         }
 
-        .action-btn {
-            padding: 6px 12px;
-            border: 1px solid var(--border-color);
-            border-radius: 6px;
-            background: none;
-            color: var(--text-primary);
-            cursor: pointer;
-            font-size: 0.85rem;
-            margin-right: 8px;
-            transition: background-color 0.2s, border-color 0.2s;
-        }
-
-        .action-btn:hover {
-            background-color: var(--bg-hover);
-            border-color: var(--accent-color);
-        }
-
-        .action-btn.danger {
-            color: var(--error-color);
-            border-color: var(--error-color);
-        }
-
-        .action-btn.danger:hover {
-            background-color: rgba(239, 68, 68, 0.1);
-        }
-
-        .action-btn.primary {
-            color: var(--accent-color);
-            border-color: var(--accent-color);
-        }
-
-        .action-btn.primary:hover {
-            background-color: rgba(16, 163, 127, 0.1);
-        }
-
-        .modal-overlay {
-            display: none;
-            position: fixed;
-            top: 0;
-            left: 0;
-            right: 0;
-            bottom: 0;
-            background-color: rgba(0, 0, 0, 0.5);
-            z-index: 1000;
-            align-items: center;
-            justify-content: center;
-        }
-
-        .modal-overlay.open {
-            display: flex;
-        }
-
-        .modal {
-            background-color: var(--bg-secondary);
-            border: 1px solid var(--border-color);
-            border-radius: 16px;
-            padding: 24px;
-            max-width: 500px;
-            width: 90%;
-            max-height: 90vh;
-            overflow-y: auto;
-        }
-
-        .modal h3 {
-            margin-bottom: 20px;
-        }
-
-        .form-group {
-            margin-bottom: 16px;
-        }
-
-        .form-group label {
-            display: block;
-            margin-bottom: 6px;
-            font-size: 0.9rem;
-            font-weight: 500;
-        }
-
-        .form-group input,
-        .form-group textarea {
-            width: 100%;
-            padding: 10px 12px;
-            background-color: var(--bg-tertiary);
-            border: 1px solid var(--border-color);
-            border-radius: 8px;
-            color: var(--text-primary);
-            font-size: 0.95rem;
-        }
-
-        .form-group input:focus,
-        .form-group textarea:focus {
-            outline: none;
-            border-color: var(--accent-color);
-        }
-
         .form-group textarea {
             min-height: 100px;
-            resize: vertical;
             font-family: monospace;
-        }
-
-        .form-group small {
-            display: block;
-            margin-top: 4px;
-            font-size: 0.8rem;
-            color: var(--text-muted);
-        }
-
-        .modal-actions {
-            display: flex;
-            gap: 12px;
-            justify-content: flex-end;
-            margin-top: 24px;
-        }
-
-        .modal-btn {
-            padding: 10px 20px;
-            border-radius: 8px;
-            border: none;
-            cursor: pointer;
-            font-size: 0.95rem;
-            font-weight: 500;
-        }
-
-        .modal-btn.cancel {
-            background-color: var(--bg-tertiary);
-            color: var(--text-primary);
-        }
-
-        .modal-btn.save {
-            background-color: var(--accent-color);
-            color: white;
-        }
-
-        .modal-btn.confirm {
-            background-color: var(--error-color);
-            color: white;
-        }
-
-        .empty-state {
-            text-align: center;
-            padding: 48px 24px;
-            color: var(--text-secondary);
-        }
-
-        .empty-state svg {
-            width: 64px;
-            height: 64px;
-            margin-bottom: 16px;
-            opacity: 0.5;
         }
 
         .external-section {
             margin-top: 32px;
-        }
-
-        @media (max-width: 768px) {
-            .models-table {
-                overflow-x: auto;
-            }
-
-            .models-table table {
-                min-width: 600px;
-            }
         }
     </style>
 </head>
@@ -576,7 +223,7 @@
 
         <section class="models-section">
             <h2>Configured Models</h2>
-            <div class="models-table">
+            <div class="data-table">
                 <table>
                     <thead>
                         <tr>
@@ -903,7 +550,7 @@
             .then(response => response.json())
             .then(result => {
                 if (result.error) {
-                    alert(result.error);
+                    toast.error(result.error);
                 } else {
                     closeBindingModal();
                     loadBindings();
@@ -913,7 +560,7 @@
             })
             .catch(error => {
                 console.error('Error:', error);
-                alert('Failed to save binding');
+                toast.error('Failed to save binding');
             });
         });
 
@@ -929,7 +576,7 @@
             .then(response => response.json())
             .then(result => {
                 if (result.error) {
-                    alert(result.error);
+                    toast.error(result.error);
                     checkbox.checked = !enabled;
                 } else {
                     loadBindings();
@@ -952,9 +599,9 @@
                 .then(response => response.json())
                 .then(result => {
                     if (result.error) {
-                        alert(result.error);
+                        toast.error(result.error);
                     } else {
-                        alert(`Reloaded ${result.reloadedModelCount} model(s)`);
+                        toast.success(`Reloaded ${result.reloadedModelCount} model(s)`);
                         loadBindings();
                         // Reload to update models
                         setTimeout(() => location.reload(), 500);
@@ -962,7 +609,7 @@
                 })
                 .catch(error => {
                     console.error('Error:', error);
-                    alert('Failed to reload binding');
+                    toast.error('Failed to reload binding');
                     btn.disabled = false;
                     btn.textContent = 'Reload';
                 });
@@ -986,7 +633,7 @@
                 .then(response => response.json())
                 .then(result => {
                     if (result.error) {
-                        alert(result.error);
+                        toast.error(result.error);
                     } else {
                         closeDeleteBindingModal();
                         loadBindings();
@@ -996,7 +643,7 @@
                 })
                 .catch(error => {
                     console.error('Error:', error);
-                    alert('Failed to delete binding');
+                    toast.error('Failed to delete binding');
                 });
         });
 
@@ -1009,5 +656,6 @@
             });
         });
     </script>
+    <script th:src="@{/js/admin-toast.js}"></script>
 </body>
 </html>

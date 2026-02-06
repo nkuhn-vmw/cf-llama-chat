@@ -5,47 +5,10 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Database Monitoring - Admin Portal</title>
     <link rel="stylesheet" th:href="@{/css/style.css}">
+    <link rel="stylesheet" th:href="@{/css/admin.css}">
     <style>
         .admin-container {
             max-width: 1400px;
-            margin: 0 auto;
-            padding: 24px;
-        }
-
-        .admin-header {
-            display: flex;
-            justify-content: space-between;
-            align-items: center;
-            margin-bottom: 32px;
-        }
-
-        .admin-header h1 {
-            font-size: 1.8rem;
-            font-weight: 600;
-        }
-
-        .header-nav {
-            display: flex;
-            align-items: center;
-            gap: 24px;
-        }
-
-        .back-link {
-            display: flex;
-            align-items: center;
-            gap: 8px;
-            color: var(--accent-color);
-            text-decoration: none;
-            font-size: 0.95rem;
-        }
-
-        .back-link:hover {
-            text-decoration: underline;
-        }
-
-        .back-link svg {
-            width: 18px;
-            height: 18px;
         }
 
         .db-overview {
@@ -79,13 +42,6 @@
             margin-bottom: 32px;
         }
 
-        .section-header {
-            display: flex;
-            justify-content: space-between;
-            align-items: center;
-            margin-bottom: 16px;
-        }
-
         .section h2 {
             font-size: 1.3rem;
             font-weight: 600;
@@ -112,42 +68,6 @@
         .refresh-btn svg {
             width: 16px;
             height: 16px;
-        }
-
-        .data-table {
-            width: 100%;
-            background-color: var(--bg-secondary);
-            border: 1px solid var(--border-color);
-            border-radius: 12px;
-            overflow: hidden;
-        }
-
-        .data-table table {
-            width: 100%;
-            border-collapse: collapse;
-        }
-
-        .data-table th,
-        .data-table td {
-            padding: 12px 14px;
-            text-align: left;
-            border-bottom: 1px solid var(--border-color);
-        }
-
-        .data-table th {
-            background-color: var(--bg-tertiary);
-            font-weight: 600;
-            font-size: 0.8rem;
-            text-transform: uppercase;
-            color: var(--text-secondary);
-        }
-
-        .data-table tr:last-child td {
-            border-bottom: none;
-        }
-
-        .data-table tr:hover td {
-            background-color: var(--bg-hover);
         }
 
         .data-table .number {
@@ -191,12 +111,6 @@
         .badge.h2 {
             background-color: rgba(234, 179, 8, 0.2);
             color: #eab308;
-        }
-
-        .empty-state {
-            text-align: center;
-            padding: 40px;
-            color: var(--text-muted);
         }
 
         .tabs {
@@ -252,14 +166,6 @@
         }
 
         @media (max-width: 768px) {
-            .data-table {
-                overflow-x: auto;
-            }
-
-            .data-table table {
-                min-width: 600px;
-            }
-
             .tabs {
                 flex-wrap: wrap;
             }
@@ -503,5 +409,6 @@
             });
         });
     </script>
+    <script th:src="@{/js/admin-toast.js}"></script>
 </body>
 </html>

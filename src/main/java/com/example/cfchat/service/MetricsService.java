@@ -200,21 +200,24 @@ public class MetricsService {
         }
         summary.put("requestsByModel", modelRequests);
 
-        // Usage by user (for admins)
+        // Usage by user (for admins) - batch-fetch users to avoid N+1
         List<Object[]> tokensByUser = usageMetricRepository.sumTokensByUser();
+        List<UUID> userIds = tokensByUser.stream().map(row -> (UUID) row[0]).toList();
+        Map<UUID, User> usersById = userRepository.findAllById(userIds).stream()
+                .collect(java.util.stream.Collectors.toMap(User::getId, u -> u));
         List<Map<String, Object>> userUsage = new ArrayList<>();
         for (Object[] row : tokensByUser) {
             UUID userId = (UUID) row[0];
             Long tokens = (Long) row[1];
 
-            Optional<User> user = userRepository.findById(userId);
             Map<String, Object> userData = new HashMap<>();
             userData.put("userId", userId);
             userData.put("totalTokens", tokens);
-            user.ifPresent(u -> {
-                userData.put("username", u.getUsername());
-                userData.put("displayName", u.getDisplayName());
-            });
+            User user = usersById.get(userId);
+            if (user != null) {
+                userData.put("username", user.getUsername());
+                userData.put("displayName", user.getDisplayName());
+            }
             userUsage.add(userData);
         }
         summary.put("usageByUser", userUsage);
@@ -414,21 +417,24 @@ public class MetricsService {
         }
         summary.put("avgProcessingTimeByModel", modelAvgTime);
 
-        // Usage by user
+        // Usage by user - batch-fetch users to avoid N+1
         List<Object[]> chunksByUser = embeddingMetricRepository.sumChunksByUser();
+        List<UUID> embUserIds = chunksByUser.stream().map(row -> (UUID) row[0]).toList();
+        Map<UUID, User> embUsersById = userRepository.findAllById(embUserIds).stream()
+                .collect(java.util.stream.Collectors.toMap(User::getId, u -> u));
         List<Map<String, Object>> userUsage = new ArrayList<>();
         for (Object[] row : chunksByUser) {
             UUID userId = (UUID) row[0];
             Long chunks = (Long) row[1];
 
-            Optional<User> user = userRepository.findById(userId);
             Map<String, Object> userData = new HashMap<>();
             userData.put("userId", userId);
             userData.put("totalChunks", chunks);
-            user.ifPresent(u -> {
-                userData.put("username", u.getUsername());
-                userData.put("displayName", u.getDisplayName());
-            });
+            User embUser = embUsersById.get(userId);
+            if (embUser != null) {
+                userData.put("username", embUser.getUsername());
+                userData.put("displayName", embUser.getDisplayName());
+            }
             userUsage.add(userData);
         }
         summary.put("usageByUser", userUsage);

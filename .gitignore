@@ -38,6 +38,9 @@ release.properties
 .gradle/
 gradle/
 
+# Claude Code
+.claude/
+
 # Temporary files
 *.tmp
 *.temp

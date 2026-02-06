@@ -10,7 +10,9 @@ import java.time.LocalDateTime;
 import java.util.UUID;
 
 @Entity
-@Table(name = "tools")
+@Table(name = "tools", indexes = {
+        @Index(name = "idx_tools_mcp_server_id", columnList = "mcp_server_id")
+})
 @Data
 @NoArgsConstructor
 @AllArgsConstructor

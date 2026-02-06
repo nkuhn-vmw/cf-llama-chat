@@ -19,6 +19,7 @@ public class ChatResponse {
     private String content;
     private String htmlContent;
     private String model;
+    private String error;
     private boolean streaming;
     private boolean complete;
 

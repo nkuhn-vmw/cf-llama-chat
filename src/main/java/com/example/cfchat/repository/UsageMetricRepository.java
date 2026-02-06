@@ -83,4 +83,6 @@ public interface UsageMetricRepository extends JpaRepository<UsageMetric, UUID> 
     @Query("DELETE FROM UsageMetric m")
     @org.springframework.data.jpa.repository.Modifying
     void deleteAllMetrics();
+
+    void deleteByUserId(UUID userId);
 }

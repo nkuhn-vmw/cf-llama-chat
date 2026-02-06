@@ -13,11 +13,14 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 import io.modelcontextprotocol.client.McpSyncClient;
 import io.modelcontextprotocol.spec.McpSchema;
 import jakarta.annotation.PostConstruct;
+import jakarta.annotation.PreDestroy;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import java.net.InetAddress;
+import java.net.URI;
 import java.time.Duration;
 import java.util.*;
 import java.util.concurrent.ConcurrentHashMap;
@@ -45,6 +48,18 @@ public class McpService {
         this.objectMapper = objectMapper;
         this.mcpClientFactory = mcpClientFactory;
         this.jdbcTemplate = jdbcTemplate;
+    }
+
+    @PreDestroy
+    public void shutdown() {
+        log.info("Shutting down MCP service - disconnecting {} active clients", activeClients.size());
+        for (UUID serverId : new ArrayList<>(activeClients.keySet())) {
+            try {
+                disconnect(serverId);
+            } catch (Exception e) {
+                log.warn("Error disconnecting MCP server {} during shutdown: {}", serverId, e.getMessage());
+            }
+        }
     }
 
     @PostConstruct
@@ -178,6 +193,7 @@ public class McpService {
             if (url == null || url.isBlank()) {
                 throw new IllegalArgumentException("URL is required for " + server.getTransportType() + " transport");
             }
+            validateMcpUrl(url);
 
             // Parse headers from the server configuration
             Map<String, String> headers = parseHeaders(server.getHeaders());
@@ -352,6 +368,12 @@ public class McpService {
         if (url == null || url.isBlank()) {
             return false;
         }
+        try {
+            validateMcpUrl(url);
+        } catch (IllegalArgumentException e) {
+            log.warn("Invalid MCP URL for server {}: {}", server.getName(), e.getMessage());
+            return false;
+        }
 
         Map<String, String> headers = parseHeaders(server.getHeaders());
 
@@ -410,6 +432,30 @@ public class McpService {
         } catch (JsonProcessingException e) {
             log.warn("Failed to parse headers JSON: {}", e.getMessage());
             return Map.of();
+        }
+    }
+
+    private void validateMcpUrl(String url) {
+        try {
+            URI uri = URI.create(url);
+            String scheme = uri.getScheme();
+            if (scheme == null || (!scheme.equalsIgnoreCase("http") && !scheme.equalsIgnoreCase("https"))) {
+                throw new IllegalArgumentException("MCP URL must use http or https scheme");
+            }
+            String host = uri.getHost();
+            if (host == null || host.isBlank()) {
+                throw new IllegalArgumentException("MCP URL must have a valid host");
+            }
+            // Block common internal addresses
+            InetAddress addr = InetAddress.getByName(host);
+            if (addr.isLoopbackAddress() || addr.isLinkLocalAddress()
+                    || addr.isSiteLocalAddress() || addr.isAnyLocalAddress()) {
+                throw new IllegalArgumentException("MCP URL must not point to internal/private addresses");
+            }
+        } catch (IllegalArgumentException e) {
+            throw e;
+        } catch (Exception e) {
+            throw new IllegalArgumentException("Invalid MCP URL: " + e.getMessage());
         }
     }
 }
