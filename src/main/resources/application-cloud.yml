@@ -60,5 +60,5 @@ app:
 
 logging:
   level:
-    io.pivotal.cfenv: DEBUG
-    com.example.cfchat: DEBUG
+    io.pivotal.cfenv: INFO
+    com.example.cfchat: INFO

@@ -139,6 +139,10 @@ class ConversationControllerTest {
     @WithMockUser(username = "testuser")
     void deleteConversation_callsService() throws Exception {
         UUID convId = UUID.randomUUID();
+        UUID userId = UUID.randomUUID();
+        User user = User.builder().id(userId).username("testuser").build();
+        when(userService.getCurrentUser()).thenReturn(Optional.of(user));
+        when(conversationService.isOwnedByUser(convId, userId)).thenReturn(true);
 
         mockMvc.perform(delete("/api/conversations/" + convId).with(csrf()))
                 .andExpect(status().isNoContent());
@@ -150,6 +154,10 @@ class ConversationControllerTest {
     @WithMockUser(username = "testuser")
     void updateConversation_updatesTitle() throws Exception {
         UUID convId = UUID.randomUUID();
+        UUID userId = UUID.randomUUID();
+        User user = User.builder().id(userId).username("testuser").build();
+        when(userService.getCurrentUser()).thenReturn(Optional.of(user));
+        when(conversationService.isOwnedByUser(convId, userId)).thenReturn(true);
 
         mockMvc.perform(patch("/api/conversations/" + convId)
                         .with(csrf())
@@ -176,10 +184,11 @@ class ConversationControllerTest {
 
     @Test
     @WithMockUser(username = "testuser")
-    void clearAllConversations_noUser_returns401() throws Exception {
+    void clearAllConversations_noUser_returnsServiceUnavailable() throws Exception {
         when(userService.getCurrentUser()).thenReturn(Optional.empty());
 
+        // requireUserId() throws IllegalStateException → 503
         mockMvc.perform(delete("/api/conversations/clear-all").with(csrf()))
-                .andExpect(status().isUnauthorized());
+                .andExpect(status().isServiceUnavailable());
     }
 }

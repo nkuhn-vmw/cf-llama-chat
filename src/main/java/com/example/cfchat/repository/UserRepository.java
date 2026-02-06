@@ -30,6 +30,9 @@ public interface UserRepository extends JpaRepository<User, UUID> {
 
     long countByOrganization(Organization organization);
 
+    @Query("SELECT u.organization.id, COUNT(u) FROM User u WHERE u.organization IS NOT NULL GROUP BY u.organization.id")
+    List<Object[]> countUsersGroupByOrganization();
+
     @Query("SELECT u FROM User u LEFT JOIN FETCH u.organization WHERE u.username = :username")
     Optional<User> findByUsernameWithOrganization(@Param("username") String username);
 

@@ -35,6 +35,8 @@ public class GenAiConfig {
     @Getter
     private final Map<String, ChatModel> chatModels = new LinkedHashMap<>();
 
+    private final Map<String, ChatClient> chatClientCache = new java.util.concurrent.ConcurrentHashMap<>();
+
     @Getter
     private final Map<String, ModelMetadata> modelMetadata = new LinkedHashMap<>();
 
@@ -276,12 +278,12 @@ public class GenAiConfig {
     }
 
     /**
-     * Get a ChatClient for a specific model.
+     * Get a ChatClient for a specific model (cached).
      */
     public ChatClient getChatClientForModel(String modelName) {
         ChatModel model = getChatModelByName(modelName);
         if (model != null) {
-            return ChatClient.builder(model).build();
+            return chatClientCache.computeIfAbsent(modelName, k -> ChatClient.builder(model).build());
         }
         return null;
     }

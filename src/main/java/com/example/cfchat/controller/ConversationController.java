@@ -28,25 +28,14 @@ public class ConversationController {
 
     @GetMapping
     public ResponseEntity<List<ConversationDto>> getAllConversations() {
-        Optional<User> currentUser = userService.getCurrentUser();
-        if (currentUser.isPresent()) {
-            return ResponseEntity.ok(conversationService.getConversationsForUser(currentUser.get().getId()));
-        }
-        return ResponseEntity.ok(conversationService.getAllConversations());
+        UUID userId = requireUserId();
+        return ResponseEntity.ok(conversationService.getConversationsForUser(userId));
     }
 
     @GetMapping("/{id}")
     public ResponseEntity<ConversationDto> getConversation(@PathVariable UUID id) {
-        Optional<User> currentUser = userService.getCurrentUser();
-        Optional<ConversationDto> conversation;
-
-        if (currentUser.isPresent()) {
-            conversation = conversationService.getConversationForUser(id, currentUser.get().getId());
-        } else {
-            conversation = conversationService.getConversation(id);
-        }
-
-        return conversation
+        UUID userId = requireUserId();
+        return conversationService.getConversationForUser(id, userId)
                 .map(conv -> {
                     if (conv.getMessages() != null) {
                         conv.getMessages().forEach(msg ->
@@ -63,7 +52,11 @@ public class ConversationController {
         String provider = body != null ? body.get("provider") : null;
         String model = body != null ? body.get("model") : null;
 
-        UUID userId = userService.getCurrentUser().map(User::getId).orElse(null);
+        if (title != null && title.length() > 500) {
+            throw new IllegalArgumentException("Title must not exceed 500 characters");
+        }
+
+        UUID userId = requireUserId();
         var conversation = conversationService.createConversation(title, provider, model, userId);
         return ResponseEntity.ok(ConversationDto.fromEntity(conversation, false));
     }
@@ -72,12 +65,15 @@ public class ConversationController {
     public ResponseEntity<Void> updateConversation(
             @PathVariable UUID id,
             @RequestBody Map<String, String> body) {
-        UUID userId = userService.getCurrentUser().map(User::getId).orElse(null);
-        if (userId != null && !conversationService.isOwnedByUser(id, userId)) {
+        UUID userId = requireUserId();
+        if (!conversationService.isOwnedByUser(id, userId)) {
             return ResponseEntity.status(403).build();
         }
         String title = body.get("title");
         if (title != null) {
+            if (title.length() > 500) {
+                throw new IllegalArgumentException("Title must not exceed 500 characters");
+            }
             conversationService.updateConversationTitle(id, title);
         }
         return ResponseEntity.ok().build();
@@ -85,8 +81,8 @@ public class ConversationController {
 
     @DeleteMapping("/{id}")
     public ResponseEntity<Void> deleteConversation(@PathVariable UUID id) {
-        UUID userId = userService.getCurrentUser().map(User::getId).orElse(null);
-        if (userId != null && !conversationService.isOwnedByUser(id, userId)) {
+        UUID userId = requireUserId();
+        if (!conversationService.isOwnedByUser(id, userId)) {
             return ResponseEntity.status(403).build();
         }
         conversationService.deleteConversation(id);
@@ -95,8 +91,8 @@ public class ConversationController {
 
     @GetMapping("/{id}/messages")
     public ResponseEntity<List<MessageDto>> getMessages(@PathVariable UUID id) {
-        UUID userId = userService.getCurrentUser().map(User::getId).orElse(null);
-        if (userId != null && !conversationService.isOwnedByUser(id, userId)) {
+        UUID userId = requireUserId();
+        if (!conversationService.isOwnedByUser(id, userId)) {
             return ResponseEntity.status(403).build();
         }
         List<MessageDto> messages = conversationService.getMessages(id).stream()
@@ -111,17 +107,22 @@ public class ConversationController {
 
     @DeleteMapping("/clear-all")
     public ResponseEntity<Map<String, Object>> clearAllConversations() {
+        UUID userId = requireUserId();
         Optional<User> currentUser = userService.getCurrentUser();
-        if (currentUser.isEmpty()) {
-            return ResponseEntity.status(401).body(Map.of("error", "Not authenticated"));
-        }
 
-        int deletedCount = conversationService.deleteAllConversationsForUser(currentUser.get().getId());
-        log.info("User {} cleared all {} conversations", currentUser.get().getUsername(), deletedCount);
+        int deletedCount = conversationService.deleteAllConversationsForUser(userId);
+        log.info("User {} cleared all {} conversations",
+                currentUser.map(User::getUsername).orElse("unknown"), deletedCount);
 
         return ResponseEntity.ok(Map.of(
                 "success", true,
                 "deletedCount", deletedCount
         ));
+    }
+
+    private UUID requireUserId() {
+        return userService.getCurrentUser()
+                .map(User::getId)
+                .orElseThrow(() -> new IllegalStateException("Authentication required"));
     }
 }

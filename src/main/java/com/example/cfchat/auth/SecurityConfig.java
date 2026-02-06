@@ -68,13 +68,20 @@ public class SecurityConfig {
     @Bean
     public SecurityFilterChain securityFilterChain(HttpSecurity http) throws Exception {
         http
-            .headers(headers -> headers
-                .contentTypeOptions(contentType -> {})
-                .frameOptions(frame -> frame.deny())
-                .httpStrictTransportSecurity(hsts -> hsts
+            .headers(headers -> {
+                headers.contentTypeOptions(contentType -> {});
+                headers.frameOptions(frame -> frame.deny());
+                headers.httpStrictTransportSecurity(hsts -> hsts
                     .includeSubDomains(true)
-                    .maxAgeInSeconds(31536000))
-            )
+                    .preload(true)
+                    .maxAgeInSeconds(31536000));
+                headers.referrerPolicy(referrer -> referrer
+                    .policy(org.springframework.security.web.header.writers.ReferrerPolicyHeaderWriter.ReferrerPolicy.STRICT_ORIGIN_WHEN_CROSS_ORIGIN));
+                headers.permissionsPolicy(permissions -> permissions
+                    .policy("geolocation=(), microphone=(), camera=(), payment=()"));
+                headers.contentSecurityPolicy(csp -> csp
+                    .policyDirectives("default-src 'self'; script-src 'self' https://cdnjs.cloudflare.com; style-src 'self' 'unsafe-inline' https://cdnjs.cloudflare.com; img-src 'self' data: https:; font-src 'self' https://cdnjs.cloudflare.com; connect-src 'self'; frame-ancestors 'none'"));
+            })
             .csrf(csrf -> csrf
                 .csrfTokenRepository(CookieCsrfTokenRepository.withHttpOnlyFalse())
                 .csrfTokenRequestHandler(new CsrfTokenRequestAttributeHandler())
@@ -92,6 +99,10 @@ public class SecurityConfig {
                 .successHandler(authenticationSuccessHandler())
                 .failureUrl("/login.html?error=true")
                 .permitAll()
+            )
+            .sessionManagement(session -> session
+                .sessionFixation(fix -> fix.migrateSession())
+                .maximumSessions(3)
             )
             .logout(logout -> logout
                 .logoutUrl("/logout")

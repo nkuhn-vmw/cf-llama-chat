@@ -366,8 +366,11 @@ public class AdminController {
             return ResponseEntity.badRequest().body(Map.of("error", "Username is required"));
         }
 
-        if (password == null || password.length() < 6) {
-            return ResponseEntity.badRequest().body(Map.of("error", "Password must be at least 6 characters"));
+        if (password == null || password.length() < 8
+                || !password.matches(".*[A-Z].*")
+                || !password.matches(".*[a-z].*")
+                || !password.matches(".*\\d.*")) {
+            return ResponseEntity.badRequest().body(Map.of("error", "Password must be at least 8 characters with uppercase, lowercase, and a number"));
         }
 
         try {
@@ -553,8 +556,11 @@ public class AdminController {
         }
 
         String newPassword = body.get("newPassword");
-        if (newPassword == null || newPassword.length() < 6) {
-            return ResponseEntity.badRequest().body(Map.of("error", "Password must be at least 6 characters"));
+        if (newPassword == null || newPassword.length() < 8
+                || !newPassword.matches(".*[A-Z].*")
+                || !newPassword.matches(".*[a-z].*")
+                || !newPassword.matches(".*\\d.*")) {
+            return ResponseEntity.badRequest().body(Map.of("error", "Password must be at least 8 characters with uppercase, lowercase, and a number"));
         }
 
         boolean success = userService.resetUserPassword(userId, newPassword);

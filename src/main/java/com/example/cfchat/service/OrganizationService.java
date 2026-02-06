@@ -13,9 +13,11 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.util.List;
+import java.util.Map;
 import java.util.Optional;
 import java.util.Set;
 import java.util.UUID;
+import java.util.stream.Collectors;
 
 @Service
 @RequiredArgsConstructor
@@ -120,20 +122,29 @@ public class OrganizationService {
 
     @Transactional(readOnly = true)
     public List<OrganizationDto> getAllOrganizations() {
+        Map<UUID, Long> memberCounts = getMemberCountsByOrg();
         return organizationRepository.findByActiveTrueOrderByNameAsc()
                 .stream()
                 .map(org -> OrganizationDto.fromEntityWithMemberCount(org,
-                        userRepository.countByOrganization(org)))
+                        memberCounts.getOrDefault(org.getId(), 0L)))
                 .toList();
     }
 
     @Transactional(readOnly = true)
     public List<OrganizationDto> getAllOrganizationsIncludingInactive() {
+        Map<UUID, Long> memberCounts = getMemberCountsByOrg();
         return organizationRepository.findAll()
                 .stream()
                 .map(org -> OrganizationDto.fromEntityWithMemberCount(org,
-                        userRepository.countByOrganization(org)))
+                        memberCounts.getOrDefault(org.getId(), 0L)))
                 .toList();
+    }
+
+    private Map<UUID, Long> getMemberCountsByOrg() {
+        return userRepository.countUsersGroupByOrganization().stream()
+                .collect(Collectors.toMap(
+                        row -> (UUID) row[0],
+                        row -> (Long) row[1]));
     }
 
     @Transactional(readOnly = true)

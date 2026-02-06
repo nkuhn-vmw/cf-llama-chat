@@ -14,6 +14,8 @@ import software.amazon.awssdk.services.s3.S3ClientBuilder;
 import software.amazon.awssdk.services.s3.S3Configuration;
 import software.amazon.awssdk.services.s3.model.*;
 
+import jakarta.annotation.PreDestroy;
+
 import java.io.IOException;
 import java.io.InputStream;
 import java.net.URI;
@@ -32,6 +34,18 @@ public class DocumentStorageService {
     private final DocumentStorageConfigRepository configRepository;
     private volatile S3Client s3Client;
     private volatile DocumentStorageConfig cachedConfig;
+
+    @PreDestroy
+    public void shutdown() {
+        if (s3Client != null) {
+            log.info("Shutting down S3 client");
+            try {
+                s3Client.close();
+            } catch (Exception e) {
+                log.warn("Error closing S3 client: {}", e.getMessage());
+            }
+        }
+    }
 
     public DocumentStorageService(DocumentStorageConfigRepository configRepository) {
         this.configRepository = configRepository;
@@ -260,6 +274,15 @@ public class DocumentStorageService {
                 config.getUpdatedAt() != null &&
                 cachedConfig.getUpdatedAt().equals(config.getUpdatedAt())) {
             return s3Client;
+        }
+
+        // Close old client before creating new one
+        if (s3Client != null) {
+            try {
+                s3Client.close();
+            } catch (Exception e) {
+                log.warn("Error closing old S3 client: {}", e.getMessage());
+            }
         }
 
         // Build new client

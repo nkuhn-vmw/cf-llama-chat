@@ -350,7 +350,9 @@ class OrganizationServiceTest {
                 .build();
 
         when(organizationRepository.findByActiveTrueOrderByNameAsc()).thenReturn(List.of(org));
-        when(userRepository.countByOrganization(org)).thenReturn(5L);
+        List<Object[]> memberCounts = new java.util.ArrayList<>();
+        memberCounts.add(new Object[]{org.getId(), 5L});
+        when(userRepository.countUsersGroupByOrganization()).thenReturn(memberCounts);
 
         List<OrganizationDto> result = organizationService.getAllOrganizations();
 
