@@ -62,6 +62,9 @@ public class ChatService {
     @Value("${app.documents.rag-top-k:5}")
     private int ragTopK;
 
+    @Value("${app.chat.streaming-timeout-minutes:10}")
+    private int streamingTimeoutMinutes;
+
     public ChatService(
             @Autowired(required = false) ChatClient primaryChatClient,
             @Autowired(required = false) OpenAiChatModel openAiChatModel,
@@ -104,6 +107,13 @@ public class ChatService {
     public ChatResponse chat(ChatRequest request) {
         String provider = request.getProvider() != null ? request.getProvider() : chatConfig.getDefaultProvider();
         String model = request.getModel();
+
+        // Validate and resolve model name
+        if (model != null && !model.isBlank()) {
+            validateModelName(model);
+        } else {
+            model = resolveDefaultModel();
+        }
 
         // Get current user ID
         UUID userId = userService.getCurrentUser().map(User::getId).orElse(null);
@@ -204,6 +214,13 @@ public class ChatService {
         String provider = request.getProvider() != null ? request.getProvider() : chatConfig.getDefaultProvider();
         String model = request.getModel();
 
+        // Validate and resolve model name
+        if (model != null && !model.isBlank()) {
+            validateModelName(model);
+        } else {
+            model = resolveDefaultModel();
+        }
+
         // Get current user ID
         UUID userId = userService.getCurrentUser().map(User::getId).orElse(null);
 
@@ -225,6 +242,7 @@ public class ChatService {
         final UUID finalConversationId = conversationId;
         final UUID finalUserId = userId;
         final String finalProvider = provider;
+        final String finalModel = model;
         final String userMessage = request.getMessage();
 
         // Save user message
@@ -317,7 +335,7 @@ public class ChatService {
         }
 
         return responseFlux
-                .timeout(java.time.Duration.ofMinutes(5))
+                .timeout(java.time.Duration.ofMinutes(streamingTimeoutMinutes))
                 .onErrorResume(e -> {
                     log.error("Streaming error for conversation {}: {}", finalConversationId, e.getMessage());
                     return Flux.just(ChatResponse.builder()
@@ -335,7 +353,7 @@ public class ChatService {
                     finalConversationId,
                     Message.MessageRole.ASSISTANT,
                     completeResponse,
-                    model
+                    finalModel
             );
 
             // Calculate metrics
@@ -353,9 +371,9 @@ public class ChatService {
                     (completionTokens / (responseTime / 1000.0)) : 0.0;
 
             log.info("Streaming metrics - TTFT: {}ms, TPS: {}, Total: {}ms, Model: {}",
-                    timeToFirstToken, String.format("%.1f", tokensPerSecond), responseTime, model);
+                    timeToFirstToken, String.format("%.1f", tokensPerSecond), responseTime, finalModel);
 
-            metricsService.recordUsage(finalUserId, finalConversationId, model, finalProvider,
+            metricsService.recordUsage(finalUserId, finalConversationId, finalModel, finalProvider,
                     promptTokens, completionTokens, responseTime, timeToFirstToken, tokensPerSecond);
 
             // Update conversation title if first exchange
@@ -370,7 +388,7 @@ public class ChatService {
                     .messageId(savedMessage.getId())
                     .content("")
                     .htmlContent(markdownService.toHtml(completeResponse))
-                    .model(model)
+                    .model(finalModel)
                     .streaming(false)
                     .complete(true)
                     .timeToFirstTokenMs(timeToFirstToken)
@@ -610,6 +628,9 @@ public class ChatService {
 
         // Add conversation history (sliding window: last 50 messages to stay within context limits)
         List<Message> history = conversation.getMessages();
+        if (history == null) {
+            history = List.of();
+        }
         int maxHistoryMessages = 50;
         int startIndex = Math.max(0, history.size() - maxHistoryMessages);
         for (int i = startIndex; i < history.size(); i++) {
@@ -667,6 +688,30 @@ public class ChatService {
             log.warn("Failed to build document context for user {}: {}", userId, e.getMessage());
             return null;
         }
+    }
+
+    private void validateModelName(String modelName) {
+        // Allow alphanumeric, dots, hyphens, underscores, colons, and slashes (common in model names)
+        if (!modelName.matches("[a-zA-Z0-9._:/-]+")) {
+            throw new IllegalArgumentException("Invalid model name");
+        }
+        if (modelName.length() > 200) {
+            throw new IllegalArgumentException("Model name too long");
+        }
+        // Verify model exists in available models
+        boolean exists = getAvailableModels().stream()
+                .anyMatch(m -> m.getId().equals(modelName));
+        if (!exists) {
+            throw new IllegalArgumentException("Unknown model: " + modelName);
+        }
+    }
+
+    private String resolveDefaultModel() {
+        List<ModelInfo> models = getAvailableModels();
+        if (!models.isEmpty()) {
+            return models.get(0).getId();
+        }
+        return "unknown";
     }
 
     private String generateTitle(String firstMessage) {

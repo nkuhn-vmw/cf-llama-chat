@@ -43,7 +43,7 @@
         <section>
             <div class="section-header">
                 <h2>MCP Server Configuration</h2>
-                <button class="add-btn" onclick="showAddModal()">
+                <button class="add-btn">
                     <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
                         <line x1="12" y1="5" x2="12" y2="19"></line>
                         <line x1="5" y1="12" x2="19" y2="12"></line>
@@ -91,8 +91,7 @@
                                 <label class="toggle-switch">
                                     <input type="checkbox"
                                            th:checked="${data.server.enabled}"
-                                           th:data-server-id="${data.server.id}"
-                                           onchange="toggleEnabled(this)">
+                                           th:data-server-id="${data.server.id}">
                                     <span class="toggle-slider"></span>
                                 </label>
                             </td>
@@ -100,23 +99,23 @@
                                 <button class="action-btn primary"
                                         th:data-server-id="${data.server.id}"
                                         th:if="${data.connectionState.status().name() != 'CONNECTED'}"
-                                        onclick="connectServer(this)">Connect</button>
+                                        data-action="connect">Connect</button>
                                 <button class="action-btn"
                                         th:data-server-id="${data.server.id}"
                                         th:if="${data.connectionState.status().name() == 'CONNECTED'}"
-                                        onclick="disconnectServer(this)">Disconnect</button>
+                                        data-action="disconnect">Disconnect</button>
                                 <button class="action-btn"
                                         th:data-server-id="${data.server.id}"
                                         th:if="${data.connectionState.status().name() == 'CONNECTED'}"
-                                        onclick="syncTools(this)">Sync Tools</button>
+                                        data-action="syncTools">Sync Tools</button>
                                 <button class="action-btn"
                                         th:data-server-id="${data.server.id}"
                                         th:data-server-name="${data.server.name}"
-                                        onclick="showEditModal(this)">Edit</button>
+                                        data-action="edit">Edit</button>
                                 <button class="action-btn danger"
                                         th:data-server-id="${data.server.id}"
                                         th:data-server-name="${data.server.name}"
-                                        onclick="showDeleteModal(this)">Delete</button>
+                                        data-action="delete">Delete</button>
                             </td>
                         </tr>
                     </tbody>
@@ -152,7 +151,7 @@
                 </div>
                 <div class="form-group">
                     <label for="transportType">Transport Type *</label>
-                    <select id="transportType" required onchange="updateTransportFields()">
+                    <select id="transportType" required>
                         <option value="SSE">SSE (Server-Sent Events)</option>
                         <option value="STREAMABLE_HTTP">Streamable HTTP</option>
                         <option value="STDIO">STDIO (Standard I/O)</option>
@@ -182,7 +181,7 @@
                     <small>JSON object of HTTP headers for authentication</small>
                 </div>
                 <div class="modal-actions">
-                    <button type="button" class="modal-btn cancel" onclick="closeServerModal()">Cancel</button>
+                    <button type="button" class="modal-btn cancel">Cancel</button>
                     <button type="submit" class="modal-btn save">Save</button>
                 </div>
             </form>
@@ -196,238 +195,13 @@
             <p>Are you sure you want to delete <strong id="deleteServerName"></strong>?</p>
             <p style="color: var(--text-muted); font-size: 0.9rem;">This will also remove all tools synced from this server.</p>
             <div class="modal-actions">
-                <button class="modal-btn cancel" onclick="closeDeleteModal()">Cancel</button>
+                <button class="modal-btn cancel">Cancel</button>
                 <button class="modal-btn confirm" id="confirmDeleteBtn">Delete</button>
             </div>
         </div>
     </div>
 
     <script th:src="@{/js/admin-toast.js}"></script>
-    <script>
-        const savedTheme = localStorage.getItem('theme') || 'dark';
-        document.body.setAttribute('data-theme', savedTheme);
-
-        let deleteServerId = null;
-
-        function updateTransportFields() {
-            const transportType = document.getElementById('transportType').value;
-            const urlGroup = document.getElementById('urlGroup');
-            const commandGroup = document.getElementById('commandGroup');
-            const argsGroup = document.getElementById('argsGroup');
-            const headersGroup = document.getElementById('headersGroup');
-
-            if (transportType === 'SSE' || transportType === 'STREAMABLE_HTTP') {
-                urlGroup.style.display = 'block';
-                commandGroup.style.display = 'none';
-                argsGroup.style.display = 'none';
-                headersGroup.style.display = 'block';
-                document.getElementById('serverUrl').required = true;
-                document.getElementById('serverCommand').required = false;
-            } else {
-                urlGroup.style.display = 'none';
-                commandGroup.style.display = 'block';
-                argsGroup.style.display = 'block';
-                headersGroup.style.display = 'none';
-                document.getElementById('serverUrl').required = false;
-                document.getElementById('serverCommand').required = true;
-            }
-        }
-
-        function showAddModal() {
-            document.getElementById('modalTitle').textContent = 'Add MCP Server';
-            document.getElementById('serverForm').reset();
-            document.getElementById('serverId').value = '';
-            updateTransportFields();
-            document.getElementById('serverModal').classList.add('open');
-        }
-
-        function showEditModal(btn) {
-            const serverId = btn.dataset.serverId;
-            document.getElementById('modalTitle').textContent = 'Edit MCP Server';
-
-            fetch(`/api/admin/mcp/servers`)
-                .then(response => response.json())
-                .then(servers => {
-                    const server = servers.find(s => s.id === serverId);
-                    if (server) {
-                        document.getElementById('serverId').value = server.id;
-                        document.getElementById('serverName').value = server.name || '';
-                        document.getElementById('serverDescription').value = server.description || '';
-                        document.getElementById('transportType').value = server.transportType || 'SSE';
-                        document.getElementById('serverUrl').value = server.url || '';
-                        document.getElementById('serverCommand').value = server.command || '';
-                        document.getElementById('serverArgs').value = server.args || '';
-                        document.getElementById('envVars').value = server.envVars || '';
-                        document.getElementById('serverHeaders').value = server.headers || '';
-                        updateTransportFields();
-                        document.getElementById('serverModal').classList.add('open');
-                    }
-                });
-        }
-
-        function closeServerModal() {
-            document.getElementById('serverModal').classList.remove('open');
-        }
-
-        document.getElementById('serverForm').addEventListener('submit', function(e) {
-            e.preventDefault();
-
-            const serverId = document.getElementById('serverId').value;
-            // Strip newlines and extra whitespace from headers (long tokens can wrap)
-            const headersRaw = document.getElementById('serverHeaders').value;
-            const headersCleaned = headersRaw.replace(/[\r\n]+/g, '').trim();
-            const data = {
-                name: document.getElementById('serverName').value,
-                description: document.getElementById('serverDescription').value,
-                transportType: document.getElementById('transportType').value,
-                url: document.getElementById('serverUrl').value,
-                command: document.getElementById('serverCommand').value,
-                args: document.getElementById('serverArgs').value,
-                envVars: document.getElementById('envVars').value,
-                headers: headersCleaned
-            };
-
-            const url = serverId ? `/api/admin/mcp/servers/${serverId}` : '/api/admin/mcp/servers';
-            const method = serverId ? 'PUT' : 'POST';
-
-            fetch(url, {
-                method: method,
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify(data)
-            })
-            .then(response => response.json())
-            .then(result => {
-                if (result.error) {
-                    toast.error(result.error);
-                } else {
-                    location.reload();
-                }
-            })
-            .catch(error => {
-                console.error('Error:', error);
-                toast.error('Failed to save server');
-            });
-        });
-
-        function toggleEnabled(checkbox) {
-            const serverId = checkbox.dataset.serverId;
-            const enabled = checkbox.checked;
-
-            fetch(`/api/admin/mcp/servers/${serverId}/enabled`, {
-                method: 'PUT',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ enabled })
-            })
-            .then(response => response.json())
-            .then(result => {
-                if (result.error) {
-                    toast.error(result.error);
-                    checkbox.checked = !enabled;
-                }
-            })
-            .catch(error => {
-                console.error('Error:', error);
-                checkbox.checked = !enabled;
-            });
-        }
-
-        function connectServer(btn) {
-            const serverId = btn.dataset.serverId;
-            btn.disabled = true;
-            btn.textContent = 'Connecting...';
-
-            fetch(`/api/admin/mcp/servers/${serverId}/connect`, { method: 'POST' })
-                .then(response => response.json())
-                .then(result => {
-                    if (result.error) {
-                        toast.error(result.error);
-                    }
-                    location.reload();
-                })
-                .catch(error => {
-                    console.error('Error:', error);
-                    toast.error('Failed to connect');
-                    location.reload();
-                });
-        }
-
-        function disconnectServer(btn) {
-            const serverId = btn.dataset.serverId;
-
-            fetch(`/api/admin/mcp/servers/${serverId}/disconnect`, { method: 'POST' })
-                .then(response => response.json())
-                .then(result => {
-                    if (result.error) {
-                        toast.error(result.error);
-                    }
-                    location.reload();
-                })
-                .catch(error => {
-                    console.error('Error:', error);
-                    toast.error('Failed to disconnect');
-                });
-        }
-
-        function syncTools(btn) {
-            const serverId = btn.dataset.serverId;
-            btn.disabled = true;
-            btn.textContent = 'Syncing...';
-
-            fetch(`/api/admin/mcp/servers/${serverId}/sync-tools`, { method: 'POST' })
-                .then(response => response.json())
-                .then(result => {
-                    if (result.error) {
-                        toast.error(result.error);
-                    } else {
-                        toast.success(`Synced ${result.toolCount} tools`);
-                    }
-                    location.reload();
-                })
-                .catch(error => {
-                    console.error('Error:', error);
-                    toast.error('Failed to sync tools');
-                    location.reload();
-                });
-        }
-
-        function showDeleteModal(btn) {
-            deleteServerId = btn.dataset.serverId;
-            document.getElementById('deleteServerName').textContent = btn.dataset.serverName;
-            document.getElementById('deleteModal').classList.add('open');
-        }
-
-        function closeDeleteModal() {
-            document.getElementById('deleteModal').classList.remove('open');
-            deleteServerId = null;
-        }
-
-        document.getElementById('confirmDeleteBtn').addEventListener('click', function() {
-            if (!deleteServerId) return;
-
-            fetch(`/api/admin/mcp/servers/${deleteServerId}`, { method: 'DELETE' })
-                .then(response => response.json())
-                .then(result => {
-                    if (result.error) {
-                        toast.error(result.error);
-                    } else {
-                        location.reload();
-                    }
-                })
-                .catch(error => {
-                    console.error('Error:', error);
-                    toast.error('Failed to delete server');
-                });
-
-            closeDeleteModal();
-        });
-
-        document.querySelectorAll('.modal-overlay').forEach(modal => {
-            modal.addEventListener('click', function(e) {
-                if (e.target === this) {
-                    this.classList.remove('open');
-                }
-            });
-        });
-    </script>
+    <script th:src="@{/js/admin-mcp.js}"></script>
 </body>
 </html>

@@ -2,9 +2,11 @@
 
 class ChatApp {
     constructor() {
-        this.conversationId = window.APP_DATA?.conversationId || null;
-        this.models = window.APP_DATA?.models || [];
-        this.currentUser = window.APP_DATA?.currentUser || null;
+        const appDataEl = document.getElementById('app-data');
+        const appData = appDataEl ? JSON.parse(appDataEl.textContent) : {};
+        this.conversationId = appData.conversationId || null;
+        this.models = appData.models || [];
+        this.currentUser = appData.currentUser || null;
         this.isStreaming = true;
         this.isWaiting = false;
         this.abortController = null;
@@ -310,50 +312,27 @@ class ChatApp {
     }
 
     initMarkdown() {
-        // Configure marked for enhanced code highlighting and GFM features
-        marked.setOptions({
-            highlight: function(code, lang) {
-                if (lang && hljs.getLanguage(lang)) {
-                    try {
-                        return hljs.highlight(code, { language: lang, ignoreIllegals: true }).value;
-                    } catch (e) {
-                        console.warn('Highlight error for language:', lang, e);
-                    }
-                }
+        // Custom renderer for marked v12 API (object parameters)
+        const renderer = {
+            code({ text, lang }) {
+                const validLang = lang && hljs.getLanguage(lang) ? lang : '';
+                const langClass = validLang ? `language-${validLang}` : '';
+                let highlighted;
                 try {
-                    return hljs.highlightAuto(code).value;
+                    highlighted = validLang
+                        ? hljs.highlight(text, { language: validLang, ignoreIllegals: true }).value
+                        : hljs.highlightAuto(text).value;
                 } catch (e) {
-                    return code;
+                    highlighted = text;
                 }
+                return `<pre><code class="hljs ${langClass}">${highlighted}</code></pre>`;
             },
-            breaks: true,
-            gfm: true,
-            headerIds: true,
-            mangle: false,
-            pedantic: false,
-            smartLists: true,
-            smartypants: true
-        });
-
-        // Custom renderer for enhanced output
-        const renderer = new marked.Renderer();
-
-        // Enhanced code block rendering with language class
-        renderer.code = function(code, language) {
-            const validLang = language && hljs.getLanguage(language) ? language : '';
-            const langClass = validLang ? `language-${validLang}` : '';
-            const highlighted = validLang
-                ? hljs.highlight(code, { language: validLang, ignoreIllegals: true }).value
-                : hljs.highlightAuto(code).value;
-            return `<pre><code class="hljs ${langClass}">${highlighted}</code></pre>`;
+            table({ header, body }) {
+                return `<div class="table-wrapper"><table class="markdown-table"><thead>${header}</thead><tbody>${body}</tbody></table></div>`;
+            }
         };
 
-        // Enhanced table rendering
-        renderer.table = function(header, body) {
-            return `<div class="table-wrapper"><table class="markdown-table"><thead>${header}</thead><tbody>${body}</tbody></table></div>`;
-        };
-
-        marked.use({ renderer });
+        marked.use({ renderer, breaks: true, gfm: true });
     }
 
     autoResizeTextarea() {
@@ -1154,12 +1133,18 @@ class ChatApp {
                     <div class="tool-toggle">
                         <input type="checkbox" ${isEnabled ? 'checked' : ''}
                                data-tool-id="${tool.id}"
-                               title="${isEnabled ? 'Disable tool' : 'Enable tool'}"
-                               onchange="window.chatApp.toggleToolEnabled(this)">
+                               title="${isEnabled ? 'Disable tool' : 'Enable tool'}">
                     </div>
                 </div>
             `;
         }).join('');
+
+        // Attach event listeners (CSP-compliant, no inline handlers)
+        this.toolsList.querySelectorAll('input[data-tool-id]').forEach(checkbox => {
+            checkbox.addEventListener('change', () => {
+                this.toggleToolEnabled(checkbox);
+            });
+        });
     }
 
     updateToolStats() {
@@ -1268,7 +1253,23 @@ class ChatApp {
     async uploadFiles(files) {
         if (!files || files.length === 0) return;
 
+        // Client-side file size validation (100MB default)
+        const maxSize = 100 * 1024 * 1024;
+        const oversized = [];
+        const valid = [];
         for (const file of files) {
+            if (file.size > maxSize) {
+                oversized.push(file.name);
+            } else {
+                valid.push(file);
+            }
+        }
+
+        if (oversized.length > 0) {
+            alert(`The following files exceed the maximum size of ${this.formatFileSize(maxSize)}:\n${oversized.join('\n')}`);
+        }
+
+        for (const file of valid) {
             await this.uploadSingleFile(file);
         }
 
@@ -1372,6 +1373,17 @@ function closeChangePasswordModal() {
 // Initialize app when DOM is ready
 document.addEventListener('DOMContentLoaded', () => {
     window.chatApp = new ChatApp();
+
+    // Change Password Modal Button Event Listeners
+    const changePasswordBtn = document.querySelector('[data-action="changePassword"]');
+    if (changePasswordBtn) {
+        changePasswordBtn.addEventListener('click', showChangePasswordModal);
+    }
+
+    const cancelChangePasswordBtn = document.querySelector('[data-action="cancelChangePassword"]');
+    if (cancelChangePasswordBtn) {
+        cancelChangePasswordBtn.addEventListener('click', closeChangePasswordModal);
+    }
 
     // Change Password Modal Handler
     const changePasswordModal = document.getElementById('changePasswordModal');

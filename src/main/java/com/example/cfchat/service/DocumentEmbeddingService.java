@@ -240,7 +240,7 @@ public class DocumentEmbeddingService {
                     .documentId(document.getId())
                     .filename(file.getOriginalFilename())
                     .status("FAILED")
-                    .message("Failed to process document: " + e.getMessage())
+                    .message("Failed to process document. Please check the file format and try again.")
                     .processingTimeMs(System.currentTimeMillis() - startTime)
                     .build();
         }

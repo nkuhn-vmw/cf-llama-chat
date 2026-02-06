@@ -261,11 +261,7 @@
         </div>
     </div>
 
-    <script>
-        // Apply saved theme
-        const savedTheme = localStorage.getItem('theme') || 'dark';
-        document.body.setAttribute('data-theme', savedTheme);
-    </script>
+    <script th:src="@{/js/admin-theme.js}"></script>
     <script th:src="@{/js/admin-toast.js}"></script>
 </body>
 </html>

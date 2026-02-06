@@ -97,7 +97,7 @@
                 <h2>Available Tools</h2>
                 <div class="filter-group">
                     <label for="mcpFilter">Filter by MCP Server:</label>
-                    <select id="mcpFilter" onchange="filterTools()">
+                    <select id="mcpFilter">
                         <option value="">All Servers</option>
                         <option th:each="server : ${mcpServers}"
                                 th:value="${server.id}"
@@ -139,8 +139,7 @@
                                 <label class="toggle-switch">
                                     <input type="checkbox"
                                            th:checked="${data.tool.enabled}"
-                                           th:data-tool-id="${data.tool.id}"
-                                           onchange="toggleEnabled(this)">
+                                           th:data-tool-id="${data.tool.id}">
                                     <span class="toggle-slider"></span>
                                 </label>
                             </td>
@@ -148,8 +147,7 @@
                                 <button class="action-btn"
                                         th:data-tool-id="${data.tool.id}"
                                         th:data-tool-name="${data.tool.displayName != null ? data.tool.displayName : data.tool.name}"
-                                        th:data-input-schema="${data.tool.inputSchema}"
-                                        onclick="showSchemaModal(this)">View Schema</button>
+                                        th:data-input-schema="${data.tool.inputSchema}">View Schema</button>
                             </td>
                         </tr>
                     </tbody>
@@ -175,82 +173,12 @@
                 No schema available
             </div>
             <div class="modal-actions">
-                <button class="modal-btn cancel" onclick="closeSchemaModal()">Close</button>
+                <button class="modal-btn cancel">Close</button>
             </div>
         </div>
     </div>
 
-    <script>
-        const savedTheme = localStorage.getItem('theme') || 'dark';
-        document.body.setAttribute('data-theme', savedTheme);
-
-        function filterTools() {
-            const mcpId = document.getElementById('mcpFilter').value;
-            const rows = document.querySelectorAll('#toolsTableBody tr');
-
-            rows.forEach(row => {
-                if (!mcpId || row.dataset.mcpId === mcpId) {
-                    row.style.display = '';
-                } else {
-                    row.style.display = 'none';
-                }
-            });
-        }
-
-        function toggleEnabled(checkbox) {
-            const toolId = checkbox.dataset.toolId;
-            const enabled = checkbox.checked;
-
-            fetch(`/api/admin/tools/${toolId}/enabled`, {
-                method: 'PUT',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ enabled })
-            })
-            .then(response => response.json())
-            .then(result => {
-                if (result.error) {
-                    toast.error(result.error);
-                    checkbox.checked = !enabled;
-                }
-            })
-            .catch(error => {
-                console.error('Error:', error);
-                checkbox.checked = !enabled;
-            });
-        }
-
-        function showSchemaModal(btn) {
-            const toolName = btn.dataset.toolName;
-            const inputSchema = btn.dataset.inputSchema;
-
-            document.getElementById('schemaToolName').textContent = toolName + ' - Input Schema';
-
-            let schemaDisplay = 'No schema available';
-            if (inputSchema && inputSchema !== 'null') {
-                try {
-                    const parsed = JSON.parse(inputSchema);
-                    schemaDisplay = JSON.stringify(parsed, null, 2);
-                } catch (e) {
-                    schemaDisplay = inputSchema;
-                }
-            }
-
-            document.getElementById('schemaContent').textContent = schemaDisplay;
-            document.getElementById('schemaModal').classList.add('open');
-        }
-
-        function closeSchemaModal() {
-            document.getElementById('schemaModal').classList.remove('open');
-        }
-
-        document.querySelectorAll('.modal-overlay').forEach(modal => {
-            modal.addEventListener('click', function(e) {
-                if (e.target === this) {
-                    this.classList.remove('open');
-                }
-            });
-        });
-    </script>
     <script th:src="@{/js/admin-toast.js}"></script>
+    <script th:src="@{/js/admin-tools.js}"></script>
 </body>
 </html>

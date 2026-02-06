@@ -102,13 +102,11 @@ public class DocumentStorageService {
             return "Invalid configuration: bucket name, region, access key, and secret key are required";
         }
 
-        try {
-            S3Client testClient = buildS3Client(config);
+        try (S3Client testClient = buildS3Client(config)) {
             HeadBucketRequest request = HeadBucketRequest.builder()
                     .bucket(config.getBucketName())
                     .build();
             testClient.headBucket(request);
-            testClient.close();
             return null; // Success
         } catch (NoSuchBucketException e) {
             return "Bucket does not exist: " + config.getBucketName();

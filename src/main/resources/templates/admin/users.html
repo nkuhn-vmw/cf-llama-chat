@@ -159,7 +159,6 @@
                             <td>
                                 <select class="role-select"
                                         th:data-user-id="${userData.user.id}"
-                                        onchange="updateRole(this)"
                                         th:disabled="${userData.user.id == currentUser.id}">
                                     <option value="USER" th:selected="${userData.user.role.name() == 'USER'}">User</option>
                                     <option value="ADMIN" th:selected="${userData.user.role.name() == 'ADMIN'}">Admin</option>
@@ -178,15 +177,13 @@
                                 <button th:if="${userData.user.authProvider.name() == 'LOCAL'}"
                                         class="action-btn reset"
                                         th:data-user-id="${userData.user.id}"
-                                        th:data-username="${userData.user.displayName != null ? userData.user.displayName : userData.user.username}"
-                                        onclick="showResetPasswordModal(this)">
+                                        th:data-username="${userData.user.displayName != null ? userData.user.displayName : userData.user.username}">
                                     Reset Password
                                 </button>
                                 <button class="action-btn danger"
                                         th:data-user-id="${userData.user.id}"
                                         th:data-username="${userData.user.displayName != null ? userData.user.displayName : userData.user.username}"
-                                        th:disabled="${userData.user.id == currentUser.id}"
-                                        onclick="showDeleteModal(this)">
+                                        th:disabled="${userData.user.id == currentUser.id}">
                                     Delete
                                 </button>
                             </td>
@@ -207,7 +204,7 @@
                 <label for="deleteConversations">Also delete user's conversations</label>
             </div>
             <div class="modal-actions">
-                <button class="modal-btn cancel" onclick="closeDeleteModal()">Cancel</button>
+                <button class="modal-btn cancel">Cancel</button>
                 <button class="modal-btn confirm" id="confirmDeleteBtn">Delete</button>
             </div>
         </div>
@@ -223,148 +220,13 @@
             <label class="modal-label" for="confirmNewPassword">Confirm Password</label>
             <input type="password" class="modal-input" id="confirmNewPassword" placeholder="Confirm new password">
             <div class="modal-actions">
-                <button class="modal-btn cancel" onclick="closeResetPasswordModal()">Cancel</button>
+                <button class="modal-btn cancel">Cancel</button>
                 <button class="modal-btn primary" id="confirmResetBtn">Reset Password</button>
             </div>
         </div>
     </div>
 
     <script th:src="@{/js/admin-toast.js}"></script>
-    <script>
-        // Apply saved theme
-        const savedTheme = localStorage.getItem('theme') || 'dark';
-        document.body.setAttribute('data-theme', savedTheme);
-
-        let deleteUserId = null;
-
-        function updateRole(select) {
-            const userId = select.dataset.userId;
-            const newRole = select.value;
-
-            fetch(`/api/admin/users/${userId}/role`, {
-                method: 'POST',
-                headers: {
-                    'Content-Type': 'application/json'
-                },
-                body: JSON.stringify({ role: newRole })
-            })
-            .then(response => response.json())
-            .then(data => {
-                if (data.error) {
-                    toast.error(data.error);
-                    location.reload();
-                }
-            })
-            .catch(error => {
-                console.error('Error updating role:', error);
-                toast.error('Failed to update role');
-                location.reload();
-            });
-        }
-
-        function showDeleteModal(btn) {
-            deleteUserId = btn.dataset.userId;
-            document.getElementById('deleteUsername').textContent = btn.dataset.username;
-            document.getElementById('deleteConversations').checked = false;
-            document.getElementById('deleteModal').classList.add('open');
-        }
-
-        function closeDeleteModal() {
-            document.getElementById('deleteModal').classList.remove('open');
-            deleteUserId = null;
-        }
-
-        document.getElementById('confirmDeleteBtn').addEventListener('click', function() {
-            if (!deleteUserId) return;
-
-            const deleteConversations = document.getElementById('deleteConversations').checked;
-
-            fetch(`/api/admin/users/${deleteUserId}?deleteConversations=${deleteConversations}`, {
-                method: 'DELETE'
-            })
-            .then(response => response.json())
-            .then(data => {
-                if (data.error) {
-                    toast.error(data.error);
-                } else {
-                    location.reload();
-                }
-            })
-            .catch(error => {
-                console.error('Error deleting user:', error);
-                toast.error('Failed to delete user');
-            });
-
-            closeDeleteModal();
-        });
-
-        // Close modal on overlay click
-        document.getElementById('deleteModal').addEventListener('click', function(e) {
-            if (e.target === this) {
-                closeDeleteModal();
-            }
-        });
-
-        // Reset Password Modal
-        let resetPasswordUserId = null;
-
-        function showResetPasswordModal(btn) {
-            resetPasswordUserId = btn.dataset.userId;
-            document.getElementById('resetUsername').textContent = btn.dataset.username;
-            document.getElementById('newPassword').value = '';
-            document.getElementById('confirmNewPassword').value = '';
-            document.getElementById('resetPasswordModal').classList.add('open');
-            document.getElementById('newPassword').focus();
-        }
-
-        function closeResetPasswordModal() {
-            document.getElementById('resetPasswordModal').classList.remove('open');
-            resetPasswordUserId = null;
-        }
-
-        document.getElementById('confirmResetBtn').addEventListener('click', function() {
-            if (!resetPasswordUserId) return;
-
-            const newPassword = document.getElementById('newPassword').value;
-            const confirmPassword = document.getElementById('confirmNewPassword').value;
-
-            if (!newPassword || newPassword.length < 8) {
-                toast.warning('Password must be at least 8 characters with uppercase, lowercase, and a number');
-                return;
-            }
-
-            if (newPassword !== confirmPassword) {
-                toast.warning('Passwords do not match');
-                return;
-            }
-
-            fetch(`/api/admin/users/${resetPasswordUserId}/reset-password`, {
-                method: 'POST',
-                headers: {
-                    'Content-Type': 'application/json'
-                },
-                body: JSON.stringify({ newPassword: newPassword })
-            })
-            .then(response => response.json())
-            .then(data => {
-                if (data.success) {
-                    toast.success('Password reset successfully');
-                    closeResetPasswordModal();
-                } else {
-                    toast.error(data.error || 'Failed to reset password');
-                }
-            })
-            .catch(error => {
-                console.error('Error resetting password:', error);
-                toast.error('Failed to reset password');
-            });
-        });
-
-        document.getElementById('resetPasswordModal').addEventListener('click', function(e) {
-            if (e.target === this) {
-                closeResetPasswordModal();
-            }
-        });
-    </script>
+    <script th:src="@{/js/admin-users.js}"></script>
 </body>
 </html>

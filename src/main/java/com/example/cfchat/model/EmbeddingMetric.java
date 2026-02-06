@@ -12,7 +12,9 @@ import java.util.UUID;
 @Entity
 @Table(name = "embedding_metrics", indexes = {
         @Index(name = "idx_embedding_metrics_user_id", columnList = "user_id"),
-        @Index(name = "idx_embedding_metrics_timestamp", columnList = "timestamp")
+        @Index(name = "idx_embedding_metrics_timestamp", columnList = "timestamp"),
+        @Index(name = "idx_embedding_metrics_model", columnList = "model"),
+        @Index(name = "idx_embedding_metrics_user_timestamp", columnList = "user_id, timestamp")
 })
 @Data
 @NoArgsConstructor

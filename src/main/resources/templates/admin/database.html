@@ -231,7 +231,7 @@
             <div class="section">
                 <div class="section-header">
                     <h2>Table Statistics</h2>
-                    <button class="refresh-btn" onclick="location.reload()">
+                    <button class="refresh-btn">
                         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
                             <polyline points="23 4 23 10 17 10"></polyline>
                             <polyline points="1 20 1 14 7 14"></polyline>
@@ -345,11 +345,11 @@
         <div class="tab-content" id="queries-tab" th:if="${isPostgres}">
             <div class="section">
                 <h2>Query Performance (Top 20 by Total Time)</h2>
-                <div th:if="${slowQueries != null && !slowQueries.isEmpty() && slowQueries[0].notice != null}" class="notice-box info">
-                    <p th:text="${slowQueries[0].notice}">Notice</p>
+                <div th:if="${slowQueries != null and !slowQueries.isEmpty() and slowQueries[0]['notice'] != null}" class="notice-box info">
+                    <p th:text="${slowQueries[0]['notice']}">Notice</p>
                     <p style="margin-top: 8px;">To enable query statistics, run: <code>CREATE EXTENSION pg_stat_statements;</code></p>
                 </div>
-                <div class="data-table" th:if="${slowQueries != null && !slowQueries.isEmpty() && slowQueries[0].notice == null}">
+                <div class="data-table" th:if="${slowQueries != null and !slowQueries.isEmpty() and slowQueries[0]['notice'] == null}">
                     <table>
                         <thead>
                             <tr>
@@ -371,7 +371,7 @@
                         </tbody>
                     </table>
                 </div>
-                <div class="empty-state" th:if="${slowQueries == null || slowQueries.isEmpty()}">
+                <div class="empty-state" th:if="${slowQueries == null or slowQueries.isEmpty()}">
                     <p>No query statistics available.</p>
                 </div>
             </div>
@@ -390,25 +390,7 @@
         </div>
     </div>
 
-    <script>
-        // Apply saved theme
-        const savedTheme = localStorage.getItem('theme') || 'dark';
-        document.body.setAttribute('data-theme', savedTheme);
-
-        // Tab switching
-        document.querySelectorAll('.tab-btn').forEach(btn => {
-            btn.addEventListener('click', () => {
-                // Remove active class from all tabs and content
-                document.querySelectorAll('.tab-btn').forEach(t => t.classList.remove('active'));
-                document.querySelectorAll('.tab-content').forEach(c => c.classList.remove('active'));
-
-                // Add active class to clicked tab and corresponding content
-                btn.classList.add('active');
-                const tabId = btn.dataset.tab + '-tab';
-                document.getElementById(tabId)?.classList.add('active');
-            });
-        });
-    </script>
     <script th:src="@{/js/admin-toast.js}"></script>
+    <script th:src="@{/js/admin-database.js}"></script>
 </body>
 </html>

@@ -120,8 +120,7 @@ public class SecurityConfig {
                 .successHandler(oauth2AuthenticationSuccessHandler())
                 .failureHandler((request, response, exception) -> {
                     log.error("OAuth2 authentication failed: {}", exception.getMessage(), exception);
-                    response.sendRedirect("/login.html?error=true&oauth_error=" +
-                        java.net.URLEncoder.encode(exception.getMessage(), java.nio.charset.StandardCharsets.UTF_8));
+                    response.sendRedirect("/login.html?error=true&oauth_error=authentication_failed");
                 })
             );
         } else {

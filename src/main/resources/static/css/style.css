@@ -24,8 +24,8 @@
     --bg-tertiary: #ececf1;
     --bg-hover: #e5e5e5;
     --text-primary: #1a1a1a;
-    --text-secondary: #6b6b6b;
-    --text-muted: #9b9b9b;
+    --text-secondary: #555555;
+    --text-muted: #707070;
     --border-color: #e5e5e5;
     --user-bg: #f0f0f0;
     --assistant-bg: transparent;
@@ -761,6 +761,11 @@ body {
 }
 
 /* Scrollbar Styling */
+* {
+    scrollbar-color: var(--border-color) transparent;
+    scrollbar-width: thin;
+}
+
 ::-webkit-scrollbar {
     width: 8px;
 }

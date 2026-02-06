@@ -207,7 +207,7 @@
                                 </a>
                                 <button th:if="${currentUser.authProvider.name() == 'LOCAL'}"
                                         type="button" class="user-menu-item"
-                                        onclick="showChangePasswordModal()">
+                                        data-action="changePassword">
                                     <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
                                         <rect x="3" y="11" width="18" height="11" rx="2" ry="2"></rect>
                                         <path d="M7 11V7a5 5 0 0 1 10 0v4"></path>
@@ -416,7 +416,7 @@
                     <input type="password" class="modal-input" id="confirmPasswordInput" placeholder="Confirm new password">
                 </div>
                 <div class="modal-actions">
-                    <button class="modal-btn cancel" onclick="closeChangePasswordModal()">Cancel</button>
+                    <button class="modal-btn cancel" data-action="cancelChangePassword">Cancel</button>
                     <button class="modal-btn primary" id="confirmChangePasswordBtn">Change Password</button>
                 </div>
             </div>
@@ -424,14 +424,7 @@
     </div>
 
     <!-- Hidden data for JavaScript -->
-    <script th:inline="javascript">
-        window.APP_DATA = {
-            conversationId: [[${conversationId}]],
-            models: [[${models}]],
-            currentUser: [[${currentUser}]],
-            orgTheme: [[${orgTheme}]]
-        };
-    </script>
+    <script id="app-data" type="application/json" th:utext="${appDataJson}"></script>
 
     <script src="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.9.0/highlight.min.js" integrity="sha512-bhQTUBx0/eFljAMCMf3GIIaQOYlubyME0JSQZQALV/WLu6p7MqI6+JuLGYRMfnyyG/6YPbqMJMfNL6JT/yCfA==" crossorigin="anonymous" referrerpolicy="no-referrer"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/marked/12.0.0/marked.min.js" integrity="sha512-tjg3xaTncXPnf/MIgJu/MByEYI2IFmq6iEByMFRk86WxMIARBilGFht01DToR6DKR2OAZSBYXYI+5yVe/BZZQA==" crossorigin="anonymous" referrerpolicy="no-referrer"></script>

@@ -6,15 +6,17 @@ import com.example.cfchat.model.User;
 import com.example.cfchat.service.ChatService;
 import com.example.cfchat.service.ConversationService;
 import com.example.cfchat.service.OrganizationService;
+import com.fasterxml.jackson.databind.ObjectMapper;
 import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Controller;
 import org.springframework.ui.Model;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
 
-import java.util.Optional;
-import java.util.UUID;
+import java.util.*;
 
+@Slf4j
 @Controller
 @RequiredArgsConstructor
 public class WebController {
@@ -23,6 +25,28 @@ public class WebController {
     private final ChatService chatService;
     private final UserService userService;
     private final OrganizationService organizationService;
+    private final ObjectMapper objectMapper;
+
+    private String buildAppDataJson(UUID conversationId, User currentUser) {
+        try {
+            Map<String, Object> data = new LinkedHashMap<>();
+            data.put("conversationId", conversationId);
+            data.put("models", chatService.getAvailableModels());
+            if (currentUser != null) {
+                Map<String, Object> userMap = new LinkedHashMap<>();
+                userMap.put("id", currentUser.getId());
+                userMap.put("username", currentUser.getUsername());
+                userMap.put("email", currentUser.getEmail());
+                userMap.put("displayName", currentUser.getDisplayName());
+                userMap.put("role", currentUser.getRole());
+                data.put("currentUser", userMap);
+            }
+            return objectMapper.writeValueAsString(data);
+        } catch (Exception e) {
+            log.error("Failed to serialize app data", e);
+            return "{}";
+        }
+    }
 
     @GetMapping("/")
     public String index(Model model) {
@@ -40,6 +64,7 @@ public class WebController {
 
         model.addAttribute("models", chatService.getAvailableModels());
         model.addAttribute("orgTheme", orgTheme);
+        model.addAttribute("appDataJson", buildAppDataJson(null, currentUser.orElse(null)));
         return "index";
     }
 
@@ -65,6 +90,7 @@ public class WebController {
         model.addAttribute("models", chatService.getAvailableModels());
         model.addAttribute("orgTheme", orgTheme.get());
         model.addAttribute("orgSlug", slug);
+        model.addAttribute("appDataJson", buildAppDataJson(null, currentUser.orElse(null)));
         return "index";
     }
 
@@ -92,6 +118,7 @@ public class WebController {
         model.addAttribute("conversationId", id);
         model.addAttribute("orgTheme", orgTheme.get());
         model.addAttribute("orgSlug", slug);
+        model.addAttribute("appDataJson", buildAppDataJson(id, currentUser.orElse(null)));
         return "index";
     }
 
@@ -114,6 +141,7 @@ public class WebController {
         model.addAttribute("models", chatService.getAvailableModels());
         model.addAttribute("conversationId", id);
         model.addAttribute("orgTheme", orgTheme);
+        model.addAttribute("appDataJson", buildAppDataJson(id, currentUser.orElse(null)));
         return "index";
     }
 }
