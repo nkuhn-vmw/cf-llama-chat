@@ -347,9 +347,11 @@ class ChatApp {
         this.isWaiting = true;
         this.sendBtn.disabled = true;
 
-        // Get selected model
+        // Get selected model — split on first colon only (model IDs may contain colons)
         const modelValue = this.modelSelect.value;
-        const [provider, model] = modelValue ? modelValue.split(':') : ['openai', 'gpt-4o-mini'];
+        const colonIdx = modelValue ? modelValue.indexOf(':') : -1;
+        const provider = colonIdx > -1 ? modelValue.substring(0, colonIdx) : 'openai';
+        const model = colonIdx > -1 ? modelValue.substring(colonIdx + 1) : (modelValue || 'gpt-4o-mini');
 
         // Add user message to UI
         this.addMessage('user', message);
