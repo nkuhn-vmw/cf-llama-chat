@@ -27,7 +27,7 @@ public class WebController {
     @GetMapping("/")
     public String index(Model model) {
         Optional<User> currentUser = userService.getCurrentUser();
-        OrganizationThemeDto orgTheme = OrganizationThemeDto.getDefaultTheme();
+        OrganizationThemeDto orgTheme = OrganizationThemeDto.createDefaultTheme();
 
         if (currentUser.isPresent()) {
             UUID userId = currentUser.get().getId();
@@ -98,7 +98,7 @@ public class WebController {
     @GetMapping("/chat/{id}")
     public String chat(@PathVariable UUID id, Model model) {
         Optional<User> currentUser = userService.getCurrentUser();
-        OrganizationThemeDto orgTheme = OrganizationThemeDto.getDefaultTheme();
+        OrganizationThemeDto orgTheme = OrganizationThemeDto.createDefaultTheme();
 
         if (currentUser.isPresent()) {
             UUID userId = currentUser.get().getId();

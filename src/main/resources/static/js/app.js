@@ -7,6 +7,7 @@ class ChatApp {
         this.currentUser = window.APP_DATA?.currentUser || null;
         this.isStreaming = true;
         this.isWaiting = false;
+        this.abortController = null;
         this.useDocumentContext = false;
         this.documentsAvailable = false;
         this.useTools = true;
@@ -20,6 +21,7 @@ class ChatApp {
         this.initTheme();
         this.initDocuments();
         this.initTools();
+        this.restoreModelSelection();
         this.scrollToBottom();
     }
 
@@ -96,12 +98,21 @@ class ChatApp {
         // Sidebar toggle for mobile
         this.sidebarToggle.addEventListener('click', () => {
             this.sidebar.classList.toggle('open');
+            const overlay = document.getElementById('sidebarOverlay');
+            if (overlay) overlay.classList.toggle('visible', this.sidebar.classList.contains('open'));
         });
 
         // Stream toggle
         this.streamToggle.addEventListener('change', (e) => {
             this.isStreaming = e.target.checked;
         });
+
+        // Model selection persistence
+        if (this.modelSelect) {
+            this.modelSelect.addEventListener('change', () => {
+                localStorage.setItem('selectedModel', this.modelSelect.value);
+            });
+        }
 
         // Conversation items click
         this.conversationsList.addEventListener('click', (e) => {
@@ -127,11 +138,13 @@ class ChatApp {
             });
         });
 
-        // Close sidebar on mobile when clicking outside
+        // Close sidebar on mobile when clicking outside or overlay
         document.addEventListener('click', (e) => {
             if (window.innerWidth <= 768) {
+                const overlay = document.getElementById('sidebarOverlay');
                 if (!this.sidebar.contains(e.target) && !this.sidebarToggle.contains(e.target)) {
                     this.sidebar.classList.remove('open');
+                    if (overlay) overlay.classList.remove('visible');
                 }
             }
         });
@@ -162,6 +175,16 @@ class ChatApp {
             this.clearHistoryBtn.addEventListener('click', () => {
                 this.clearAllHistory();
             });
+        }
+    }
+
+    restoreModelSelection() {
+        const saved = localStorage.getItem('selectedModel');
+        if (saved && this.modelSelect) {
+            const option = this.modelSelect.querySelector(`option[value="${saved}"]`);
+            if (option) {
+                this.modelSelect.value = saved;
+            }
         }
     }
 
@@ -423,12 +446,16 @@ class ChatApp {
     }
 
     async sendStreamingMessage(request, typingIndicator) {
+        this.abortController = new AbortController();
+        this.showCancelButton();
+
         const response = await fetch('/api/chat/stream', {
             method: 'POST',
             headers: {
                 'Content-Type': 'application/json'
             },
-            body: JSON.stringify(request)
+            body: JSON.stringify(request),
+            signal: this.abortController.signal
         });
 
         if (!response.ok) {
@@ -470,11 +497,15 @@ class ChatApp {
                             this.updateURL(data.conversationId);
                         }
 
-                        if (data.complete) {
+                        if (data.error) {
+                            streamComplete = true;
+                            textEl.innerHTML = DOMPurify.sanitize(`<div class="stream-error">${this.escapeHtml(data.error)}</div>`);
+                            this.scrollToBottom();
+                        } else if (data.complete) {
                             streamComplete = true;
                             // Final message with full HTML content from backend
                             if (data.htmlContent) {
-                                textEl.innerHTML = data.htmlContent;
+                                textEl.innerHTML = DOMPurify.sanitize(data.htmlContent);
                             }
                             this.highlightCode(textEl);
 
@@ -511,7 +542,7 @@ class ChatApp {
                             this.refreshConversationsList();
                         } else if (data.content) {
                             fullContent += data.content;
-                            textEl.innerHTML = marked.parse(fullContent);
+                            textEl.innerHTML = DOMPurify.sanitize(marked.parse(fullContent));
                             this.scrollToBottom();
                         }
                     } catch (e) {
@@ -521,12 +552,39 @@ class ChatApp {
             }
         }
 
+        this.hideCancelButton();
+        this.abortController = null;
+
         // Fallback: only re-render if stream ended without a complete event
         if (fullContent && !streamComplete) {
-            textEl.innerHTML = marked.parse(fullContent);
+            textEl.innerHTML = DOMPurify.sanitize(marked.parse(fullContent));
             this.highlightCode(textEl);
             this.scrollToBottom();
         }
+    }
+
+    showCancelButton() {
+        if (!this.sendBtn) return;
+        this.sendBtn.dataset.originalText = this.sendBtn.textContent;
+        this.sendBtn.textContent = 'Cancel';
+        this.sendBtn.classList.add('cancel-mode');
+        this.sendBtn.disabled = false;
+        this.sendBtn.onclick = () => this.cancelStream();
+    }
+
+    hideCancelButton() {
+        if (!this.sendBtn) return;
+        this.sendBtn.textContent = this.sendBtn.dataset.originalText || 'Send';
+        this.sendBtn.classList.remove('cancel-mode');
+        this.sendBtn.onclick = null;
+    }
+
+    cancelStream() {
+        if (this.abortController) {
+            this.abortController.abort();
+            this.abortController = null;
+        }
+        this.hideCancelButton();
     }
 
     addMessage(role, content, htmlContent = null, model = null) {
@@ -549,7 +607,7 @@ class ChatApp {
         div.className = `message ${role}`;
 
         const avatarText = role === 'user' ? 'U' : 'AI';
-        const displayContent = htmlContent || (content ? marked.parse(content) : '');
+        const displayContent = DOMPurify.sanitize(htmlContent || (content ? marked.parse(content) : ''));
 
         div.innerHTML = `
             <div class="message-avatar">${avatarText}</div>
@@ -1250,7 +1308,7 @@ class ChatApp {
                     this.uploadProgress.style.display = 'none';
                     this.progressFill.style.backgroundColor = '';
                 }
-            }, 2000);
+            }, 4000);
 
         } catch (error) {
             console.error('Error uploading file:', error);
@@ -1330,8 +1388,8 @@ document.addEventListener('DOMContentLoaded', () => {
                 return;
             }
 
-            if (!newPassword || newPassword.length < 6) {
-                alert('New password must be at least 6 characters');
+            if (!newPassword || newPassword.length < 8 || !/[A-Z]/.test(newPassword) || !/[a-z]/.test(newPassword) || !/\d/.test(newPassword)) {
+                alert('Password must be at least 8 characters with uppercase, lowercase, and a number');
                 return;
             }
 
@@ -1370,6 +1428,14 @@ document.addEventListener('DOMContentLoaded', () => {
         changePasswordModal.addEventListener('click', (e) => {
             if (e.target === changePasswordModal) {
                 closeChangePasswordModal();
+            }
+        });
+
+        // Enter key submits the password form
+        changePasswordModal.addEventListener('keydown', (e) => {
+            if (e.key === 'Enter' && confirmChangePasswordBtn) {
+                e.preventDefault();
+                confirmChangePasswordBtn.click();
             }
         });
     }

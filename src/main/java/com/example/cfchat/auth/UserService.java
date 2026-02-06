@@ -29,7 +29,7 @@ public class UserService {
     @Value("${app.admin.default-username:admin}")
     private String defaultAdminUsername;
 
-    @Value("${app.admin.default-password:Tanzu123!}")
+    @Value("${app.admin.default-password:}")
     private String defaultAdminPassword;
 
     @PostConstruct
@@ -44,16 +44,25 @@ public class UserService {
     public void createDefaultAdminIfNeeded() {
         long userCount = userRepository.count();
         if (userCount == 0) {
+            String password = defaultAdminPassword;
+            if (password == null || password.isBlank()) {
+                password = UUID.randomUUID().toString().replace("-", "").substring(0, 16);
+                log.warn("================================================================");
+                log.warn("  Generated admin password: {}", password);
+                log.warn("  Change this immediately after first login!");
+                log.warn("  Set app.admin.default-password to avoid this in future.");
+                log.warn("================================================================");
+            }
             log.info("No users found in database - creating default admin user");
             User admin = User.builder()
                     .username(defaultAdminUsername)
-                    .passwordHash(passwordEncoder.encode(defaultAdminPassword))
+                    .passwordHash(passwordEncoder.encode(password))
                     .displayName("Administrator")
                     .role(User.UserRole.ADMIN)
                     .authProvider(User.AuthProvider.LOCAL)
                     .build();
             userRepository.save(admin);
-            log.info("Created default admin user: {} (please change the password!)", defaultAdminUsername);
+            log.info("Created default admin user: {}", defaultAdminUsername);
         } else {
             log.debug("Database has {} users - skipping default admin creation", userCount);
         }
@@ -115,14 +124,10 @@ public class UserService {
             return Optional.empty();
         }
 
-        // Legacy user without password - set password on first login
+        // Legacy user without password - require admin password reset
         if (user.getPasswordHash() == null) {
-            log.info("Legacy user {} logging in for first time - setting password", username);
-            user.setPasswordHash(passwordEncoder.encode(password));
-            user.setLastLoginAt(LocalDateTime.now());
-            userRepository.save(user);
-            log.info("Password set for legacy user: {}", username);
-            return Optional.of(user);
+            log.warn("Legacy user {} has no password - login denied. Admin must reset password.", username);
+            return Optional.empty();
         }
 
         // Check password

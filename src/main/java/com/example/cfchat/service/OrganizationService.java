@@ -14,12 +14,19 @@ import org.springframework.transaction.annotation.Transactional;
 
 import java.util.List;
 import java.util.Optional;
+import java.util.Set;
 import java.util.UUID;
 
 @Service
 @RequiredArgsConstructor
 @Slf4j
 public class OrganizationService {
+
+    private static final Set<String> RESERVED_SLUGS = Set.of(
+            "admin", "api", "auth", "login", "register", "logout", "chat",
+            "settings", "profile", "metrics", "health", "error", "static",
+            "css", "js", "images", "fonts", "public", "system", "root"
+    );
 
     private final OrganizationRepository organizationRepository;
     private final UserRepository userRepository;
@@ -33,6 +40,10 @@ public class OrganizationService {
         String slug = request.getSlug();
         if (slug == null || slug.isBlank()) {
             slug = request.getName().toLowerCase().replaceAll("[^a-z0-9]+", "-");
+        }
+
+        if (RESERVED_SLUGS.contains(slug.toLowerCase())) {
+            throw new IllegalArgumentException("Slug '" + slug + "' is reserved and cannot be used");
         }
 
         if (organizationRepository.existsBySlug(slug)) {
@@ -77,6 +88,9 @@ public class OrganizationService {
         }
 
         if (request.getSlug() != null && !request.getSlug().equals(org.getSlug())) {
+            if (RESERVED_SLUGS.contains(request.getSlug().toLowerCase())) {
+                throw new IllegalArgumentException("Slug '" + request.getSlug() + "' is reserved and cannot be used");
+            }
             if (organizationRepository.existsBySlug(request.getSlug())) {
                 throw new IllegalArgumentException("Organization with slug '" + request.getSlug() + "' already exists");
             }
@@ -149,7 +163,7 @@ public class OrganizationService {
     @Transactional(readOnly = true)
     public OrganizationThemeDto getThemeForUser(User user) {
         if (user == null || user.getOrganization() == null) {
-            return OrganizationThemeDto.getDefaultTheme();
+            return OrganizationThemeDto.createDefaultTheme();
         }
         return OrganizationThemeDto.fromEntity(user.getOrganization());
     }
@@ -158,7 +172,7 @@ public class OrganizationService {
     public OrganizationThemeDto getThemeBySlug(String slug) {
         return organizationRepository.findBySlug(slug)
                 .map(OrganizationThemeDto::fromEntity)
-                .orElse(OrganizationThemeDto.getDefaultTheme());
+                .orElse(OrganizationThemeDto.createDefaultTheme());
     }
 
     @Transactional(readOnly = true)

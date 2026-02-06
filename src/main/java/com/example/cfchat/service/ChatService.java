@@ -116,13 +116,11 @@ public class ChatService {
             conversation = conversationService.createConversation(null, provider, model, userId);
             conversationId = conversation.getId();
         } else {
-            if (userId != null) {
-                conversation = conversationService.getConversationEntityForUser(conversationId, userId)
-                        .orElseThrow(() -> new IllegalArgumentException("Conversation not found"));
-            } else {
-                conversation = conversationService.getConversationEntity(conversationId)
-                        .orElseThrow(() -> new IllegalArgumentException("Conversation not found"));
+            if (userId == null) {
+                throw new IllegalStateException("Authentication required to access conversations");
             }
+            conversation = conversationService.getConversationEntityForUser(conversationId, userId)
+                    .orElseThrow(() -> new IllegalArgumentException("Conversation not found"));
         }
 
         // Save user message
@@ -217,13 +215,11 @@ public class ChatService {
             conversation = conversationService.createConversation(null, provider, model, userId);
             conversationId = conversation.getId();
         } else {
-            if (userId != null) {
-                conversation = conversationService.getConversationEntityForUser(conversationId, userId)
-                        .orElseThrow(() -> new IllegalArgumentException("Conversation not found"));
-            } else {
-                conversation = conversationService.getConversationEntity(conversationId)
-                        .orElseThrow(() -> new IllegalArgumentException("Conversation not found"));
+            if (userId == null) {
+                return Flux.error(new IllegalStateException("Authentication required to access conversations"));
             }
+            conversation = conversationService.getConversationEntityForUser(conversationId, userId)
+                    .orElseThrow(() -> new IllegalArgumentException("Conversation not found"));
         }
 
         final UUID finalConversationId = conversationId;
@@ -320,7 +316,19 @@ public class ChatService {
                     });
         }
 
-        return responseFlux.concatWith(Flux.defer(() -> {
+        return responseFlux
+                .timeout(java.time.Duration.ofMinutes(5))
+                .onErrorResume(e -> {
+                    log.error("Streaming error for conversation {}: {}", finalConversationId, e.getMessage());
+                    return Flux.just(ChatResponse.builder()
+                            .conversationId(finalConversationId)
+                            .content("")
+                            .error("Streaming interrupted: " + (e instanceof java.util.concurrent.TimeoutException ? "response timed out" : "connection error"))
+                            .streaming(false)
+                            .complete(true)
+                            .build());
+                })
+                .concatWith(Flux.defer(() -> {
             // Save complete response
             String completeResponse = fullResponse.toString();
             Message savedMessage = conversationService.addMessage(
@@ -600,8 +608,12 @@ public class ChatService {
 
         messages.add(new SystemMessage(systemPromptBuilder.toString()));
 
-        // Add conversation history
-        for (Message msg : conversation.getMessages()) {
+        // Add conversation history (sliding window: last 50 messages to stay within context limits)
+        List<Message> history = conversation.getMessages();
+        int maxHistoryMessages = 50;
+        int startIndex = Math.max(0, history.size() - maxHistoryMessages);
+        for (int i = startIndex; i < history.size(); i++) {
+            Message msg = history.get(i);
             if (msg.getRole() == Message.MessageRole.USER) {
                 messages.add(new UserMessage(msg.getContent()));
             } else if (msg.getRole() == Message.MessageRole.ASSISTANT) {
@@ -661,11 +673,18 @@ public class ChatService {
         if (firstMessage == null || firstMessage.isBlank()) {
             return "New Conversation";
         }
-        // Take first 50 characters or until first newline
-        String title = firstMessage.split("\n")[0];
-        if (title.length() > 50) {
-            title = title.substring(0, 47) + "...";
+        // Take first line, strip common conversational prefixes
+        String title = firstMessage.split("\n")[0].trim();
+        title = title.replaceFirst("(?i)^(hey|hi|hello|please|can you|could you|help me|i need|i want)\\s+", "");
+        // Capitalize first letter
+        if (!title.isEmpty()) {
+            title = Character.toUpperCase(title.charAt(0)) + title.substring(1);
         }
-        return title;
+        if (title.length() > 50) {
+            // Try to break at a word boundary
+            int breakAt = title.lastIndexOf(' ', 47);
+            title = (breakAt > 20 ? title.substring(0, breakAt) : title.substring(0, 47)) + "...";
+        }
+        return title.isEmpty() ? "New Conversation" : title;
     }
 }

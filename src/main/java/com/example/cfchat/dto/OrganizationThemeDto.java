@@ -34,7 +34,7 @@ public class OrganizationThemeDto {
 
     public static OrganizationThemeDto fromEntity(Organization org) {
         if (org == null) {
-            return getDefaultTheme();
+            return createDefaultTheme();
         }
         return OrganizationThemeDto.builder()
                 .name(org.getName())
@@ -56,7 +56,7 @@ public class OrganizationThemeDto {
                 .build();
     }
 
-    public static OrganizationThemeDto getDefaultTheme() {
+    public static OrganizationThemeDto createDefaultTheme() {
         return OrganizationThemeDto.builder()
                 .name("Default")
                 .slug("default")
