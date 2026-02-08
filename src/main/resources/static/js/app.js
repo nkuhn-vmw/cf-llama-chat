@@ -313,6 +313,9 @@ class ChatApp {
 
     initMarkdown() {
         // Custom renderer for marked v12 API (object parameters)
+        // Only override renderers that receive pre-rendered strings — NOT ones
+        // that receive tokens (tablecell, heading, paragraph etc.) since those
+        // need this.parser which may not be available in marked.use() context
         const renderer = {
             code({ text, lang }) {
                 const safeText = text || '';
@@ -330,6 +333,9 @@ class ChatApp {
             },
             table({ header, body }) {
                 return `<div class="table-wrapper"><table class="markdown-table"><thead>${header || ''}</thead><tbody>${body || ''}</tbody></table></div>`;
+            },
+            tablerow({ text }) {
+                return `<tr>${text || ''}</tr>\n`;
             }
         };
 
@@ -525,7 +531,12 @@ class ChatApp {
                                 this.refreshConversationsList();
                             } else if (data.content) {
                                 fullContent += data.content;
-                                textEl.innerHTML = DOMPurify.sanitize(marked.parse(fullContent));
+                                try {
+                                    textEl.innerHTML = DOMPurify.sanitize(marked.parse(fullContent));
+                                } catch (renderErr) {
+                                    // Partial markdown may fail to render — show raw text as fallback
+                                    textEl.textContent = fullContent;
+                                }
                                 this.scrollToBottom();
                             }
                         } catch (e) {
@@ -549,7 +560,7 @@ class ChatApp {
 
     showCancelButton() {
         if (!this.sendBtn) return;
-        this.sendBtn.dataset.originalText = this.sendBtn.textContent;
+        this._originalBtnHtml = this.sendBtn.innerHTML;
         this.sendBtn.textContent = 'Cancel';
         this.sendBtn.classList.add('cancel-mode');
         this.sendBtn.disabled = false;
@@ -558,7 +569,9 @@ class ChatApp {
 
     hideCancelButton() {
         if (!this.sendBtn) return;
-        this.sendBtn.textContent = this.sendBtn.dataset.originalText || 'Send';
+        if (this._originalBtnHtml) {
+            this.sendBtn.innerHTML = this._originalBtnHtml;
+        }
         this.sendBtn.classList.remove('cancel-mode');
         this.sendBtn.onclick = null;
     }
