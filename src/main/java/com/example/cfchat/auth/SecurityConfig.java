@@ -33,9 +33,12 @@ import org.springframework.security.web.csrf.CsrfToken;
 import org.springframework.security.web.csrf.CsrfTokenRequestAttributeHandler;
 import org.springframework.web.filter.OncePerRequestFilter;
 
+import com.example.cfchat.config.SsoConfig;
+
 import java.io.IOException;
 import java.util.Collections;
 import java.util.List;
+import java.util.Optional;
 
 @Configuration
 @EnableWebSecurity
@@ -50,11 +53,13 @@ public class SecurityConfig {
 
     private final Environment environment;
     private final UserService userService;
+    private final Optional<SsoConfig> ssoConfig;
 
-    public SecurityConfig(Environment environment, UserService userService) {
+    public SecurityConfig(Environment environment, UserService userService, Optional<SsoConfig> ssoConfig) {
         this.environment = environment;
         this.userService = userService;
-        log.info("SecurityConfig initialized");
+        this.ssoConfig = ssoConfig;
+        log.info("SecurityConfig initialized, ssoConfig present: {}", ssoConfig.isPresent());
     }
 
     public String getInvitationCode() {
@@ -277,13 +282,9 @@ public class SecurityConfig {
     }
 
     public boolean isSsoConfigured() {
-        String clientId = environment.getProperty("sso.client-id");
-        String authUri = environment.getProperty("sso.auth-uri");
-        boolean configured = clientId != null && !clientId.isEmpty() && authUri != null && !authUri.isEmpty();
-        log.debug("SSO configured check - clientId: {}, authUri: {}, result: {}",
-                clientId != null ? "present" : "null",
-                authUri != null ? "present" : "null",
-                configured);
+        boolean configured = ssoConfig.map(SsoConfig::isSsoConfigured).orElse(false);
+        log.debug("SSO configured check - ssoConfig present: {}, result: {}",
+                ssoConfig.isPresent(), configured);
         return configured;
     }
 

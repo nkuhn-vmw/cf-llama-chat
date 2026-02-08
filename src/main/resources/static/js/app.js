@@ -315,20 +315,21 @@ class ChatApp {
         // Custom renderer for marked v12 API (object parameters)
         const renderer = {
             code({ text, lang }) {
+                const safeText = text || '';
                 const validLang = lang && hljs.getLanguage(lang) ? lang : '';
                 const langClass = validLang ? `language-${validLang}` : '';
                 let highlighted;
                 try {
                     highlighted = validLang
-                        ? hljs.highlight(text, { language: validLang, ignoreIllegals: true }).value
-                        : hljs.highlightAuto(text).value;
+                        ? hljs.highlight(safeText, { language: validLang, ignoreIllegals: true }).value
+                        : hljs.highlightAuto(safeText).value;
                 } catch (e) {
-                    highlighted = text;
+                    highlighted = safeText;
                 }
                 return `<pre><code class="hljs ${langClass}">${highlighted}</code></pre>`;
             },
             table({ header, body }) {
-                return `<div class="table-wrapper"><table class="markdown-table"><thead>${header}</thead><tbody>${body}</tbody></table></div>`;
+                return `<div class="table-wrapper"><table class="markdown-table"><thead>${header || ''}</thead><tbody>${body || ''}</tbody></table></div>`;
             }
         };
 
@@ -430,117 +431,119 @@ class ChatApp {
         this.abortController = new AbortController();
         this.showCancelButton();
 
-        const response = await fetch('/api/chat/stream', {
-            method: 'POST',
-            headers: {
-                'Content-Type': 'application/json'
-            },
-            body: JSON.stringify(request),
-            signal: this.abortController.signal
-        });
+        try {
+            const response = await fetch('/api/chat/stream', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json'
+                },
+                body: JSON.stringify(request),
+                signal: this.abortController.signal
+            });
 
-        if (!response.ok) {
-            throw new Error('Failed to send message');
-        }
+            if (!response.ok) {
+                throw new Error('Failed to send message');
+            }
 
-        typingIndicator.remove();
+            typingIndicator.remove();
 
-        // Create assistant message element
-        const messageEl = this.createMessageElement('assistant', '');
-        this.messages.appendChild(messageEl);
-        const textEl = messageEl.querySelector('.message-text');
-        let fullContent = '';
-        let streamComplete = false;
+            // Create assistant message element
+            const messageEl = this.createMessageElement('assistant', '');
+            this.messages.appendChild(messageEl);
+            const textEl = messageEl.querySelector('.message-text');
+            let fullContent = '';
+            let streamComplete = false;
 
-        const reader = response.body.getReader();
-        const decoder = new TextDecoder();
-        let buffer = '';  // Buffer for incomplete SSE events
+            const reader = response.body.getReader();
+            const decoder = new TextDecoder();
+            let buffer = '';  // Buffer for incomplete SSE events
 
-        while (true) {
-            const { value, done } = await reader.read();
-            if (done) break;
+            while (true) {
+                const { value, done } = await reader.read();
+                if (done) break;
 
-            buffer += decoder.decode(value, { stream: true });
-            const lines = buffer.split('\n');
+                buffer += decoder.decode(value, { stream: true });
+                const lines = buffer.split('\n');
 
-            // Keep the last line in buffer if it's incomplete (doesn't end with newline)
-            buffer = lines.pop() || '';
+                // Keep the last line in buffer if it's incomplete (doesn't end with newline)
+                buffer = lines.pop() || '';
 
-            for (const line of lines) {
-                if (line.startsWith('data:')) {
-                    try {
-                        const jsonStr = line.slice(5).trim();
-                        if (!jsonStr) continue;
-                        const data = JSON.parse(jsonStr);
+                for (const line of lines) {
+                    if (line.startsWith('data:')) {
+                        try {
+                            const jsonStr = line.slice(5).trim();
+                            if (!jsonStr) continue;
+                            const data = JSON.parse(jsonStr);
 
-                        if (!this.conversationId && data.conversationId) {
-                            this.conversationId = data.conversationId;
-                            this.updateURL(data.conversationId);
-                        }
-
-                        if (data.error) {
-                            streamComplete = true;
-                            textEl.innerHTML = DOMPurify.sanitize(`<div class="stream-error">${this.escapeHtml(data.error)}</div>`);
-                            this.scrollToBottom();
-                        } else if (data.complete) {
-                            streamComplete = true;
-                            // Final message with full HTML content from backend
-                            if (data.htmlContent) {
-                                textEl.innerHTML = DOMPurify.sanitize(data.htmlContent);
-                            }
-                            this.highlightCode(textEl);
-
-                            // Add performance metrics if available (check for existence, not truthiness)
-                            const hasMetrics = data.timeToFirstTokenMs != null ||
-                                               data.tokensPerSecond != null ||
-                                               data.totalResponseTimeMs != null;
-
-                            if (hasMetrics) {
-                                const metaEl = messageEl.querySelector('.message-meta') ||
-                                    (() => {
-                                        const meta = document.createElement('div');
-                                        meta.className = 'message-meta';
-                                        messageEl.querySelector('.message-content').appendChild(meta);
-                                        return meta;
-                                    })();
-
-                                let metricsText = [];
-                                if (data.model) metricsText.push(data.model);
-                                if (data.tokensPerSecond != null && data.tokensPerSecond > 0) {
-                                    metricsText.push(`${data.tokensPerSecond.toFixed(1)} t/s`);
-                                }
-                                if (data.timeToFirstTokenMs != null) {
-                                    metricsText.push(`TTFT: ${data.timeToFirstTokenMs}ms`);
-                                }
-                                if (data.totalResponseTimeMs != null) {
-                                    metricsText.push(`Total: ${(data.totalResponseTimeMs / 1000).toFixed(1)}s`);
-                                }
-                                if (metricsText.length > 0) {
-                                    metaEl.textContent = metricsText.join(' | ');
-                                }
+                            if (!this.conversationId && data.conversationId) {
+                                this.conversationId = data.conversationId;
+                                this.updateURL(data.conversationId);
                             }
 
-                            this.refreshConversationsList();
-                        } else if (data.content) {
-                            fullContent += data.content;
-                            textEl.innerHTML = DOMPurify.sanitize(marked.parse(fullContent));
-                            this.scrollToBottom();
+                            if (data.error) {
+                                streamComplete = true;
+                                textEl.innerHTML = DOMPurify.sanitize(`<div class="stream-error">${this.escapeHtml(data.error)}</div>`);
+                                this.scrollToBottom();
+                            } else if (data.complete) {
+                                streamComplete = true;
+                                // Final message with full HTML content from backend
+                                if (data.htmlContent) {
+                                    textEl.innerHTML = DOMPurify.sanitize(data.htmlContent);
+                                }
+                                this.highlightCode(textEl);
+
+                                // Add performance metrics if available (check for existence, not truthiness)
+                                const hasMetrics = data.timeToFirstTokenMs != null ||
+                                                   data.tokensPerSecond != null ||
+                                                   data.totalResponseTimeMs != null;
+
+                                if (hasMetrics) {
+                                    const metaEl = messageEl.querySelector('.message-meta') ||
+                                        (() => {
+                                            const meta = document.createElement('div');
+                                            meta.className = 'message-meta';
+                                            messageEl.querySelector('.message-content').appendChild(meta);
+                                            return meta;
+                                        })();
+
+                                    let metricsText = [];
+                                    if (data.model) metricsText.push(data.model);
+                                    if (data.tokensPerSecond != null && data.tokensPerSecond > 0) {
+                                        metricsText.push(`${data.tokensPerSecond.toFixed(1)} t/s`);
+                                    }
+                                    if (data.timeToFirstTokenMs != null) {
+                                        metricsText.push(`TTFT: ${data.timeToFirstTokenMs}ms`);
+                                    }
+                                    if (data.totalResponseTimeMs != null) {
+                                        metricsText.push(`Total: ${(data.totalResponseTimeMs / 1000).toFixed(1)}s`);
+                                    }
+                                    if (metricsText.length > 0) {
+                                        metaEl.textContent = metricsText.join(' | ');
+                                    }
+                                }
+
+                                this.refreshConversationsList();
+                            } else if (data.content) {
+                                fullContent += data.content;
+                                textEl.innerHTML = DOMPurify.sanitize(marked.parse(fullContent));
+                                this.scrollToBottom();
+                            }
+                        } catch (e) {
+                            console.warn('SSE parse error:', e.message, 'Line:', line);
                         }
-                    } catch (e) {
-                        console.warn('SSE parse error:', e.message, 'Line:', line);
                     }
                 }
             }
-        }
 
-        this.hideCancelButton();
-        this.abortController = null;
-
-        // Fallback: only re-render if stream ended without a complete event
-        if (fullContent && !streamComplete) {
-            textEl.innerHTML = DOMPurify.sanitize(marked.parse(fullContent));
-            this.highlightCode(textEl);
-            this.scrollToBottom();
+            // Fallback: only re-render if stream ended without a complete event
+            if (fullContent && !streamComplete) {
+                textEl.innerHTML = DOMPurify.sanitize(marked.parse(fullContent));
+                this.highlightCode(textEl);
+                this.scrollToBottom();
+            }
+        } finally {
+            this.hideCancelButton();
+            this.abortController = null;
         }
     }
 
@@ -1022,13 +1025,13 @@ class ChatApp {
                     this.toolsBtn.style.display = this.toolsAvailable ? 'flex' : 'none';
                 }
 
-                // Set initial toggle state from saved preference
+                // Set initial toggle state from saved preference (defaults to true from constructor)
                 const savedPref = localStorage.getItem('useTools');
                 if (savedPref !== null) {
                     this.useTools = savedPref === 'true';
-                    if (this.useToolsToggle) {
-                        this.useToolsToggle.checked = this.useTools;
-                    }
+                }
+                if (this.useToolsToggle) {
+                    this.useToolsToggle.checked = this.useTools;
                 }
 
                 // Set up tools panel if tools are available
