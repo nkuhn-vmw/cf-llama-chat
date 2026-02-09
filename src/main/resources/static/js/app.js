@@ -178,6 +178,16 @@ class ChatApp {
                 this.clearAllHistory();
             });
         }
+
+        // Use tools toggle — registered here (synchronous) rather than in async
+        // initTools() to ensure the listener is always attached
+        if (this.useToolsToggle) {
+            this.useToolsToggle.addEventListener('change', (e) => {
+                this.useTools = e.target.checked;
+                localStorage.setItem('useTools', this.useTools);
+                console.debug('Tools toggle changed:', this.useTools);
+            });
+        }
     }
 
     restoreModelSelection() {
@@ -319,6 +329,7 @@ class ChatApp {
         const renderer = {
             code({ text, lang }) {
                 const safeText = text || '';
+                if (!safeText.trim()) return ''; // Skip empty code block outlines during streaming
                 const validLang = lang && hljs.getLanguage(lang) ? lang : '';
                 const langClass = validLang ? `language-${validLang}` : '';
                 let highlighted;
@@ -332,10 +343,16 @@ class ChatApp {
                 return `<pre><code class="hljs ${langClass}">${highlighted}</code></pre>`;
             },
             table({ header, body }) {
-                return `<div class="table-wrapper"><table class="markdown-table"><thead>${header || ''}</thead><tbody>${body || ''}</tbody></table></div>`;
+                if (!body) {
+                    // During streaming: header arrived but no body rows yet — show
+                    // header content as text instead of an empty table skeleton
+                    return header || '';
+                }
+                return `<div class="table-wrapper"><table class="markdown-table"><thead>${header || ''}</thead><tbody>${body}</tbody></table></div>`;
             },
             tablerow({ text }) {
-                return `<tr>${text || ''}</tr>\n`;
+                if (!text) return ''; // Skip empty rows during streaming
+                return `<tr>${text}</tr>\n`;
             }
         };
 
@@ -1078,14 +1095,6 @@ class ChatApp {
         if (this.closeToolsPanelBtn) {
             this.closeToolsPanelBtn.addEventListener('click', () => {
                 this.closeToolsPanel();
-            });
-        }
-
-        // Use tools toggle
-        if (this.useToolsToggle) {
-            this.useToolsToggle.addEventListener('change', (e) => {
-                this.useTools = e.target.checked;
-                localStorage.setItem('useTools', this.useTools);
             });
         }
     }
