@@ -16,6 +16,9 @@ class ChatApp {
         this.toolsAvailable = false;
         this.tools = [];
         this.toolPreferences = {};
+        this._renderPending = false;
+        this._lastRenderTime = 0;
+        this._renderThrottleMs = 80;
 
         this.initElements();
         this.initEventListeners();
@@ -359,6 +362,105 @@ class ChatApp {
         marked.use({ renderer, breaks: true, gfm: true });
     }
 
+    prepareStreamingContent(raw) {
+        let safe = raw;
+
+        // 1. Unclosed code fences — count ``` at start of lines
+        const fencePattern = /^```/gm;
+        const fences = safe.match(fencePattern);
+        if (fences && fences.length % 2 !== 0) {
+            // Odd number of fences means the last one is unclosed — trim to before it
+            const lastFenceIdx = safe.lastIndexOf('```');
+            safe = safe.substring(0, lastFenceIdx);
+        }
+
+        // 2. Incomplete tables — if trailing lines look like a header/separator
+        //    with no body rows, trim them
+        const lines = safe.split('\n');
+        let tableStart = -1;
+        for (let i = lines.length - 1; i >= 0; i--) {
+            const line = lines[i].trim();
+            if (!line) continue;
+            // Table separator line (|---|---|)
+            if (/^\|[\s\-:|]+\|$/.test(line)) {
+                tableStart = i;
+                continue;
+            }
+            // Table header line (| head | head |)
+            if (tableStart !== -1 && /^\|.+\|$/.test(line)) {
+                // Check if next non-empty line after separator exists (body row)
+                let hasBody = false;
+                for (let j = tableStart + 1; j < lines.length; j++) {
+                    const bodyLine = lines[j].trim();
+                    if (!bodyLine) continue;
+                    if (/^\|.+\|$/.test(bodyLine)) {
+                        hasBody = true;
+                    }
+                    break;
+                }
+                if (!hasBody) {
+                    safe = lines.slice(0, i).join('\n');
+                }
+            }
+            break;
+        }
+
+        // 3. Unclosed emphasis on the last line
+        const lastNewline = safe.lastIndexOf('\n');
+        const lastLine = safe.substring(lastNewline + 1);
+        // Count unmatched ** or * markers
+        const boldCount = (lastLine.match(/\*\*/g) || []).length;
+        if (boldCount % 2 !== 0) {
+            const idx = safe.lastIndexOf('**');
+            safe = safe.substring(0, idx);
+        } else {
+            // Check single * (but not **)
+            const stripped = lastLine.replace(/\*\*/g, '');
+            const italicCount = (stripped.match(/\*/g) || []).length;
+            if (italicCount % 2 !== 0) {
+                const idx = safe.lastIndexOf('*');
+                safe = safe.substring(0, idx);
+            }
+        }
+
+        // 4. Unclosed links — [ after last ]
+        const lastClose = safe.lastIndexOf(']');
+        const lastOpen = safe.lastIndexOf('[');
+        if (lastOpen > lastClose) {
+            safe = safe.substring(0, lastOpen);
+        }
+
+        return safe;
+    }
+
+    scheduleStreamingRender(textEl, fullContent) {
+        // Store the latest content — only the most recent matters
+        this._latestStreamContent = fullContent;
+        this._latestStreamTarget = textEl;
+
+        if (this._renderPending) return; // coalesce rapid chunks
+
+        const now = Date.now();
+        const elapsed = now - this._lastRenderTime;
+        const delay = Math.max(0, this._renderThrottleMs - elapsed);
+
+        this._renderPending = true;
+        setTimeout(() => {
+            requestAnimationFrame(() => {
+                if (!this._renderPending) return; // cancelled by complete event
+                try {
+                    const prepared = this.prepareStreamingContent(this._latestStreamContent);
+                    this._latestStreamTarget.innerHTML = DOMPurify.sanitize(marked.parse(prepared));
+                } catch (renderErr) {
+                    this._latestStreamTarget.textContent = this._latestStreamContent;
+                }
+                this._lastRenderTime = Date.now();
+                this._renderPending = false;
+                this.scrollToBottom();
+            });
+        }, delay);
+    }
+
     autoResizeTextarea() {
         this.messageInput.style.height = 'auto';
         this.messageInput.style.height = Math.min(this.messageInput.scrollHeight, 200) + 'px';
@@ -476,6 +578,7 @@ class ChatApp {
             const textEl = messageEl.querySelector('.message-text');
             let fullContent = '';
             let streamComplete = false;
+            this._renderPending = false;
 
             const reader = response.body.getReader();
             const decoder = new TextDecoder();
@@ -505,10 +608,12 @@ class ChatApp {
 
                             if (data.error) {
                                 streamComplete = true;
+                                this._renderPending = false;
                                 textEl.innerHTML = DOMPurify.sanitize(`<div class="stream-error">${this.escapeHtml(data.error)}</div>`);
                                 this.scrollToBottom();
                             } else if (data.complete) {
                                 streamComplete = true;
+                                this._renderPending = false;
                                 // Final message with full HTML content from backend
                                 if (data.htmlContent) {
                                     textEl.innerHTML = DOMPurify.sanitize(data.htmlContent);
@@ -548,13 +653,7 @@ class ChatApp {
                                 this.refreshConversationsList();
                             } else if (data.content) {
                                 fullContent += data.content;
-                                try {
-                                    textEl.innerHTML = DOMPurify.sanitize(marked.parse(fullContent));
-                                } catch (renderErr) {
-                                    // Partial markdown may fail to render — show raw text as fallback
-                                    textEl.textContent = fullContent;
-                                }
-                                this.scrollToBottom();
+                                this.scheduleStreamingRender(textEl, fullContent);
                             }
                         } catch (e) {
                             console.warn('SSE parse error:', e.message, 'Line:', line);
