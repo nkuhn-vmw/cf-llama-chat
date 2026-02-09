@@ -446,11 +446,10 @@ public class McpService {
             if (host == null || host.isBlank()) {
                 throw new IllegalArgumentException("MCP URL must have a valid host");
             }
-            // Block common internal addresses
+            // Block loopback and link-local addresses (allow site-local for CF-internal services)
             InetAddress addr = InetAddress.getByName(host);
-            if (addr.isLoopbackAddress() || addr.isLinkLocalAddress()
-                    || addr.isSiteLocalAddress() || addr.isAnyLocalAddress()) {
-                throw new IllegalArgumentException("MCP URL must not point to internal/private addresses");
+            if (addr.isLoopbackAddress() || addr.isLinkLocalAddress() || addr.isAnyLocalAddress()) {
+                throw new IllegalArgumentException("MCP URL must not point to loopback or link-local addresses");
             }
         } catch (IllegalArgumentException e) {
             throw e;

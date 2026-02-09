@@ -73,6 +73,8 @@ management:
       show-details: when-authorized
 
 app:
+  admin:
+    default-password: ${APP_ADMIN_DEFAULT_PASSWORD:Tanzu123}
   chat:
     default-provider: ${CHAT_PROVIDER:openai}
     system-prompt: |
