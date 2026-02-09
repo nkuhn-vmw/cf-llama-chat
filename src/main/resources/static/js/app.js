@@ -16,10 +16,6 @@ class ChatApp {
         this.toolsAvailable = false;
         this.tools = [];
         this.toolPreferences = {};
-        this._renderPending = false;
-        this._lastRenderTime = 0;
-        this._renderThrottleMs = 80;
-
         this.initElements();
         this.initEventListeners();
         this.initMarkdown();
@@ -324,15 +320,73 @@ class ChatApp {
         localStorage.setItem('theme', newTheme);
     }
 
+    // DOMPurify config that allows KaTeX MathML output
+    domPurifyConfig = {
+        ADD_TAGS: ['math', 'mi', 'mo', 'mn', 'ms', 'mtext', 'mrow', 'mfrac', 'msqrt',
+                   'mroot', 'msup', 'msub', 'msubsup', 'munder', 'mover', 'munderover',
+                   'mtable', 'mtr', 'mtd', 'mspace', 'mpadded', 'mphantom', 'mfenced',
+                   'menclose', 'semantics', 'annotation', 'annotation-xml'],
+        ADD_ATTR: ['mathvariant', 'fence', 'separator', 'accent', 'accentunder',
+                   'lspace', 'rspace', 'stretchy', 'symmetric', 'maxsize', 'minsize',
+                   'largeop', 'movablelimits', 'columnalign', 'rowalign', 'columnspan',
+                   'rowspan', 'columnlines', 'rowlines', 'frame', 'framespacing',
+                   'equalrows', 'equalcolumns', 'displaystyle', 'scriptlevel',
+                   'linethickness', 'depth', 'height', 'width', 'xmlns', 'encoding']
+    };
+
+    protectMathDelimiters(text) {
+        const blocks = [];
+        let result = text;
+        // Protect display math $$...$$ first (greedy within lines or across lines)
+        result = result.replace(/\$\$([\s\S]+?)\$\$/g, (match, inner) => {
+            const idx = blocks.length;
+            blocks.push({ type: 'block', content: match });
+            return `MATH_BLOCK_${idx}`;
+        });
+        // Protect inline math $...$ (non-greedy, single line, not preceded/followed by digit)
+        result = result.replace(/(?<!\$)\$(?!\$)(.+?)(?<!\$)\$(?!\$)/g, (match, inner) => {
+            // Skip if it looks like a currency amount (e.g. $100)
+            if (/^\d/.test(inner.trim())) return match;
+            const idx = blocks.length;
+            blocks.push({ type: 'inline', content: match });
+            return `MATH_INLINE_${idx}`;
+        });
+        return { text: result, blocks };
+    }
+
+    restoreMathDelimiters(html, blocks) {
+        let result = html;
+        for (let i = 0; i < blocks.length; i++) {
+            const placeholder = blocks[i].type === 'block' ? `MATH_BLOCK_${i}` : `MATH_INLINE_${i}`;
+            result = result.replace(placeholder, blocks[i].content);
+        }
+        return result;
+    }
+
+    renderMath(element) {
+        if (typeof renderMathInElement === 'function') {
+            try {
+                renderMathInElement(element, {
+                    delimiters: [
+                        { left: '$$', right: '$$', display: true },
+                        { left: '\\[', right: '\\]', display: true },
+                        { left: '$', right: '$', display: false },
+                        { left: '\\(', right: '\\)', display: false }
+                    ],
+                    throwOnError: false,
+                    ignoredTags: ['script', 'noscript', 'style', 'textarea', 'pre', 'code']
+                });
+            } catch (e) {
+                console.warn('KaTeX rendering error:', e);
+            }
+        }
+    }
+
     initMarkdown() {
-        // Custom renderer for marked v12 API (object parameters)
-        // Only override renderers that receive pre-rendered strings — NOT ones
-        // that receive tokens (tablecell, heading, paragraph etc.) since those
-        // need this.parser which may not be available in marked.use() context
+        // Custom renderer for marked v12 (positional arguments, not object destructuring)
         const renderer = {
-            code({ text, lang }) {
+            code(text, lang, escaped) {
                 const safeText = text || '';
-                if (!safeText.trim()) return ''; // Skip empty code block outlines during streaming
                 const validLang = lang && hljs.getLanguage(lang) ? lang : '';
                 const langClass = validLang ? `language-${validLang}` : '';
                 let highlighted;
@@ -345,17 +399,8 @@ class ChatApp {
                 }
                 return `<pre><code class="hljs ${langClass}">${highlighted}</code></pre>`;
             },
-            table({ header, body }) {
-                if (!body) {
-                    // During streaming: header arrived but no body rows yet — show
-                    // header content as text instead of an empty table skeleton
-                    return header || '';
-                }
-                return `<div class="table-wrapper"><table class="markdown-table"><thead>${header || ''}</thead><tbody>${body}</tbody></table></div>`;
-            },
-            tablerow({ text }) {
-                if (!text) return ''; // Skip empty rows during streaming
-                return `<tr>${text}</tr>\n`;
+            table(header, body) {
+                return `<div class="table-wrapper"><table class="markdown-table"><thead>${header || ''}</thead><tbody>${body || ''}</tbody></table></div>`;
             }
         };
 
@@ -365,100 +410,22 @@ class ChatApp {
     prepareStreamingContent(raw) {
         let safe = raw;
 
-        // 1. Unclosed code fences — count ``` at start of lines
+        // 1. Close unclosed code fences so partial code is visible during streaming
         const fencePattern = /^```/gm;
         const fences = safe.match(fencePattern);
         if (fences && fences.length % 2 !== 0) {
-            // Odd number of fences means the last one is unclosed — trim to before it
-            const lastFenceIdx = safe.lastIndexOf('```');
-            safe = safe.substring(0, lastFenceIdx);
+            safe = safe + '\n```';
         }
 
-        // 2. Incomplete tables — if trailing lines look like a header/separator
-        //    with no body rows, trim them
+        // 2. Close partial table rows (starts with | but doesn't end with |)
         const lines = safe.split('\n');
-        let tableStart = -1;
-        for (let i = lines.length - 1; i >= 0; i--) {
-            const line = lines[i].trim();
-            if (!line) continue;
-            // Table separator line (|---|---|)
-            if (/^\|[\s\-:|]+\|$/.test(line)) {
-                tableStart = i;
-                continue;
-            }
-            // Table header line (| head | head |)
-            if (tableStart !== -1 && /^\|.+\|$/.test(line)) {
-                // Check if next non-empty line after separator exists (body row)
-                let hasBody = false;
-                for (let j = tableStart + 1; j < lines.length; j++) {
-                    const bodyLine = lines[j].trim();
-                    if (!bodyLine) continue;
-                    if (/^\|.+\|$/.test(bodyLine)) {
-                        hasBody = true;
-                    }
-                    break;
-                }
-                if (!hasBody) {
-                    safe = lines.slice(0, i).join('\n');
-                }
-            }
-            break;
-        }
-
-        // 3. Unclosed emphasis on the last line
-        const lastNewline = safe.lastIndexOf('\n');
-        const lastLine = safe.substring(lastNewline + 1);
-        // Count unmatched ** or * markers
-        const boldCount = (lastLine.match(/\*\*/g) || []).length;
-        if (boldCount % 2 !== 0) {
-            const idx = safe.lastIndexOf('**');
-            safe = safe.substring(0, idx);
-        } else {
-            // Check single * (but not **)
-            const stripped = lastLine.replace(/\*\*/g, '');
-            const italicCount = (stripped.match(/\*/g) || []).length;
-            if (italicCount % 2 !== 0) {
-                const idx = safe.lastIndexOf('*');
-                safe = safe.substring(0, idx);
-            }
-        }
-
-        // 4. Unclosed links — [ after last ]
-        const lastClose = safe.lastIndexOf(']');
-        const lastOpen = safe.lastIndexOf('[');
-        if (lastOpen > lastClose) {
-            safe = safe.substring(0, lastOpen);
+        const lastLine = lines[lines.length - 1];
+        if (lastLine && lastLine.trimStart().startsWith('|') && !lastLine.trimEnd().endsWith('|')) {
+            lines[lines.length - 1] = lastLine + ' |';
+            safe = lines.join('\n');
         }
 
         return safe;
-    }
-
-    scheduleStreamingRender(textEl, fullContent) {
-        // Store the latest content — only the most recent matters
-        this._latestStreamContent = fullContent;
-        this._latestStreamTarget = textEl;
-
-        if (this._renderPending) return; // coalesce rapid chunks
-
-        const now = Date.now();
-        const elapsed = now - this._lastRenderTime;
-        const delay = Math.max(0, this._renderThrottleMs - elapsed);
-
-        this._renderPending = true;
-        setTimeout(() => {
-            requestAnimationFrame(() => {
-                if (!this._renderPending) return; // cancelled by complete event
-                try {
-                    const prepared = this.prepareStreamingContent(this._latestStreamContent);
-                    this._latestStreamTarget.innerHTML = DOMPurify.sanitize(marked.parse(prepared));
-                } catch (renderErr) {
-                    this._latestStreamTarget.textContent = this._latestStreamContent;
-                }
-                this._lastRenderTime = Date.now();
-                this._renderPending = false;
-                this.scrollToBottom();
-            });
-        }, delay);
     }
 
     autoResizeTextarea() {
@@ -578,7 +545,6 @@ class ChatApp {
             const textEl = messageEl.querySelector('.message-text');
             let fullContent = '';
             let streamComplete = false;
-            this._renderPending = false;
 
             const reader = response.body.getReader();
             const decoder = new TextDecoder();
@@ -608,17 +574,16 @@ class ChatApp {
 
                             if (data.error) {
                                 streamComplete = true;
-                                this._renderPending = false;
                                 textEl.innerHTML = DOMPurify.sanitize(`<div class="stream-error">${this.escapeHtml(data.error)}</div>`);
                                 this.scrollToBottom();
                             } else if (data.complete) {
                                 streamComplete = true;
-                                this._renderPending = false;
                                 // Final message with full HTML content from backend
                                 if (data.htmlContent) {
-                                    textEl.innerHTML = DOMPurify.sanitize(data.htmlContent);
+                                    textEl.innerHTML = DOMPurify.sanitize(data.htmlContent, this.domPurifyConfig);
                                 }
                                 this.highlightCode(textEl);
+                                this.renderMath(textEl);
 
                                 // Add performance metrics if available (check for existence, not truthiness)
                                 const hasMetrics = data.timeToFirstTokenMs != null ||
@@ -653,7 +618,9 @@ class ChatApp {
                                 this.refreshConversationsList();
                             } else if (data.content) {
                                 fullContent += data.content;
-                                this.scheduleStreamingRender(textEl, fullContent);
+                                const displayContent = this.prepareStreamingContent(fullContent);
+                                textEl.innerHTML = DOMPurify.sanitize(marked.parse(displayContent));
+                                this.scrollToBottom();
                             }
                         } catch (e) {
                             console.warn('SSE parse error:', e.message, 'Line:', line);
@@ -662,10 +629,35 @@ class ChatApp {
                 }
             }
 
+            // Flush any remaining data left in the SSE buffer (e.g. final event
+            // that arrived without a trailing newline before the connection closed)
+            if (!streamComplete && buffer.trim()) {
+                const remaining = buffer.trim();
+                if (remaining.startsWith('data:')) {
+                    try {
+                        const jsonStr = remaining.slice(5).trim();
+                        if (jsonStr) {
+                            const data = JSON.parse(jsonStr);
+                            if (data.complete && data.htmlContent) {
+                                streamComplete = true;
+                                textEl.innerHTML = DOMPurify.sanitize(data.htmlContent, this.domPurifyConfig);
+                                this.highlightCode(textEl);
+                                this.renderMath(textEl);
+                            } else if (data.content) {
+                                fullContent += data.content;
+                            }
+                        }
+                    } catch (e) {
+                        console.warn('SSE buffer flush parse error:', e.message);
+                    }
+                }
+            }
+
             // Fallback: only re-render if stream ended without a complete event
             if (fullContent && !streamComplete) {
                 textEl.innerHTML = DOMPurify.sanitize(marked.parse(fullContent));
                 this.highlightCode(textEl);
+                this.renderMath(textEl);
                 this.scrollToBottom();
             }
         } finally {
@@ -712,6 +704,7 @@ class ChatApp {
         const messageEl = this.createMessageElement(role, content, htmlContent, model);
         this.messages.appendChild(messageEl);
         this.highlightCode(messageEl);
+        this.renderMath(messageEl);
         this.scrollToBottom();
     }
 
@@ -720,7 +713,7 @@ class ChatApp {
         div.className = `message ${role}`;
 
         const avatarText = role === 'user' ? 'U' : 'AI';
-        const displayContent = DOMPurify.sanitize(htmlContent || (content ? marked.parse(content) : ''));
+        const displayContent = DOMPurify.sanitize(htmlContent || (content ? marked.parse(content) : ''), this.domPurifyConfig);
 
         div.innerHTML = `
             <div class="message-avatar">${avatarText}</div>
@@ -785,27 +778,83 @@ class ChatApp {
                 }
             }
 
-            // Create header with language label and copy button
+            // Create header with language label, edit and copy buttons
             const header = document.createElement('div');
             header.className = 'code-block-header';
             header.innerHTML = `
                 <span class="code-language">${this.escapeHtml(language)}</span>
-                <button class="copy-code-btn" title="Copy code">
-                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                        <rect x="9" y="9" width="13" height="13" rx="2" ry="2"></rect>
-                        <path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"></path>
-                    </svg>
-                    <span>Copy</span>
-                </button>
+                <div class="code-block-actions">
+                    <button class="edit-code-btn" title="Edit code">
+                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                            <path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"></path>
+                            <path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"></path>
+                        </svg>
+                        <span>Edit</span>
+                    </button>
+                    <button class="copy-code-btn" title="Copy code">
+                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                            <rect x="9" y="9" width="13" height="13" rx="2" ry="2"></rect>
+                            <path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"></path>
+                        </svg>
+                        <span>Copy</span>
+                    </button>
+                </div>
             `;
 
             // Insert header before the pre content
             pre.insertBefore(header, pre.firstChild);
 
+            // Add edit functionality
+            const editBtn = header.querySelector('.edit-code-btn');
+            editBtn.addEventListener('click', () => {
+                const isEditing = pre.classList.contains('editing');
+                if (isEditing) {
+                    // Save mode: read textarea, update code block, re-highlight
+                    const textarea = pre.querySelector('.code-edit-textarea');
+                    if (textarea) {
+                        block.textContent = textarea.value;
+                        hljs.highlightElement(block);
+                        textarea.remove();
+                        block.style.display = '';
+                        // Update line numbers if present
+                        const lineNums = pre.querySelector('.line-numbers');
+                        if (lineNums) {
+                            const lines = block.textContent.split('\n');
+                            lineNums.innerHTML = lines.map((_, i) => `<span>${i + 1}</span>`).join('');
+                            lineNums.style.display = '';
+                        }
+                    }
+                    pre.classList.remove('editing');
+                    editBtn.querySelector('span').textContent = 'Edit';
+                } else {
+                    // Edit mode: hide code, show textarea
+                    const textarea = document.createElement('textarea');
+                    textarea.className = 'code-edit-textarea';
+                    textarea.value = block.textContent;
+                    textarea.spellcheck = false;
+                    block.style.display = 'none';
+                    const lineNums = pre.querySelector('.line-numbers');
+                    if (lineNums) lineNums.style.display = 'none';
+                    pre.appendChild(textarea);
+                    // Auto-size textarea
+                    textarea.style.height = 'auto';
+                    textarea.style.height = textarea.scrollHeight + 'px';
+                    textarea.addEventListener('input', () => {
+                        textarea.style.height = 'auto';
+                        textarea.style.height = textarea.scrollHeight + 'px';
+                    });
+                    pre.classList.add('editing');
+                    editBtn.querySelector('span').textContent = 'Save';
+                    textarea.focus();
+                }
+            });
+
             // Add copy functionality
             const copyBtn = header.querySelector('.copy-code-btn');
             copyBtn.addEventListener('click', async () => {
-                const code = block.textContent;
+                const code = pre.classList.contains('editing')
+                    ? (pre.querySelector('.code-edit-textarea')?.value || block.textContent)
+                    : block.textContent;
                 try {
                     await navigator.clipboard.writeText(code);
                     copyBtn.classList.add('copied');
@@ -1499,6 +1548,11 @@ function closeChangePasswordModal() {
 // Initialize app when DOM is ready
 document.addEventListener('DOMContentLoaded', () => {
     window.chatApp = new ChatApp();
+
+    // Render math in any SSR-rendered messages
+    document.querySelectorAll('.message-text').forEach(el => {
+        window.chatApp.renderMath(el);
+    });
 
     // Change Password Modal Button Event Listeners
     const changePasswordBtn = document.querySelector('[data-action="changePassword"]');

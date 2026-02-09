@@ -468,7 +468,14 @@ body {
     letter-spacing: 0.5px;
 }
 
-.copy-code-btn {
+.code-block-actions {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+}
+
+.copy-code-btn,
+.edit-code-btn {
     display: flex;
     align-items: center;
     gap: 6px;
@@ -482,7 +489,8 @@ body {
     transition: all 0.2s;
 }
 
-.copy-code-btn:hover {
+.copy-code-btn:hover,
+.edit-code-btn:hover {
     background-color: var(--bg-hover);
     border-color: var(--accent-color);
     color: var(--text-primary);
@@ -494,9 +502,39 @@ body {
     color: var(--accent-color);
 }
 
-.copy-code-btn svg {
+.copy-code-btn svg,
+.edit-code-btn svg {
     width: 14px;
     height: 14px;
+}
+
+/* Code block edit mode */
+pre.editing .code-block-header {
+    border-bottom-color: var(--accent-color);
+}
+
+pre.editing .edit-code-btn {
+    background-color: rgba(16, 163, 127, 0.2);
+    border-color: var(--accent-color);
+    color: var(--accent-color);
+}
+
+.code-edit-textarea {
+    display: block;
+    width: 100%;
+    min-height: 60px;
+    padding: 16px;
+    background-color: transparent;
+    color: var(--text-primary);
+    border: none;
+    outline: none;
+    resize: none;
+    font-family: 'SF Mono', Monaco, 'Cascadia Code', 'Fira Code', monospace;
+    font-size: 0.875rem;
+    line-height: 1.6;
+    tab-size: 4;
+    overflow-x: auto;
+    white-space: pre;
 }
 
 /* Code block with line numbers */
@@ -1816,3 +1854,21 @@ body {
 .modal-btn.primary:hover {
     background-color: var(--accent-hover);
 }
+
+/* KaTeX Math Rendering */
+.katex-display {
+    overflow-x: auto;
+    overflow-y: hidden;
+    padding: 8px 0;
+    margin: 12px 0;
+    text-align: center;
+}
+
+.katex {
+    font-size: 1.1em;
+}
+
+.message-text .katex-display > .katex {
+    white-space: normal;
+}
+
