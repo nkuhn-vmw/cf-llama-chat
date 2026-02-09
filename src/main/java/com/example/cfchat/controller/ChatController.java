@@ -35,14 +35,14 @@ public class ChatController {
 
     @PostMapping
     public ResponseEntity<ChatResponse> chat(@Valid @RequestBody ChatRequest request) {
-        log.info("Received chat request for conversation: {}", request.getConversationId());
+        log.info("Received chat request for conversation: {}, useTools: {}", request.getConversationId(), request.isUseTools());
         ChatResponse response = chatService.chat(request);
         return ResponseEntity.ok(response);
     }
 
     @PostMapping(value = "/stream", produces = MediaType.TEXT_EVENT_STREAM_VALUE)
     public Flux<ChatResponse> chatStream(@Valid @RequestBody ChatRequest request) {
-        log.info("Received streaming chat request for conversation: {}", request.getConversationId());
+        log.info("Received streaming chat request for conversation: {}, useTools: {}", request.getConversationId(), request.isUseTools());
         return chatService.chatStream(request);
     }
 
