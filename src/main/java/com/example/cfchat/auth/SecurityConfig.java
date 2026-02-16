@@ -94,7 +94,7 @@ public class SecurityConfig {
             )
             .addFilterAfter(new CsrfCookieFilter(), BasicAuthenticationFilter.class)
             .authorizeHttpRequests(auth -> auth
-                .requestMatchers("/login.html", "/register.html", "/auth/provider", "/auth/login", "/auth/register", "/auth/check-username", "/auth/check-email", "/actuator/health", "/css/**", "/js/**", "/error").permitAll()
+                .requestMatchers("/login.html", "/register.html", "/auth/provider", "/auth/login", "/auth/register", "/auth/check-username", "/auth/check-email", "/actuator/health", "/css/**", "/js/**", "/manifest.json", "/sw.js", "/error").permitAll()
                 .requestMatchers("/admin/**", "/api/admin/**").hasRole("ADMIN")
                 .anyRequest().authenticated()
             )
