@@ -778,6 +778,7 @@ class ChatApp {
                                 }
                                 this.highlightCode(textEl);
                                 this.renderMath(textEl);
+                                this.renderArtifacts(textEl);
 
                                 // Update RTL direction based on final content
                                 if (fullContent) {
@@ -846,6 +847,7 @@ class ChatApp {
                                 textEl.innerHTML = this.sanitizeHtml(data.htmlContent);
                                 this.highlightCode(textEl);
                                 this.renderMath(textEl);
+                                this.renderArtifacts(textEl);
                             } else if (data.content) {
                                 fullContent += data.content;
                             }
@@ -861,6 +863,7 @@ class ChatApp {
                 textEl.innerHTML = this.renderMarkdownWithLatex(fullContent);
                 this.highlightCode(textEl);
                 this.renderMath(textEl);
+                this.renderArtifacts(textEl);
                 // Update RTL direction based on final content
                 messageEl.setAttribute('dir', this.detectDirection(fullContent));
                 this.scrollToBottom();
@@ -910,6 +913,7 @@ class ChatApp {
         this.messages.appendChild(messageEl);
         this.highlightCode(messageEl);
         this.renderMath(messageEl);
+        this.renderArtifacts(messageEl);
         this.scrollToBottom();
     }
 
@@ -980,6 +984,45 @@ class ChatApp {
         div.textContent = text;
         this.messages?.appendChild(div);
         this.scrollToBottom();
+    }
+
+    // Interactive Artifacts - renders HTML/SVG code blocks as sandboxed iframes
+    renderArtifacts(container) {
+        if (!container) return;
+        container.querySelectorAll('pre code').forEach(codeBlock => {
+            const lang = (codeBlock.className.match(/language-(\w+)/) || [])[1];
+            if (lang && ['html', 'svg'].includes(lang.toLowerCase())) {
+                const code = codeBlock.textContent;
+                const wrapper = document.createElement('div');
+                wrapper.className = 'artifact-container';
+                wrapper.style.cssText = 'margin: 8px 0; position: relative;';
+
+                const toggleBtn = document.createElement('button');
+                toggleBtn.textContent = '\u25b6 Run';
+                toggleBtn.className = 'artifact-toggle';
+                toggleBtn.style.cssText = 'background: var(--accent-color, #4a9eff); color: white; border: none; padding: 4px 12px; border-radius: 4px; cursor: pointer; font-size: 12px; margin-bottom: 4px;';
+
+                const iframe = document.createElement('iframe');
+                iframe.sandbox = 'allow-scripts';
+                iframe.style.cssText = 'width:100%;border:1px solid var(--border-color, #ddd);border-radius:8px;min-height:200px;display:none;background:white;';
+
+                toggleBtn.addEventListener('click', () => {
+                    if (iframe.style.display === 'none') {
+                        iframe.srcdoc = code;
+                        iframe.style.display = 'block';
+                        toggleBtn.textContent = '\u25bc Hide';
+                    } else {
+                        iframe.style.display = 'none';
+                        iframe.srcdoc = '';
+                        toggleBtn.textContent = '\u25b6 Run';
+                    }
+                });
+
+                wrapper.appendChild(toggleBtn);
+                wrapper.appendChild(iframe);
+                codeBlock.parentElement.after(wrapper);
+            }
+        });
     }
 
     highlightCode(element) {

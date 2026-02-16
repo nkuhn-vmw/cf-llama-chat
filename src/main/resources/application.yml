@@ -175,3 +175,9 @@ translation:
   provider: ${TRANSLATION_PROVIDER:libretranslate}
   libretranslate:
     url: ${LIBRETRANSLATE_URL:http://localhost:5000}
+
+# Storage configuration
+storage:
+  provider: ${STORAGE_PROVIDER:local}
+  local:
+    path: ${STORAGE_LOCAL_PATH:/tmp/cf-llama-uploads}

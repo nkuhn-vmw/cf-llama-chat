@@ -52,6 +52,10 @@ public class Message {
     @Column(name = "token_count")
     private Integer tokenCount;
 
+    @Column(name = "favorited")
+    @Builder.Default
+    private Boolean favorited = false;
+
     @Column(name = "created_at", nullable = false, updatable = false)
     private LocalDateTime createdAt;
 

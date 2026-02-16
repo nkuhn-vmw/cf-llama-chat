@@ -51,6 +51,12 @@ class ConversationControllerTest {
     @MockBean
     private com.example.cfchat.service.SystemSettingService systemSettingService;
 
+    @MockBean
+    private com.example.cfchat.repository.ConversationRepository conversationRepository;
+
+    @MockBean
+    private com.example.cfchat.repository.MessageRepository messageRepository;
+
     @Test
     @WithMockUser(username = "testuser")
     void getAllConversations_authenticated_returnsUserConversations() throws Exception {

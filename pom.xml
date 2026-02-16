@@ -206,6 +206,12 @@
             <artifactId>spring-boot-starter-data-redis</artifactId>
             <optional>true</optional>
         </dependency>
+        <!-- Redis Session (optional, for distributed sessions) -->
+        <dependency>
+            <groupId>org.springframework.session</groupId>
+            <artifactId>spring-session-data-redis</artifactId>
+            <optional>true</optional>
+        </dependency>
 
         <!-- Testing -->
         <dependency>

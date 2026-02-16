@@ -184,4 +184,17 @@ public class ConversationService {
         return conversationRepository.findArchivedByUserId(userId, pageable)
                 .map(c -> ConversationDto.fromEntity(c, false));
     }
+
+    @Transactional
+    public Conversation cloneConversation(UUID conversationId, UUID userId) {
+        Conversation original = conversationRepository.findByIdAndUserIdWithMessages(conversationId, userId)
+            .orElseThrow(() -> new IllegalArgumentException("Conversation not found"));
+        Conversation clone = createConversation(original.getTitle() + " (copy)", null, original.getModelName(), userId);
+        if (original.getMessages() != null) {
+            original.getMessages().stream()
+                .filter(m -> Boolean.TRUE.equals(m.getActive()))
+                .forEach(m -> addMessage(clone.getId(), m.getRole(), m.getContent(), m.getModelUsed()));
+        }
+        return clone;
+    }
 }
