@@ -6,6 +6,7 @@ import com.example.cfchat.dto.MessageDto;
 import com.example.cfchat.model.User;
 import com.example.cfchat.service.ConversationService;
 import com.example.cfchat.service.MarkdownService;
+import com.example.cfchat.service.SystemSettingService;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.data.domain.Page;
@@ -27,6 +28,7 @@ public class ConversationController {
     private final ConversationService conversationService;
     private final MarkdownService markdownService;
     private final UserService userService;
+    private final SystemSettingService systemSettingService;
 
     @GetMapping
     public ResponseEntity<List<ConversationDto>> getAllConversations() {
@@ -100,6 +102,15 @@ public class ConversationController {
         if (!conversationService.isOwnedByUser(id, userId)) {
             return ResponseEntity.status(403).build();
         }
+        // Check if chat deletion is prevented for non-admin users
+        if (systemSettingService.getBooleanSetting("prevent_chat_deletion", false)) {
+            Optional<User> currentUser = userService.getCurrentUser();
+            if (currentUser.isEmpty() || currentUser.get().getRole() != User.UserRole.ADMIN) {
+                log.warn("Non-admin user {} attempted to delete conversation {} while deletion is prevented",
+                        currentUser.map(User::getUsername).orElse("unknown"), id);
+                return ResponseEntity.status(403).build();
+            }
+        }
         conversationService.deleteConversation(id);
         return ResponseEntity.noContent().build();
     }
@@ -169,6 +180,17 @@ public class ConversationController {
     public ResponseEntity<Map<String, Object>> clearAllConversations() {
         UUID userId = requireUserId();
         Optional<User> currentUser = userService.getCurrentUser();
+
+        // Check if chat deletion is prevented for non-admin users
+        if (systemSettingService.getBooleanSetting("prevent_chat_deletion", false)) {
+            if (currentUser.isEmpty() || currentUser.get().getRole() != User.UserRole.ADMIN) {
+                log.warn("Non-admin user {} attempted to clear all conversations while deletion is prevented",
+                        currentUser.map(User::getUsername).orElse("unknown"));
+                return ResponseEntity.status(403).body(Map.of(
+                        "error", "Chat deletion is currently disabled by administrator"
+                ));
+            }
+        }
 
         int deletedCount = conversationService.deleteAllConversationsForUser(userId);
         log.info("User {} cleared all {} conversations",

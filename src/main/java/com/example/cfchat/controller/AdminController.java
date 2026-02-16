@@ -14,6 +14,7 @@ import com.example.cfchat.repository.UserDocumentRepository;
 import com.example.cfchat.service.ChatService;
 import com.example.cfchat.service.ConversationService;
 import com.example.cfchat.service.DatabaseStatsService;
+import com.example.cfchat.service.SystemSettingService;
 import com.example.cfchat.service.UserAccessService;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -41,6 +42,7 @@ public class AdminController {
     private final EmbeddingMetricRepository embeddingMetricRepository;
     private final UserAccessRepository userAccessRepository;
     private final UserDocumentRepository userDocumentRepository;
+    private final SystemSettingService systemSettingService;
 
     @Value("${spring.profiles.active:default}")
     private String activeProfile;
@@ -57,7 +59,8 @@ public class AdminController {
             UsageMetricRepository usageMetricRepository,
             EmbeddingMetricRepository embeddingMetricRepository,
             UserAccessRepository userAccessRepository,
-            @Autowired(required = false) UserDocumentRepository userDocumentRepository) {
+            @Autowired(required = false) UserDocumentRepository userDocumentRepository,
+            SystemSettingService systemSettingService) {
         this.userService = userService;
         this.conversationService = conversationService;
         this.conversationRepository = conversationRepository;
@@ -70,6 +73,7 @@ public class AdminController {
         this.embeddingMetricRepository = embeddingMetricRepository;
         this.userAccessRepository = userAccessRepository;
         this.userDocumentRepository = userDocumentRepository;
+        this.systemSettingService = systemSettingService;
     }
 
     @GetMapping("/admin")
@@ -573,5 +577,36 @@ public class AdminController {
         } else {
             return ResponseEntity.badRequest().body(Map.of("error", "Failed to reset password"));
         }
+    }
+
+    @GetMapping("/api/admin/settings")
+    @ResponseBody
+    public ResponseEntity<Map<String, Object>> getSettings() {
+        Optional<User> currentUser = userService.getCurrentUser();
+        if (currentUser.isEmpty() || currentUser.get().getRole() != User.UserRole.ADMIN) {
+            return ResponseEntity.status(403).build();
+        }
+
+        Map<String, Object> settings = new HashMap<>();
+        settings.put("prevent_chat_deletion", systemSettingService.getBooleanSetting("prevent_chat_deletion", false));
+        return ResponseEntity.ok(settings);
+    }
+
+    @PostMapping("/api/admin/settings/prevent-deletion")
+    @ResponseBody
+    public ResponseEntity<?> setPreventDeletion(@RequestBody Map<String, Boolean> body) {
+        Optional<User> currentUser = userService.getCurrentUser();
+        if (currentUser.isEmpty() || currentUser.get().getRole() != User.UserRole.ADMIN) {
+            return ResponseEntity.status(403).body(Map.of("error", "Forbidden"));
+        }
+
+        Boolean enabled = body.get("enabled");
+        if (enabled == null) {
+            return ResponseEntity.badRequest().body(Map.of("error", "'enabled' field is required"));
+        }
+
+        systemSettingService.setSetting("prevent_chat_deletion", enabled.toString());
+        log.info("Admin {} set prevent_chat_deletion to {}", currentUser.get().getUsername(), enabled);
+        return ResponseEntity.ok(Map.of("success", true, "prevent_chat_deletion", enabled));
     }
 }

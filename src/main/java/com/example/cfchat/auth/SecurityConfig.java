@@ -54,12 +54,18 @@ public class SecurityConfig {
     private final Environment environment;
     private final UserService userService;
     private final Optional<SsoConfig> ssoConfig;
+    private final Optional<org.springframework.security.authentication.AuthenticationProvider> ldapAuthenticationProvider;
 
-    public SecurityConfig(Environment environment, UserService userService, Optional<SsoConfig> ssoConfig) {
+    public SecurityConfig(Environment environment, UserService userService, Optional<SsoConfig> ssoConfig,
+                          @org.springframework.beans.factory.annotation.Autowired(required = false)
+                          @org.springframework.beans.factory.annotation.Qualifier("ldapAuthenticationProvider")
+                          org.springframework.security.authentication.AuthenticationProvider ldapAuthenticationProvider) {
         this.environment = environment;
         this.userService = userService;
         this.ssoConfig = ssoConfig;
-        log.info("SecurityConfig initialized, ssoConfig present: {}", ssoConfig.isPresent());
+        this.ldapAuthenticationProvider = Optional.ofNullable(ldapAuthenticationProvider);
+        log.info("SecurityConfig initialized, ssoConfig present: {}, ldapProvider present: {}",
+                ssoConfig.isPresent(), this.ldapAuthenticationProvider.isPresent());
     }
 
     public String getInvitationCode() {
@@ -90,11 +96,11 @@ public class SecurityConfig {
             .csrf(csrf -> csrf
                 .csrfTokenRepository(CookieCsrfTokenRepository.withHttpOnlyFalse())
                 .csrfTokenRequestHandler(new CsrfTokenRequestAttributeHandler())
-                .ignoringRequestMatchers("/auth/**", "/logout")
+                .ignoringRequestMatchers("/auth/**", "/logout", "/scim/**")
             )
             .addFilterAfter(new CsrfCookieFilter(), BasicAuthenticationFilter.class)
             .authorizeHttpRequests(auth -> auth
-                .requestMatchers("/login.html", "/register.html", "/auth/provider", "/auth/login", "/auth/register", "/auth/check-username", "/auth/check-email", "/actuator/health", "/css/**", "/js/**", "/manifest.json", "/sw.js", "/error").permitAll()
+                .requestMatchers("/login.html", "/register.html", "/auth/provider", "/auth/login", "/auth/register", "/auth/check-username", "/auth/check-email", "/actuator/health", "/css/**", "/js/**", "/manifest.json", "/sw.js", "/error", "/scim/**").permitAll()
                 .requestMatchers("/admin/**", "/api/admin/**").hasRole("ADMIN")
                 .anyRequest().authenticated()
             )
@@ -138,6 +144,11 @@ public class SecurityConfig {
     @Bean
     public AuthenticationManager authenticationManager(HttpSecurity http) throws Exception {
         AuthenticationManagerBuilder authBuilder = http.getSharedObject(AuthenticationManagerBuilder.class);
+        // Register LDAP provider first if available (it will try LDAP auth before local)
+        ldapAuthenticationProvider.ifPresent(provider -> {
+            log.info("Registering LDAP authentication provider");
+            authBuilder.authenticationProvider(provider);
+        });
         authBuilder.authenticationProvider(formLoginAuthenticationProvider());
         return authBuilder.build();
     }

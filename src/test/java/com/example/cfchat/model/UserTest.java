@@ -31,7 +31,9 @@ class UserTest {
 
     @Test
     void authProvider_values_containsExpected() {
-        assertThat(User.AuthProvider.values()).containsExactly(User.AuthProvider.LOCAL, User.AuthProvider.SSO);
+        assertThat(User.AuthProvider.values()).containsExactly(
+                User.AuthProvider.LOCAL, User.AuthProvider.SSO,
+                User.AuthProvider.LDAP, User.AuthProvider.SCIM);
     }
 
     @Test

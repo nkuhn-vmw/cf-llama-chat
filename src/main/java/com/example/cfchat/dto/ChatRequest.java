@@ -40,4 +40,12 @@ public class ChatRequest {
      */
     @Builder.Default
     private boolean useTools = true;
+
+    /**
+     * Whether this is a temporary (ephemeral) chat.
+     * When true, messages are not persisted to the database.
+     * The conversation exists only for the duration of the session.
+     */
+    @Builder.Default
+    private boolean temporary = false;
 }

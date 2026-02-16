@@ -36,6 +36,8 @@ import java.util.UUID;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.concurrent.atomic.AtomicLong;
+import java.util.regex.Matcher;
+import java.util.regex.Pattern;
 
 @Service
 @Slf4j
@@ -55,6 +57,10 @@ public class ChatService {
     private final McpToolCallbackCacheService mcpToolCallbackCacheService;
     private final DocumentEmbeddingService documentEmbeddingService;
     private final ExternalBindingService externalBindingService;
+    private final YouTubeTranscriptService youTubeTranscriptService;
+    private final RagPromptBuilder ragPromptBuilder;
+
+    private static final Pattern YT_RAG_PATTERN = Pattern.compile("#\\s*(https?://(?:www\\.)?(?:youtube\\.com/watch\\?v=|youtu\\.be/)[\\w-]{11}\\S*)");
 
     @Value("${spring.profiles.active:default}")
     private String activeProfile;
@@ -79,7 +85,9 @@ public class ChatService {
             @Autowired(required = false) SkillService skillService,
             @Autowired(required = false) McpToolCallbackCacheService mcpToolCallbackCacheService,
             @Autowired(required = false) DocumentEmbeddingService documentEmbeddingService,
-            @Autowired(required = false) ExternalBindingService externalBindingService) {
+            @Autowired(required = false) ExternalBindingService externalBindingService,
+            @Autowired(required = false) YouTubeTranscriptService youTubeTranscriptService,
+            RagPromptBuilder ragPromptBuilder) {
         this.primaryChatClient = primaryChatClient;
         // Use OpenAI model as primary for streaming
         this.primaryChatModel = openAiChatModel;
@@ -95,6 +103,8 @@ public class ChatService {
         this.mcpToolCallbackCacheService = mcpToolCallbackCacheService;
         this.documentEmbeddingService = documentEmbeddingService;
         this.externalBindingService = externalBindingService;
+        this.youTubeTranscriptService = youTubeTranscriptService;
+        this.ragPromptBuilder = ragPromptBuilder;
 
         log.info("ChatService initialized - primaryChatClient: {}, ollamaChatClient: {}, primaryChatModel: {}, mcpTools: {}, documentEmbedding: {}, externalBindings: {}",
                 primaryChatClient != null, ollamaChatClient != null,
@@ -107,6 +117,7 @@ public class ChatService {
     public ChatResponse chat(ChatRequest request) {
         String provider = request.getProvider() != null ? request.getProvider() : chatConfig.getDefaultProvider();
         String model = request.getModel();
+        boolean isTemporary = request.isTemporary();
 
         // Validate and resolve model name
         if (model != null && !model.isBlank()) {
@@ -118,11 +129,22 @@ public class ChatService {
         // Get current user ID
         UUID userId = userService.getCurrentUser().map(User::getId).orElse(null);
 
-        // Create or get conversation
+        // Create or get conversation (skip persistence for temporary chats)
         UUID conversationId = request.getConversationId();
         Conversation conversation;
 
-        if (conversationId == null) {
+        if (isTemporary) {
+            // For temporary chats, create an in-memory conversation object (not persisted)
+            conversation = Conversation.builder()
+                    .title("Temporary Chat")
+                    .modelProvider(provider)
+                    .modelName(model)
+                    .userId(userId)
+                    .build();
+            // Use a transient UUID for the response
+            conversationId = UUID.randomUUID();
+            log.debug("Temporary chat requested - skipping persistence");
+        } else if (conversationId == null) {
             conversation = conversationService.createConversation(null, provider, model, userId);
             conversationId = conversation.getId();
         } else {
@@ -133,8 +155,10 @@ public class ChatService {
                     .orElseThrow(() -> new IllegalArgumentException("Conversation not found"));
         }
 
-        // Save user message
-        conversationService.addMessage(conversationId, Message.MessageRole.USER, request.getMessage(), null);
+        // Save user message (skip for temporary chats)
+        if (!isTemporary) {
+            conversationService.addMessage(conversationId, Message.MessageRole.USER, request.getMessage(), null);
+        }
 
         // Build prompt with conversation history (with optional skill and document context)
         List<org.springframework.ai.chat.messages.Message> messages = buildMessageHistory(
@@ -166,8 +190,12 @@ public class ChatService {
 
         long responseTime = System.currentTimeMillis() - startTime;
 
-        // Save assistant message
-        Message savedMessage = conversationService.addMessage(conversationId, Message.MessageRole.ASSISTANT, response, model);
+        // Save assistant message (skip for temporary chats)
+        UUID messageId = null;
+        if (!isTemporary) {
+            Message savedMessage = conversationService.addMessage(conversationId, Message.MessageRole.ASSISTANT, response, model);
+            messageId = savedMessage.getId();
+        }
 
         // Record metrics (estimate tokens based on content length)
         int promptTokens = estimateTokens(request.getMessage());
@@ -180,22 +208,25 @@ public class ChatService {
         Double tokensPerSecond = responseTime > 0 ?
                 (completionTokens / (responseTime / 1000.0)) : 0.0;
 
-        metricsService.recordUsage(userId, conversationId, model, provider, promptTokens, completionTokens,
-                responseTime, timeToFirstToken, tokensPerSecond);
+        if (!isTemporary) {
+            metricsService.recordUsage(userId, conversationId, model, provider, promptTokens, completionTokens,
+                    responseTime, timeToFirstToken, tokensPerSecond);
 
-        // Update conversation title if this is the first exchange
-        if (conversation.getMessages().size() <= 2) {
-            String title = generateTitle(request.getMessage());
-            conversationService.updateConversationTitle(conversationId, title);
+            // Update conversation title if this is the first exchange
+            if (conversation.getMessages().size() <= 2) {
+                String title = generateTitle(request.getMessage());
+                conversationService.updateConversationTitle(conversationId, title);
+            }
         }
 
         return ChatResponse.builder()
-                .conversationId(conversationId)
-                .messageId(savedMessage.getId())
+                .conversationId(isTemporary ? null : conversationId)
+                .messageId(messageId)
                 .content(response)
                 .htmlContent(markdownService.toHtml(response))
                 .model(model)
                 .complete(true)
+                .temporary(isTemporary)
                 .timeToFirstTokenMs(timeToFirstToken)
                 .tokensPerSecond(tokensPerSecond)
                 .totalResponseTimeMs(responseTime)
@@ -213,6 +244,7 @@ public class ChatService {
     public Flux<ChatResponse> chatStream(ChatRequest request) {
         String provider = request.getProvider() != null ? request.getProvider() : chatConfig.getDefaultProvider();
         String model = request.getModel();
+        boolean isTemporary = request.isTemporary();
 
         // Validate and resolve model name
         if (model != null && !model.isBlank()) {
@@ -224,11 +256,21 @@ public class ChatService {
         // Get current user ID
         UUID userId = userService.getCurrentUser().map(User::getId).orElse(null);
 
-        // Create or get conversation
+        // Create or get conversation (skip persistence for temporary chats)
         UUID conversationId = request.getConversationId();
         Conversation conversation;
 
-        if (conversationId == null) {
+        if (isTemporary) {
+            // For temporary chats, create an in-memory conversation object (not persisted)
+            conversation = Conversation.builder()
+                    .title("Temporary Chat")
+                    .modelProvider(provider)
+                    .modelName(model)
+                    .userId(userId)
+                    .build();
+            conversationId = UUID.randomUUID();
+            log.debug("Temporary streaming chat requested - skipping persistence");
+        } else if (conversationId == null) {
             conversation = conversationService.createConversation(null, provider, model, userId);
             conversationId = conversation.getId();
         } else {
@@ -244,9 +286,12 @@ public class ChatService {
         final String finalProvider = provider;
         final String finalModel = model;
         final String userMessage = request.getMessage();
+        final boolean finalIsTemporary = isTemporary;
 
-        // Save user message
-        conversationService.addMessage(conversationId, Message.MessageRole.USER, request.getMessage(), null);
+        // Save user message (skip for temporary chats)
+        if (!isTemporary) {
+            conversationService.addMessage(conversationId, Message.MessageRole.USER, request.getMessage(), null);
+        }
 
         // Build prompt with conversation history (with optional skill and document context)
         List<org.springframework.ai.chat.messages.Message> messages = buildMessageHistory(
@@ -349,12 +394,6 @@ public class ChatService {
                 .concatWith(Flux.defer(() -> {
             // Save complete response
             String completeResponse = fullResponse.toString();
-            Message savedMessage = conversationService.addMessage(
-                    finalConversationId,
-                    Message.MessageRole.ASSISTANT,
-                    completeResponse,
-                    finalModel
-            );
 
             // Calculate metrics
             long endTime = System.currentTimeMillis();
@@ -373,24 +412,36 @@ public class ChatService {
             log.info("Streaming metrics - TTFT: {}ms, TPS: {}, Total: {}ms, Model: {}",
                     timeToFirstToken, String.format("%.1f", tokensPerSecond), responseTime, finalModel);
 
-            metricsService.recordUsage(finalUserId, finalConversationId, finalModel, finalProvider,
-                    promptTokens, completionTokens, responseTime, timeToFirstToken, tokensPerSecond);
+            UUID messageId = null;
+            if (!finalIsTemporary) {
+                Message savedMessage = conversationService.addMessage(
+                        finalConversationId,
+                        Message.MessageRole.ASSISTANT,
+                        completeResponse,
+                        finalModel
+                );
+                messageId = savedMessage.getId();
 
-            // Update conversation title if first exchange
-            Conversation conv = conversationService.getConversationEntity(finalConversationId).orElse(null);
-            if (conv != null && conv.getMessages().size() <= 2) {
-                String title = generateTitle(userMessage);
-                conversationService.updateConversationTitle(finalConversationId, title);
+                metricsService.recordUsage(finalUserId, finalConversationId, finalModel, finalProvider,
+                        promptTokens, completionTokens, responseTime, timeToFirstToken, tokensPerSecond);
+
+                // Update conversation title if first exchange
+                Conversation conv = conversationService.getConversationEntity(finalConversationId).orElse(null);
+                if (conv != null && conv.getMessages().size() <= 2) {
+                    String title = generateTitle(userMessage);
+                    conversationService.updateConversationTitle(finalConversationId, title);
+                }
             }
 
             ChatResponse finalResponse = ChatResponse.builder()
-                    .conversationId(finalConversationId)
-                    .messageId(savedMessage.getId())
+                    .conversationId(finalIsTemporary ? null : finalConversationId)
+                    .messageId(messageId)
                     .content("")
                     .htmlContent(markdownService.toHtml(completeResponse))
                     .model(finalModel)
                     .streaming(false)
                     .complete(true)
+                    .temporary(finalIsTemporary)
                     .timeToFirstTokenMs(timeToFirstToken)
                     .tokensPerSecond(tokensPerSecond)
                     .totalResponseTimeMs(responseTime)
@@ -642,8 +693,36 @@ public class ChatService {
             }
         }
 
-        // Add current message
-        messages.add(new UserMessage(currentMessage));
+        // Check for YouTube URLs prefixed with # for transcript RAG injection
+        String processedMessage = currentMessage;
+        if (youTubeTranscriptService != null) {
+            Matcher ytMatcher = YT_RAG_PATTERN.matcher(currentMessage);
+            if (ytMatcher.find()) {
+                String ytUrl = ytMatcher.group(1);
+                log.info("Detected YouTube RAG request for URL: {}", ytUrl);
+                try {
+                    String transcript = youTubeTranscriptService.getTranscript(ytUrl);
+                    if (transcript != null && !transcript.isEmpty()) {
+                        // Remove the # URL from the user's query to get the actual question
+                        String queryWithoutUrl = currentMessage.replaceAll("#\\s*https?://\\S+", "").trim();
+                        if (queryWithoutUrl.isEmpty()) {
+                            queryWithoutUrl = "Summarize this YouTube video.";
+                        }
+                        // Build prompt with transcript context using RagPromptBuilder
+                        processedMessage = ragPromptBuilder.buildPromptWithTranscript(
+                                queryWithoutUrl, transcript, ytUrl, null);
+                        log.info("Injected YouTube transcript ({} chars) as RAG context", transcript.length());
+                    } else {
+                        log.warn("No transcript available for YouTube URL: {}", ytUrl);
+                    }
+                } catch (Exception e) {
+                    log.warn("Failed to extract YouTube transcript for {}: {}", ytUrl, e.getMessage());
+                }
+            }
+        }
+
+        // Add current message (with possible YouTube transcript context)
+        messages.add(new UserMessage(processedMessage));
 
         return messages;
     }

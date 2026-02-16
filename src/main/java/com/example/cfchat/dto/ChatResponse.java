@@ -22,6 +22,7 @@ public class ChatResponse {
     private String error;
     private boolean streaming;
     private boolean complete;
+    private boolean temporary;
 
     // Performance metrics
     private Long timeToFirstTokenMs;

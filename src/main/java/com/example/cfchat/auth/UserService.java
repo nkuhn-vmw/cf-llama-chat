@@ -118,9 +118,17 @@ public class UserService {
 
         User user = userOpt.get();
 
-        // SSO users cannot login with password
-        if (user.getAuthProvider() == User.AuthProvider.SSO) {
-            log.debug("User {} is SSO user, cannot authenticate with password", username);
+        // SSO/LDAP/SCIM users cannot login with password
+        if (user.getAuthProvider() == User.AuthProvider.SSO
+                || user.getAuthProvider() == User.AuthProvider.LDAP
+                || user.getAuthProvider() == User.AuthProvider.SCIM) {
+            log.debug("User {} is {} user, cannot authenticate with password", username, user.getAuthProvider());
+            return Optional.empty();
+        }
+
+        // Check if user is enabled
+        if (!Boolean.TRUE.equals(user.getEnabled())) {
+            log.debug("User {} is disabled, cannot authenticate", username);
             return Optional.empty();
         }
 
@@ -264,6 +272,26 @@ public class UserService {
         return userRepository.countByRole(User.UserRole.ADMIN);
     }
 
+    @Transactional(readOnly = true)
+    public Optional<User> findByExternalId(String externalId) {
+        return userRepository.findByExternalId(externalId);
+    }
+
+    @Transactional(readOnly = true)
+    public Optional<User> findByUsername(String username) {
+        return userRepository.findByUsername(username);
+    }
+
+    @Transactional(readOnly = true)
+    public List<User> findByAuthProvider(User.AuthProvider authProvider) {
+        return userRepository.findByAuthProvider(authProvider);
+    }
+
+    @Transactional
+    public User saveUser(User user) {
+        return userRepository.save(user);
+    }
+
     /**
      * Change password for the current user (non-SSO users only).
      * @param currentPassword The user's current password for verification
@@ -280,9 +308,9 @@ public class UserService {
 
         User user = userOpt.get();
 
-        // SSO users cannot change password
-        if (user.getAuthProvider() == User.AuthProvider.SSO) {
-            log.warn("SSO user {} attempted to change password", user.getUsername());
+        // SSO/LDAP/SCIM users cannot change password
+        if (user.getAuthProvider() != User.AuthProvider.LOCAL) {
+            log.warn("{} user {} attempted to change password", user.getAuthProvider(), user.getUsername());
             return false;
         }
 
@@ -315,9 +343,9 @@ public class UserService {
 
         User user = userOpt.get();
 
-        // SSO users cannot have password reset
-        if (user.getAuthProvider() == User.AuthProvider.SSO) {
-            log.warn("Cannot reset password for SSO user: {}", user.getUsername());
+        // Non-local users cannot have password reset
+        if (user.getAuthProvider() != User.AuthProvider.LOCAL) {
+            log.warn("Cannot reset password for {} user: {}", user.getAuthProvider(), user.getUsername());
             return false;
         }
 

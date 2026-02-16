@@ -16,6 +16,7 @@ class ChatApp {
         this.toolsAvailable = false;
         this.tools = [];
         this.toolPreferences = {};
+        this.temporaryChat = false;
         this.initElements();
         this.initEventListeners();
         this.initMarkdown();
@@ -63,6 +64,10 @@ class ChatApp {
         this.noDocuments = document.getElementById('noDocuments');
         this.useDocumentsToggle = document.getElementById('useDocumentsToggle');
         this.docToggleLabel = document.getElementById('docToggleLabel');
+
+        // Temporary chat toggle
+        this.tempChatToggle = document.getElementById('tempChatToggle');
+        this.tempChatToggleLabel = document.getElementById('tempChatToggleLabel');
 
         // Tools elements
         this.useToolsToggle = document.getElementById('useToolsToggle');
@@ -180,6 +185,28 @@ class ChatApp {
             this.clearHistoryBtn.addEventListener('click', () => {
                 this.clearAllHistory();
             });
+        }
+
+        // Temporary chat toggle
+        if (this.tempChatToggle) {
+            this.tempChatToggle.addEventListener('change', (e) => {
+                this.temporaryChat = e.target.checked;
+                localStorage.setItem('temporaryChat', this.temporaryChat);
+                console.debug('Temporary chat toggle changed:', this.temporaryChat);
+                // Visual indicator when temporary mode is active
+                const indicator = document.getElementById('tempChatIndicator');
+                if (indicator) {
+                    indicator.style.display = this.temporaryChat ? 'inline-flex' : 'none';
+                }
+            });
+            // Restore saved preference
+            const savedTempChat = localStorage.getItem('temporaryChat');
+            if (savedTempChat === 'true') {
+                this.temporaryChat = true;
+                this.tempChatToggle.checked = true;
+                const indicator = document.getElementById('tempChatIndicator');
+                if (indicator) indicator.style.display = 'inline-flex';
+            }
         }
 
         // Use tools toggle — registered here (synchronous) rather than in async
@@ -612,15 +639,16 @@ class ChatApp {
             const toolsEnabled = this.useToolsToggle ? this.useToolsToggle.checked : this.useTools;
 
             const request = {
-                conversationId: this.conversationId,
+                conversationId: this.temporaryChat ? null : this.conversationId,
                 message: message,
                 provider: provider,
                 model: model,
                 useDocumentContext: this.useDocumentContext && this.documentsAvailable,
-                useTools: toolsEnabled && this.toolsAvailable
+                useTools: toolsEnabled && this.toolsAvailable,
+                temporary: this.temporaryChat
             };
 
-            console.debug('Chat request - useTools:', request.useTools, '(toggle:', toolsEnabled, ', available:', this.toolsAvailable, ')');
+            console.debug('Chat request - useTools:', request.useTools, '(toggle:', toolsEnabled, ', available:', this.toolsAvailable, '), temporary:', request.temporary);
 
             if (this.isStreaming) {
                 await this.sendStreamingMessage(request, typingIndicator);
@@ -654,10 +682,13 @@ class ChatApp {
         const data = await response.json();
         typingIndicator.remove();
 
-        this.conversationId = data.conversationId;
+        // For temporary chats, do not update conversationId or URL
+        if (!data.temporary) {
+            this.conversationId = data.conversationId;
+            this.updateURL(data.conversationId);
+            this.refreshConversationsList();
+        }
         this.addMessage('assistant', data.content, data.htmlContent, data.model);
-        this.updateURL(data.conversationId);
-        this.refreshConversationsList();
     }
 
     async sendStreamingMessage(request, typingIndicator) {
@@ -725,7 +756,7 @@ class ChatApp {
                             if (!jsonStr) continue;
                             const data = JSON.parse(jsonStr);
 
-                            if (!this.conversationId && data.conversationId) {
+                            if (!this.conversationId && data.conversationId && !data.temporary) {
                                 this.conversationId = data.conversationId;
                                 this.updateURL(data.conversationId);
                             }
@@ -783,7 +814,9 @@ class ChatApp {
                                     }
                                 }
 
-                                this.refreshConversationsList();
+                                if (!data.temporary) {
+                                    this.refreshConversationsList();
+                                }
                             } else if (data.content) {
                                 fullContent += data.content;
                                 // Use debounced rendering during streaming (100ms)
@@ -1722,11 +1755,20 @@ class ChatApp {
                 const text = e.clipboardData.getData('text');
                 if (text.length > 5000) {
                     e.preventDefault();
-                    if (confirm(`Large text detected (${text.length} characters). Would you like to upload it as a document for RAG context instead?`)) {
-                        const file = new File([text], 'pasted-content.txt', { type: 'text/plain' });
+                    if (confirm(`Large text detected (${text.length} characters). Upload as document for RAG instead?`)) {
+                        const timestamp = new Date().toISOString().replace(/[:.]/g, '-');
+                        const file = new File([text], `pasted-content-${timestamp}.txt`, { type: 'text/plain' });
                         this.uploadPastedDocument(file);
                     } else {
-                        this.messageInput.value += text;
+                        // Insert text at cursor position preserving selection
+                        const start = this.messageInput.selectionStart;
+                        const end = this.messageInput.selectionEnd;
+                        this.messageInput.value =
+                            this.messageInput.value.substring(0, start) +
+                            text +
+                            this.messageInput.value.substring(end);
+                        this.messageInput.selectionStart = this.messageInput.selectionEnd = start + text.length;
+                        this.autoResizeTextarea();
                     }
                 }
             });
