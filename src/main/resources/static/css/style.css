@@ -17,6 +17,23 @@
     --input-max-width: 800px;
 }
 
+/* OLED Dark Theme */
+[data-theme="oled"] {
+    --bg-primary: #000000;
+    --bg-secondary: #0a0a0a;
+    --bg-tertiary: #111111;
+    --bg-hover: #1a1a1a;
+    --text-primary: #e0e0e0;
+    --text-secondary: #999;
+    --text-muted: #666;
+    --border-color: #222;
+    --accent-color: #4a90d9;
+    --accent-hover: #357abd;
+    --user-bg: #0d1117;
+    --assistant-bg: #000000;
+    --error-color: #ef4444;
+}
+
 /* Light Theme */
 [data-theme="light"] {
     --bg-primary: #ffffff;
@@ -1008,6 +1025,15 @@ pre.editing .edit-code-btn {
     display: none;
 }
 
+/* OLED theme: show moon icon (same as dark, but we distinguish via title attribute) */
+[data-theme="oled"] .theme-toggle .sun-icon {
+    display: none;
+}
+
+[data-theme="oled"] .theme-toggle .moon-icon {
+    display: block;
+}
+
 /* User Menu */
 .user-menu {
     position: relative;
@@ -1855,6 +1881,34 @@ pre.editing .edit-code-btn {
     background-color: var(--accent-hover);
 }
 
+/* Quick Actions Toolbar */
+.quick-actions-toolbar {
+    position: absolute;
+    display: flex;
+    gap: 4px;
+    background: var(--bg-secondary);
+    border: 1px solid var(--border-color);
+    border-radius: 8px;
+    padding: 4px;
+    box-shadow: 0 4px 12px rgba(0,0,0,0.3);
+    z-index: 1000;
+}
+
+.quick-action-btn {
+    background: transparent;
+    border: none;
+    color: var(--text-primary);
+    padding: 4px 10px;
+    border-radius: 4px;
+    cursor: pointer;
+    font-size: 0.8em;
+    white-space: nowrap;
+}
+
+.quick-action-btn:hover {
+    background: var(--bg-hover);
+}
+
 /* KaTeX Math Rendering */
 .katex-display {
     overflow-x: auto;
@@ -1870,5 +1924,62 @@ pre.editing .edit-code-btn {
 
 .message-text .katex-display > .katex {
     white-space: normal;
+}
+
+/* RTL Text Support */
+.message[dir="rtl"] {
+    direction: rtl;
+    text-align: right;
+}
+
+.message[dir="rtl"] code {
+    direction: ltr;
+    text-align: left;
+}
+
+.message[dir="rtl"] pre {
+    direction: ltr;
+    text-align: left;
+}
+
+/* RAG Citation badges */
+.citation-badge {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    background: var(--accent-color);
+    color: white;
+    font-size: 0.7em;
+    font-weight: 600;
+    padding: 1px 6px;
+    border-radius: 10px;
+    cursor: pointer;
+    vertical-align: super;
+    transition: background-color 0.2s, transform 0.1s;
+    text-decoration: none;
+}
+
+.citation-badge:hover {
+    background: var(--accent-hover);
+    transform: scale(1.1);
+}
+
+.citation-badge[data-source]::before {
+    content: '';
+}
+
+/* Citation tooltip */
+.citation-tooltip {
+    position: absolute;
+    background: var(--bg-secondary);
+    border: 1px solid var(--border-color);
+    border-radius: 8px;
+    padding: 8px 12px;
+    font-size: 0.85em;
+    color: var(--text-primary);
+    max-width: 300px;
+    z-index: 1000;
+    box-shadow: 0 4px 12px rgba(0,0,0,0.3);
+    pointer-events: none;
 }
 

@@ -45,6 +45,9 @@ class ConversationControllerTest {
     @MockBean
     private UserService userService;
 
+    @MockBean
+    private com.example.cfchat.service.RateLimitService rateLimitService;
+
     @Test
     @WithMockUser(username = "testuser")
     void getAllConversations_authenticated_returnsUserConversations() throws Exception {

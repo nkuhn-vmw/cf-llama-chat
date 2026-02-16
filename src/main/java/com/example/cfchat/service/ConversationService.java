@@ -7,7 +7,9 @@ import com.example.cfchat.repository.ConversationRepository;
 import com.example.cfchat.repository.MessageRepository;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.data.domain.Page;
 import org.springframework.data.domain.PageRequest;
+import org.springframework.data.domain.Pageable;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -132,5 +134,54 @@ public class ConversationService {
     @Transactional(readOnly = true)
     public List<Message> getMessages(UUID conversationId) {
         return messageRepository.findByConversationIdOrderByCreatedAtAsc(conversationId);
+    }
+
+    @Transactional
+    public void archiveConversation(UUID id) {
+        conversationRepository.findById(id).ifPresent(c -> {
+            c.setArchived(true);
+            conversationRepository.save(c);
+        });
+    }
+
+    @Transactional
+    public void unarchiveConversation(UUID id) {
+        conversationRepository.findById(id).ifPresent(c -> {
+            c.setArchived(false);
+            conversationRepository.save(c);
+        });
+    }
+
+    @Transactional
+    public int archiveAllForUser(UUID userId) {
+        return conversationRepository.archiveAllByUserId(userId);
+    }
+
+    @Transactional
+    public void pinConversation(UUID id, boolean pinned) {
+        conversationRepository.findById(id).ifPresent(c -> {
+            c.setPinned(pinned);
+            conversationRepository.save(c);
+        });
+    }
+
+    @Transactional(readOnly = true)
+    public List<ConversationDto> getPinnedConversations(UUID userId) {
+        return conversationRepository.findByUserIdAndPinnedTrueOrderByUpdatedAtDesc(userId)
+                .stream()
+                .map(c -> ConversationDto.fromEntity(c, false))
+                .toList();
+    }
+
+    @Transactional(readOnly = true)
+    public Page<ConversationDto> searchConversations(UUID userId, String query, Pageable pageable) {
+        return conversationRepository.searchByTitle(userId, query, pageable)
+                .map(c -> ConversationDto.fromEntity(c, false));
+    }
+
+    @Transactional(readOnly = true)
+    public Page<ConversationDto> getArchivedConversations(UUID userId, Pageable pageable) {
+        return conversationRepository.findArchivedByUserId(userId, pageable)
+                .map(c -> ConversationDto.fromEntity(c, false));
     }
 }

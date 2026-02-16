@@ -22,6 +22,10 @@ class ChatApp {
         this.initTheme();
         this.initDocuments();
         this.initTools();
+        this.initPasteDetection();
+        this.initKeyboardShortcuts();
+        this.initSettingsSearch();
+        this.initQuickActions();
         this.restoreModelSelection();
         this.scrollToBottom();
     }
@@ -203,6 +207,12 @@ class ChatApp {
         const savedTheme = localStorage.getItem('theme') || 'dark';
         document.body.setAttribute('data-theme', savedTheme);
 
+        // Update theme toggle tooltip
+        if (this.themeToggle) {
+            const themeNames = { dark: 'Dark', light: 'Light', oled: 'OLED Dark' };
+            this.themeToggle.title = `Theme: ${themeNames[savedTheme] || savedTheme} (click to switch)`;
+        }
+
         // Load organization theme if user is part of an organization
         this.loadOrganizationTheme();
     }
@@ -315,9 +325,18 @@ class ChatApp {
 
     toggleTheme() {
         const currentTheme = document.body.getAttribute('data-theme') || 'dark';
-        const newTheme = currentTheme === 'dark' ? 'light' : 'dark';
+        // Cycle: dark -> light -> oled -> dark
+        const themeOrder = ['dark', 'light', 'oled'];
+        const currentIndex = themeOrder.indexOf(currentTheme);
+        const newTheme = themeOrder[(currentIndex + 1) % themeOrder.length];
         document.body.setAttribute('data-theme', newTheme);
         localStorage.setItem('theme', newTheme);
+
+        // Update tooltip to show current theme name
+        if (this.themeToggle) {
+            const themeNames = { dark: 'Dark', light: 'Light', oled: 'OLED Dark' };
+            this.themeToggle.title = `Theme: ${themeNames[newTheme]} (click to switch)`;
+        }
     }
 
     // DOMPurify config that allows KaTeX MathML output
@@ -361,6 +380,127 @@ class ChatApp {
             result = result.replace(placeholder, blocks[i].content);
         }
         return result;
+    }
+
+    /**
+     * Extract LaTeX blocks ($$...$$ and $...$) before markdown parsing
+     * to prevent markdown from mangling them. Returns the sanitized text
+     * and an array of extracted blocks with their placeholders.
+     */
+    preprocessLatex(text) {
+        const blocks = [];
+        let result = text;
+
+        // Extract display math $$...$$ first
+        result = result.replace(/\$\$([\s\S]+?)\$\$/g, (match, inner) => {
+            const idx = blocks.length;
+            blocks.push({ type: 'display', latex: inner.trim(), original: match });
+            return `%%LATEX_DISPLAY_${idx}%%`;
+        });
+
+        // Extract display math \[...\]
+        result = result.replace(/\\\[([\s\S]+?)\\\]/g, (match, inner) => {
+            const idx = blocks.length;
+            blocks.push({ type: 'display', latex: inner.trim(), original: match });
+            return `%%LATEX_DISPLAY_${idx}%%`;
+        });
+
+        // Extract inline math $...$ (not currency like $100)
+        result = result.replace(/(?<!\$)\$(?!\$)(.+?)(?<!\$)\$(?!\$)/g, (match, inner) => {
+            if (/^\d/.test(inner.trim())) return match;
+            const idx = blocks.length;
+            blocks.push({ type: 'inline', latex: inner.trim(), original: match });
+            return `%%LATEX_INLINE_${idx}%%`;
+        });
+
+        // Extract inline math \(...\)
+        result = result.replace(/\\\(([\s\S]+?)\\\)/g, (match, inner) => {
+            const idx = blocks.length;
+            blocks.push({ type: 'inline', latex: inner.trim(), original: match });
+            return `%%LATEX_INLINE_${idx}%%`;
+        });
+
+        return { text: result, blocks };
+    }
+
+    /**
+     * Render extracted LaTeX blocks back into the HTML using KaTeX.
+     * Replaces placeholders with rendered KaTeX HTML output.
+     */
+    postprocessLatex(html, blocks) {
+        let result = html;
+        for (let i = 0; i < blocks.length; i++) {
+            const block = blocks[i];
+            const isDisplay = block.type === 'display';
+            const placeholder = isDisplay ? `%%LATEX_DISPLAY_${i}%%` : `%%LATEX_INLINE_${i}%%`;
+
+            let rendered;
+            if (typeof katex !== 'undefined') {
+                try {
+                    rendered = katex.renderToString(block.latex, {
+                        displayMode: isDisplay,
+                        throwOnError: false,
+                        output: 'htmlAndMathml'
+                    });
+                } catch (e) {
+                    console.warn('KaTeX render error for block', i, ':', e);
+                    rendered = block.original;
+                }
+            } else {
+                // KaTeX not available, restore original delimiters
+                rendered = block.original;
+            }
+            result = result.replace(placeholder, rendered);
+        }
+        return result;
+    }
+
+    /**
+     * Full rendering pipeline: preprocess LaTeX, parse markdown, postprocess LaTeX,
+     * and optionally sanitize with DOMPurify.
+     */
+    renderMarkdownWithLatex(text) {
+        const { text: preprocessed, blocks } = this.preprocessLatex(text);
+        let html = marked.parse(preprocessed);
+        html = this.postprocessLatex(html, blocks);
+        return this.sanitizeHtml(html);
+    }
+
+    /**
+     * RAG Citation rendering - replaces [Source N] markers with styled badges.
+     */
+    renderCitations(html, citations) {
+        if (!citations || citations.length === 0) return html;
+
+        return html.replace(/\[Source (\d+)\]/g, (match, num) => {
+            const idx = parseInt(num) - 1;
+            const citation = citations[idx];
+            if (!citation) return match;
+
+            const relevance = Math.round(citation.relevance * 100);
+            return `<span class="citation-badge" data-source="${num}" title="${citation.documentName} (${relevance}% relevance)">[${num}]</span>`;
+        });
+    }
+
+    /**
+     * Sanitize HTML output using DOMPurify if available.
+     */
+    sanitizeHtml(html) {
+        if (typeof DOMPurify !== 'undefined') {
+            return DOMPurify.sanitize(html, this.domPurifyConfig);
+        }
+        return html;
+    }
+
+    /**
+     * Detect text direction (RTL vs LTR) based on the proportion of RTL
+     * script characters in the first 100 characters of the text.
+     */
+    detectDirection(text) {
+        const rtl = /[\u0600-\u06FF\u0750-\u077F\u0590-\u05FF\uFB1D-\uFB4F]/;
+        const sample = text.substring(0, 100);
+        const count = (sample.match(new RegExp(rtl.source, 'g')) || []).length;
+        return count > sample.length * 0.3 ? 'rtl' : 'ltr';
     }
 
     renderMath(element) {
@@ -437,6 +577,7 @@ class ChatApp {
         const message = this.messageInput.value.trim();
         if (!message || this.isWaiting) return;
 
+        this.haptic();
         this.isWaiting = true;
         this.sendBtn.disabled = true;
 
@@ -546,6 +687,23 @@ class ChatApp {
             let fullContent = '';
             let streamComplete = false;
 
+            // Streaming debounce: re-render content at most every 100ms
+            let streamRenderTimer = null;
+            let pendingRender = false;
+            const debouncedStreamRender = () => {
+                pendingRender = true;
+                if (streamRenderTimer) return;
+                streamRenderTimer = setTimeout(() => {
+                    streamRenderTimer = null;
+                    if (pendingRender) {
+                        pendingRender = false;
+                        const displayContent = this.prepareStreamingContent(fullContent);
+                        textEl.innerHTML = this.renderMarkdownWithLatex(displayContent);
+                        this.scrollToBottom();
+                    }
+                }, 100);
+            };
+
             const reader = response.body.getReader();
             const decoder = new TextDecoder();
             let buffer = '';  // Buffer for incomplete SSE events
@@ -574,16 +732,26 @@ class ChatApp {
 
                             if (data.error) {
                                 streamComplete = true;
-                                textEl.innerHTML = DOMPurify.sanitize(`<div class="stream-error">${this.escapeHtml(data.error)}</div>`);
+                                // Clear any pending debounced render
+                                if (streamRenderTimer) { clearTimeout(streamRenderTimer); streamRenderTimer = null; }
+                                const errorHtml = `<div class="stream-error">${this.escapeHtml(data.error)}</div>`;
+                                textEl.innerHTML = this.sanitizeHtml(errorHtml);
                                 this.scrollToBottom();
                             } else if (data.complete) {
                                 streamComplete = true;
+                                // Clear any pending debounced render
+                                if (streamRenderTimer) { clearTimeout(streamRenderTimer); streamRenderTimer = null; }
                                 // Final message with full HTML content from backend
                                 if (data.htmlContent) {
-                                    textEl.innerHTML = DOMPurify.sanitize(data.htmlContent, this.domPurifyConfig);
+                                    textEl.innerHTML = this.sanitizeHtml(data.htmlContent);
                                 }
                                 this.highlightCode(textEl);
                                 this.renderMath(textEl);
+
+                                // Update RTL direction based on final content
+                                if (fullContent) {
+                                    messageEl.setAttribute('dir', this.detectDirection(fullContent));
+                                }
 
                                 // Add performance metrics if available (check for existence, not truthiness)
                                 const hasMetrics = data.timeToFirstTokenMs != null ||
@@ -618,9 +786,8 @@ class ChatApp {
                                 this.refreshConversationsList();
                             } else if (data.content) {
                                 fullContent += data.content;
-                                const displayContent = this.prepareStreamingContent(fullContent);
-                                textEl.innerHTML = DOMPurify.sanitize(marked.parse(displayContent));
-                                this.scrollToBottom();
+                                // Use debounced rendering during streaming (100ms)
+                                debouncedStreamRender();
                             }
                         } catch (e) {
                             console.warn('SSE parse error:', e.message, 'Line:', line);
@@ -628,6 +795,9 @@ class ChatApp {
                     }
                 }
             }
+
+            // Clear any pending debounced render before final processing
+            if (streamRenderTimer) { clearTimeout(streamRenderTimer); streamRenderTimer = null; }
 
             // Flush any remaining data left in the SSE buffer (e.g. final event
             // that arrived without a trailing newline before the connection closed)
@@ -640,7 +810,7 @@ class ChatApp {
                             const data = JSON.parse(jsonStr);
                             if (data.complete && data.htmlContent) {
                                 streamComplete = true;
-                                textEl.innerHTML = DOMPurify.sanitize(data.htmlContent, this.domPurifyConfig);
+                                textEl.innerHTML = this.sanitizeHtml(data.htmlContent);
                                 this.highlightCode(textEl);
                                 this.renderMath(textEl);
                             } else if (data.content) {
@@ -655,9 +825,11 @@ class ChatApp {
 
             // Fallback: only re-render if stream ended without a complete event
             if (fullContent && !streamComplete) {
-                textEl.innerHTML = DOMPurify.sanitize(marked.parse(fullContent));
+                textEl.innerHTML = this.renderMarkdownWithLatex(fullContent);
                 this.highlightCode(textEl);
                 this.renderMath(textEl);
+                // Update RTL direction based on final content
+                messageEl.setAttribute('dir', this.detectDirection(fullContent));
                 this.scrollToBottom();
             }
         } finally {
@@ -712,16 +884,41 @@ class ChatApp {
         const div = document.createElement('div');
         div.className = `message ${role}`;
 
-        const avatarText = role === 'user' ? 'U' : 'AI';
-        const displayContent = DOMPurify.sanitize(htmlContent || (content ? marked.parse(content) : ''), this.domPurifyConfig);
+        // Detect text direction for RTL language support
+        const rawText = content || '';
+        const dir = this.detectDirection(rawText);
+        div.setAttribute('dir', dir);
 
-        div.innerHTML = `
-            <div class="message-avatar">${avatarText}</div>
-            <div class="message-content">
-                <div class="message-text">${displayContent}</div>
-                ${model ? `<div class="message-meta">${model}</div>` : ''}
-            </div>
-        `;
+        const avatarText = role === 'user' ? 'U' : 'AI';
+        // Use the enhanced rendering pipeline with LaTeX preprocessing and DOMPurify sanitization
+        const displayContent = htmlContent
+            ? this.sanitizeHtml(htmlContent)
+            : (content ? this.renderMarkdownWithLatex(content) : '');
+
+        // Build message element using safe DOM construction
+        const avatarDiv = document.createElement('div');
+        avatarDiv.className = 'message-avatar';
+        avatarDiv.textContent = avatarText;
+
+        const contentDiv = document.createElement('div');
+        contentDiv.className = 'message-content';
+
+        const textDiv = document.createElement('div');
+        textDiv.className = 'message-text';
+        // displayContent is sanitized via DOMPurify in renderMarkdownWithLatex / sanitizeHtml
+        textDiv.innerHTML = displayContent;
+
+        contentDiv.appendChild(textDiv);
+
+        if (model) {
+            const metaDiv = document.createElement('div');
+            metaDiv.className = 'message-meta';
+            metaDiv.textContent = model;
+            contentDiv.appendChild(metaDiv);
+        }
+
+        div.appendChild(avatarDiv);
+        div.appendChild(contentDiv);
 
         return div;
     }
@@ -1516,6 +1713,177 @@ class ChatApp {
             console.error('Error deleting document:', error);
             alert('Failed to delete document');
         }
+    }
+
+    // Feature 53: Large text paste detection
+    initPasteDetection() {
+        if (this.messageInput) {
+            this.messageInput.addEventListener('paste', (e) => {
+                const text = e.clipboardData.getData('text');
+                if (text.length > 5000) {
+                    e.preventDefault();
+                    if (confirm(`Large text detected (${text.length} characters). Would you like to upload it as a document for RAG context instead?`)) {
+                        const file = new File([text], 'pasted-content.txt', { type: 'text/plain' });
+                        this.uploadPastedDocument(file);
+                    } else {
+                        this.messageInput.value += text;
+                    }
+                }
+            });
+        }
+    }
+
+    async uploadPastedDocument(file) {
+        const formData = new FormData();
+        formData.append('file', file);
+
+        try {
+            const response = await fetch('/api/documents/upload', {
+                method: 'POST',
+                body: formData
+            });
+
+            if (response.ok) {
+                const result = await response.json();
+                if (result.status === 'COMPLETED') {
+                    alert('Pasted content uploaded as document successfully.');
+                    await this.loadDocuments();
+                } else {
+                    alert(`Document upload status: ${result.status}. ${result.message || ''}`);
+                }
+            } else {
+                alert('Failed to upload pasted content as document.');
+            }
+        } catch (error) {
+            console.error('Error uploading pasted document:', error);
+            alert('Failed to upload pasted content.');
+        }
+    }
+
+    // Feature 57: Keyboard shortcuts
+    initKeyboardShortcuts() {
+        document.addEventListener('keydown', (e) => {
+            if (e.ctrlKey || e.metaKey) {
+                switch (e.key) {
+                    case 'n':
+                        e.preventDefault();
+                        this.startNewChat();
+                        break;
+                    case 'k':
+                        e.preventDefault();
+                        this.toggleSearchPanel();
+                        break;
+                    case '/':
+                        e.preventDefault();
+                        if (this.messageInput) this.messageInput.focus();
+                        break;
+                }
+            }
+            if (e.key === 'Escape') {
+                this.closePanels();
+            }
+        });
+    }
+
+    toggleSearchPanel() {
+        // Toggle the documents panel as a search/reference panel
+        this.toggleDocumentsPanel();
+    }
+
+    closePanels() {
+        this.closeDocumentsPanel();
+        this.closeToolsPanel();
+        // Close user menu dropdown if open
+        if (this.userMenuDropdown) {
+            this.userMenuDropdown.classList.remove('open');
+        }
+        // Close sidebar on mobile
+        if (window.innerWidth <= 768) {
+            this.sidebar.classList.remove('open');
+            const overlay = document.getElementById('sidebarOverlay');
+            if (overlay) overlay.classList.remove('visible');
+        }
+    }
+
+    // Feature 58: Settings search functionality
+    initSettingsSearch() {
+        const searchInput = document.getElementById('settings-search');
+        if (!searchInput) return;
+
+        searchInput.addEventListener('input', (e) => {
+            const query = e.target.value.toLowerCase();
+            document.querySelectorAll('.settings-section').forEach(section => {
+                const keywords = (section.dataset.searchKeywords || section.textContent).toLowerCase();
+                section.style.display = keywords.includes(query) ? '' : 'none';
+            });
+        });
+    }
+
+    // Feature 59: Haptic feedback for mobile
+    haptic(style = 'light') {
+        if (navigator.vibrate) {
+            navigator.vibrate(style === 'heavy' ? 50 : 10);
+        }
+    }
+
+    // Feature 64: Quick actions on text selection
+    initQuickActions() {
+        let toolbar = document.getElementById('quick-actions-toolbar');
+        if (!toolbar) {
+            toolbar = document.createElement('div');
+            toolbar.id = 'quick-actions-toolbar';
+            toolbar.className = 'quick-actions-toolbar';
+            toolbar.style.display = 'none';
+            toolbar.innerHTML = `
+                <button class="quick-action-btn" data-action="ask">Ask</button>
+                <button class="quick-action-btn" data-action="explain">Explain</button>
+                <button class="quick-action-btn" data-action="copy">Copy</button>
+            `;
+            document.body.appendChild(toolbar);
+        }
+
+        document.addEventListener('selectionchange', () => {
+            const sel = window.getSelection();
+            if (sel.rangeCount && sel.toString().trim().length > 0) {
+                const range = sel.getRangeAt(0);
+                const rect = range.getBoundingClientRect();
+                // Only show within message area
+                const msgArea = document.querySelector('.chat-messages, .messages-container, #messages');
+                if (msgArea && msgArea.contains(range.startContainer)) {
+                    toolbar.style.top = (rect.top + window.scrollY - 45) + 'px';
+                    toolbar.style.left = (rect.left + window.scrollX) + 'px';
+                    toolbar.style.display = 'flex';
+                    toolbar.dataset.selectedText = sel.toString();
+                }
+            } else {
+                toolbar.style.display = 'none';
+            }
+        });
+
+        toolbar.addEventListener('click', (e) => {
+            const btn = e.target.closest('.quick-action-btn');
+            if (!btn) return;
+            const text = toolbar.dataset.selectedText;
+            const action = btn.dataset.action;
+            toolbar.style.display = 'none';
+
+            if (action === 'copy') {
+                navigator.clipboard.writeText(text);
+                this.haptic();
+            } else if (action === 'ask') {
+                if (this.messageInput) {
+                    this.messageInput.value = 'Tell me more about: ' + text;
+                    this.messageInput.focus();
+                }
+                this.haptic();
+            } else if (action === 'explain') {
+                if (this.messageInput) {
+                    this.messageInput.value = 'Please explain this: ' + text;
+                    this.messageInput.focus();
+                }
+                this.haptic();
+            }
+        });
     }
 
     formatFileSize(bytes) {

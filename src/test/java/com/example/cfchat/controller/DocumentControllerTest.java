@@ -35,6 +35,9 @@ class DocumentControllerTest {
     @MockBean
     private UserService userService;
 
+    @MockBean
+    private com.example.cfchat.service.RateLimitService rateLimitService;
+
     @Test
     @WithMockUser(username = "testuser")
     void getStatus_available_returnsAvailable() throws Exception {

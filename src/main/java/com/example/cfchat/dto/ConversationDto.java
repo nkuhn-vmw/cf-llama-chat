@@ -23,6 +23,9 @@ public class ConversationDto {
     private LocalDateTime updatedAt;
     private List<MessageDto> messages;
     private int messageCount;
+    private boolean archived;
+    private boolean pinned;
+    private String folderId;
 
     public static ConversationDto fromEntity(Conversation conversation, boolean includeMessages) {
         ConversationDtoBuilder builder = ConversationDto.builder()
@@ -32,7 +35,10 @@ public class ConversationDto {
                 .modelName(conversation.getModelName())
                 .createdAt(conversation.getCreatedAt())
                 .updatedAt(conversation.getUpdatedAt())
-                .messageCount(conversation.getMessages().size());
+                .messageCount(conversation.getMessages().size())
+                .archived(conversation.isArchived())
+                .pinned(conversation.isPinned())
+                .folderId(conversation.getFolderId());
 
         if (includeMessages) {
             builder.messages(conversation.getMessages().stream()

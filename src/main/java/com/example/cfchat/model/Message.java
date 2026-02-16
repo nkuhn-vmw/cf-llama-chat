@@ -36,6 +36,22 @@ public class Message {
     @Column(name = "tokens_used")
     private Integer tokensUsed;
 
+    @Column(name = "sequence_number")
+    private Integer sequenceNumber;
+
+    @Column(name = "parent_message_id")
+    private String parentMessageId;
+
+    @Column(name = "is_active")
+    @Builder.Default
+    private boolean active = true;
+
+    @Column(name = "generation_time_ms")
+    private Long generationTimeMs;
+
+    @Column(name = "token_count")
+    private Integer tokenCount;
+
     @Column(name = "created_at", nullable = false, updatable = false)
     private LocalDateTime createdAt;
 

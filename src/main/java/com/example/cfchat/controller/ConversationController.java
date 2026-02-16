@@ -8,6 +8,8 @@ import com.example.cfchat.service.ConversationService;
 import com.example.cfchat.service.MarkdownService;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.Pageable;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 
@@ -64,17 +66,30 @@ public class ConversationController {
     @PatchMapping("/{id}")
     public ResponseEntity<Void> updateConversation(
             @PathVariable UUID id,
-            @RequestBody Map<String, String> body) {
+            @RequestBody Map<String, Object> body) {
         UUID userId = requireUserId();
         if (!conversationService.isOwnedByUser(id, userId)) {
             return ResponseEntity.status(403).build();
         }
-        String title = body.get("title");
-        if (title != null) {
+        Object titleObj = body.get("title");
+        if (titleObj != null) {
+            String title = titleObj.toString();
             if (title.length() > 500) {
                 throw new IllegalArgumentException("Title must not exceed 500 characters");
             }
             conversationService.updateConversationTitle(id, title);
+        }
+        if (body.containsKey("pinned")) {
+            boolean pinned = Boolean.parseBoolean(body.get("pinned").toString());
+            conversationService.pinConversation(id, pinned);
+        }
+        if (body.containsKey("archived")) {
+            boolean archived = Boolean.parseBoolean(body.get("archived").toString());
+            if (archived) {
+                conversationService.archiveConversation(id);
+            } else {
+                conversationService.unarchiveConversation(id);
+            }
         }
         return ResponseEntity.ok().build();
     }
@@ -103,6 +118,51 @@ public class ConversationController {
                 })
                 .toList();
         return ResponseEntity.ok(messages);
+    }
+
+    @PostMapping("/{id}/archive")
+    public ResponseEntity<Void> archive(@PathVariable UUID id) {
+        UUID userId = requireUserId();
+        if (!conversationService.isOwnedByUser(id, userId)) {
+            return ResponseEntity.status(403).build();
+        }
+        conversationService.archiveConversation(id);
+        return ResponseEntity.ok().build();
+    }
+
+    @PostMapping("/{id}/unarchive")
+    public ResponseEntity<Void> unarchive(@PathVariable UUID id) {
+        UUID userId = requireUserId();
+        if (!conversationService.isOwnedByUser(id, userId)) {
+            return ResponseEntity.status(403).build();
+        }
+        conversationService.unarchiveConversation(id);
+        return ResponseEntity.ok().build();
+    }
+
+    @PostMapping("/archive-all")
+    public ResponseEntity<Map<String, Integer>> archiveAll() {
+        UUID userId = requireUserId();
+        int count = conversationService.archiveAllForUser(userId);
+        return ResponseEntity.ok(Map.of("archivedCount", count));
+    }
+
+    @GetMapping("/search")
+    public ResponseEntity<Page<ConversationDto>> search(@RequestParam String q, Pageable pageable) {
+        UUID userId = requireUserId();
+        return ResponseEntity.ok(conversationService.searchConversations(userId, q, pageable));
+    }
+
+    @GetMapping("/pinned")
+    public ResponseEntity<List<ConversationDto>> pinned() {
+        UUID userId = requireUserId();
+        return ResponseEntity.ok(conversationService.getPinnedConversations(userId));
+    }
+
+    @GetMapping("/archived")
+    public ResponseEntity<Page<ConversationDto>> archived(Pageable pageable) {
+        UUID userId = requireUserId();
+        return ResponseEntity.ok(conversationService.getArchivedConversations(userId, pageable));
     }
 
     @DeleteMapping("/clear-all")

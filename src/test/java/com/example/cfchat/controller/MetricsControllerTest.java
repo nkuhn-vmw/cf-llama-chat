@@ -32,6 +32,9 @@ class MetricsControllerTest {
     @MockBean
     private UserService userService;
 
+    @MockBean
+    private com.example.cfchat.service.RateLimitService rateLimitService;
+
     @Test
     @WithMockUser(username = "testuser")
     void getSummary_authenticated_returnsSummary() throws Exception {

@@ -68,6 +68,9 @@ class SecurityIntegrationTest {
     @MockBean
     private UserDocumentRepository userDocumentRepository;
 
+
+    @MockBean
+    private com.example.cfchat.service.RateLimitService rateLimitService;
     // ===== Unauthenticated access to admin endpoints =====
 
     @Test
