@@ -12,9 +12,5 @@ applications:
       APP_AUTH_SECRET: changeme
     services:
       - cf-llama-chat-db
-      - tanzu-all-models
-      # Individual model bindings (use these if not using tanzu-all-models/"multi-model" plan)
-      # - tanzu-nomic-embed-text-v2-moe
-      # - tanzu-gpt-oss-120b
-      # - tanzu-Qwen3-Coder-30B
+      - cf-llama-chat-genai
       - cf-llama-chat-sso
