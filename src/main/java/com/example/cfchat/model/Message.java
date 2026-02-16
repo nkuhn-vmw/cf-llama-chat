@@ -44,7 +44,7 @@ public class Message {
 
     @Column(name = "is_active")
     @Builder.Default
-    private boolean active = true;
+    private Boolean active = true;
 
     @Column(name = "generation_time_ms")
     private Long generationTimeMs;

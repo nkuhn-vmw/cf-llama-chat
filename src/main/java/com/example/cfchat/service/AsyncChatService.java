@@ -89,7 +89,7 @@ public class AsyncChatService {
         if (conv.getMessages() != null) {
             for (Message msg : conv.getMessages()) {
                 // Only include active messages
-                if (!msg.isActive()) continue;
+                if (!Boolean.TRUE.equals(msg.getActive())) continue;
 
                 switch (msg.getRole()) {
                     case SYSTEM -> messages.add(new SystemMessage(msg.getContent()));

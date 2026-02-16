@@ -36,8 +36,8 @@ public class ConversationDto {
                 .createdAt(conversation.getCreatedAt())
                 .updatedAt(conversation.getUpdatedAt())
                 .messageCount(conversation.getMessages().size())
-                .archived(conversation.isArchived())
-                .pinned(conversation.isPinned())
+                .archived(Boolean.TRUE.equals(conversation.getArchived()))
+                .pinned(Boolean.TRUE.equals(conversation.getPinned()))
                 .folderId(conversation.getFolderId());
 
         if (includeMessages) {

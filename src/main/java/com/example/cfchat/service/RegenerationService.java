@@ -30,7 +30,7 @@ public class RegenerationService {
         Message lastAssistant = null;
         for (int i = messages.size() - 1; i >= 0; i--) {
             Message m = messages.get(i);
-            if (m.isActive() && m.getRole() == Message.MessageRole.ASSISTANT) {
+            if (Boolean.TRUE.equals(m.getActive()) && m.getRole() == Message.MessageRole.ASSISTANT) {
                 lastAssistant = m;
                 break;
             }
@@ -95,7 +95,7 @@ public class RegenerationService {
         Message preceding = null;
         for (Message m : messages) {
             if (m.getId().equals(assistantMsg.getId())) break;
-            if (m.isActive() && m.getRole() == Message.MessageRole.USER) {
+            if (Boolean.TRUE.equals(m.getActive()) && m.getRole() == Message.MessageRole.USER) {
                 preceding = m;
             }
         }

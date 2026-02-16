@@ -42,7 +42,7 @@ public class ChatExportService {
         StringBuilder sb = new StringBuilder("# " + c.getTitle() + "\n\n");
         if (c.getMessages() != null) {
             c.getMessages().stream()
-                    .filter(Message::isActive)
+                    .filter(m -> Boolean.TRUE.equals(m.getActive()))
                     .forEach(m -> sb.append(m.getRole().name()).append(":\n").append(m.getContent()).append("\n\n"));
         }
         return sb.toString().getBytes(StandardCharsets.UTF_8);
@@ -77,7 +77,7 @@ public class ChatExportService {
 
     private ConversationExport toExport(Conversation c) {
         List<MessageExport> msgs = c.getMessages() != null ? c.getMessages().stream()
-                .filter(Message::isActive)
+                .filter(m -> Boolean.TRUE.equals(m.getActive()))
                 .map(m -> new MessageExport(m.getRole().name(), m.getContent(), m.getModelUsed(), m.getTokensUsed(), m.getCreatedAt()))
                 .toList() : List.of();
         return new ConversationExport(c.getId().toString(), c.getTitle(), c.getModelName(), c.getCreatedAt(), msgs);

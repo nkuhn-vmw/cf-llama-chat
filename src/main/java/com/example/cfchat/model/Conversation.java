@@ -46,11 +46,11 @@ public class Conversation {
 
     @Column(name = "archived")
     @Builder.Default
-    private boolean archived = false;
+    private Boolean archived = false;
 
     @Column(name = "pinned")
     @Builder.Default
-    private boolean pinned = false;
+    private Boolean pinned = false;
 
     @Column(name = "folder_id")
     private String folderId;

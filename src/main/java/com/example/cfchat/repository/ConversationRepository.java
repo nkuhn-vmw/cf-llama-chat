@@ -38,18 +38,19 @@ public interface ConversationRepository extends JpaRepository<Conversation, UUID
 
     void deleteByUserId(UUID userId);
 
-    @Query("SELECT c FROM Conversation c WHERE c.userId = :uid AND c.archived = false ORDER BY c.updatedAt DESC")
+    @Query("SELECT c FROM Conversation c WHERE c.userId = :uid AND (c.archived = false OR c.archived IS NULL) ORDER BY c.updatedAt DESC")
     Page<Conversation> findActiveByUserId(@Param("uid") UUID uid, Pageable p);
 
     @Query("SELECT c FROM Conversation c WHERE c.userId = :uid AND c.archived = true ORDER BY c.updatedAt DESC")
     Page<Conversation> findArchivedByUserId(@Param("uid") UUID uid, Pageable p);
 
-    List<Conversation> findByUserIdAndPinnedTrueOrderByUpdatedAtDesc(UUID userId);
+    @Query("SELECT c FROM Conversation c WHERE c.userId = :userId AND (c.pinned = true) ORDER BY c.updatedAt DESC")
+    List<Conversation> findByUserIdAndPinnedTrueOrderByUpdatedAtDesc(@Param("userId") UUID userId);
 
     @Query("SELECT c FROM Conversation c WHERE c.userId = :uid AND LOWER(c.title) LIKE LOWER(CONCAT('%',:q,'%'))")
     Page<Conversation> searchByTitle(@Param("uid") UUID uid, @Param("q") String q, Pageable p);
 
     @Modifying
-    @Query("UPDATE Conversation c SET c.archived = true WHERE c.userId = :uid AND c.archived = false")
+    @Query("UPDATE Conversation c SET c.archived = true WHERE c.userId = :uid AND (c.archived = false OR c.archived IS NULL)")
     int archiveAllByUserId(@Param("uid") UUID uid);
 }
