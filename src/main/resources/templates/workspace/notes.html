@@ -1,0 +1,296 @@
+<!DOCTYPE html>
+<html lang="en" xmlns:th="http://www.thymeleaf.org">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Notes - My Workspace</title>
+    <link rel="stylesheet" th:href="@{/css/style.css}">
+    <link rel="stylesheet" th:href="@{/css/admin.css}">
+    <style>
+        .notes-grid {
+            display: grid;
+            grid-template-columns: 280px 1fr;
+            gap: 24px;
+            margin-top: 24px;
+        }
+        @media (max-width: 768px) {
+            .notes-grid { grid-template-columns: 1fr; }
+        }
+        .note-list-item {
+            background-color: var(--bg-secondary);
+            border: 1px solid var(--border-color);
+            border-radius: 10px;
+            padding: 14px;
+            margin-bottom: 10px;
+            cursor: pointer;
+            transition: border-color 0.2s;
+        }
+        .note-list-item:hover { border-color: var(--accent-color); }
+        .note-list-item.active { border-color: var(--accent-color); background-color: var(--bg-tertiary); }
+        .note-list-item h4 {
+            margin: 0 0 4px;
+            font-size: 0.95rem;
+            font-weight: 600;
+        }
+        .note-list-item .note-date {
+            font-size: 0.78rem;
+            color: var(--text-muted);
+        }
+        .note-editor-box {
+            background-color: var(--bg-secondary);
+            border: 1px solid var(--border-color);
+            border-radius: 12px;
+            padding: 24px;
+            min-height: 400px;
+        }
+        .note-editor-box input {
+            width: 100%;
+            padding: 10px 14px;
+            border: 1px solid var(--border-color);
+            border-radius: 8px;
+            background-color: var(--bg-primary);
+            color: var(--text-primary);
+            font-size: 1.1rem;
+            font-weight: 600;
+            margin-bottom: 12px;
+        }
+        .note-editor-box textarea {
+            width: 100%;
+            padding: 12px 14px;
+            border: 1px solid var(--border-color);
+            border-radius: 8px;
+            background-color: var(--bg-primary);
+            color: var(--text-primary);
+            font-size: 0.9rem;
+            line-height: 1.6;
+            resize: vertical;
+            min-height: 250px;
+            font-family: inherit;
+        }
+        .note-editor-actions {
+            display: flex;
+            gap: 12px;
+            margin-top: 16px;
+            justify-content: flex-end;
+        }
+        .note-preview {
+            margin-top: 16px;
+            padding: 16px;
+            background-color: var(--bg-tertiary);
+            border-radius: 8px;
+            font-size: 0.9rem;
+            line-height: 1.6;
+            display: none;
+        }
+        .preview-toggle {
+            font-size: 0.85rem;
+            color: var(--accent-color);
+            cursor: pointer;
+            background: none;
+            border: none;
+            padding: 4px 0;
+        }
+    </style>
+</head>
+<body>
+    <div class="admin-container">
+        <header class="admin-header">
+            <h1>Notes</h1>
+            <a href="/workspace" class="back-link">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                    <line x1="19" y1="12" x2="5" y2="12"></line>
+                    <polyline points="12 19 5 12 12 5"></polyline>
+                </svg>
+                Back to Workspace
+            </a>
+        </header>
+
+        <div class="stats-cards">
+            <div class="stat-card">
+                <div class="stat-value" id="totalNotes">--</div>
+                <div class="stat-label">Total Notes</div>
+            </div>
+        </div>
+
+        <div class="notes-grid">
+            <div>
+                <button class="action-btn primary" id="newNoteBtn" style="width: 100%; padding: 10px; margin-bottom: 16px; font-size: 0.95rem;">New Note</button>
+                <div id="noteList">
+                    <p style="color: var(--text-muted);">Loading notes...</p>
+                </div>
+            </div>
+            <div>
+                <div class="note-editor-box" id="noteEditorBox">
+                    <div id="emptyNoteView" style="display: flex; align-items: center; justify-content: center; height: 300px; color: var(--text-muted);">
+                        Select a note or create a new one
+                    </div>
+                    <div id="noteEditorContent" style="display: none;">
+                        <input type="text" id="noteTitleInput" placeholder="Note title">
+                        <textarea id="noteContentInput" placeholder="Write your note... (Markdown supported)" rows="12"></textarea>
+                        <button class="preview-toggle" id="previewToggle">Show Preview</button>
+                        <div class="note-preview" id="notePreview"></div>
+                        <div class="note-editor-actions">
+                            <button class="action-btn" id="cancelNoteBtn">Cancel</button>
+                            <button class="action-btn danger" id="deleteNoteBtn" style="display: none;">Delete</button>
+                            <button class="action-btn primary" id="saveNoteBtn">Save Note</button>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div class="toast-container" id="toastContainer"></div>
+    <script th:src="@{/js/admin-theme.js}"></script>
+    <script th:src="@{/js/admin-toast.js}"></script>
+    <script>
+    // Notes page - uses safe DOM construction via textContent/createElement
+    (function() {
+        var editingNoteId = null;
+
+        function showToast(msg, type) {
+            if (window.showAdminToast) window.showAdminToast(msg, type || 'info');
+        }
+
+        function createEl(tag, className, textContent) {
+            var el = document.createElement(tag);
+            if (className) el.className = className;
+            if (textContent) el.textContent = textContent;
+            return el;
+        }
+
+        function renderNoteList(notes) {
+            var list = document.getElementById('noteList');
+            list.textContent = '';
+            document.getElementById('totalNotes').textContent = notes.length;
+            if (notes.length === 0) {
+                list.appendChild(createEl('p', '', 'No notes yet.'));
+                list.firstChild.style.color = 'var(--text-muted)';
+                return;
+            }
+            notes.forEach(function(n) {
+                var item = createEl('div', 'note-list-item' + (n.id === editingNoteId ? ' active' : ''));
+                item.dataset.id = n.id;
+                item.appendChild(createEl('h4', '', n.title || 'Untitled'));
+                item.appendChild(createEl('div', 'note-date', n.updatedAt ? new Date(n.updatedAt).toLocaleDateString() : ''));
+                list.appendChild(item);
+            });
+        }
+
+        async function loadNotes() {
+            try {
+                var resp = await fetch('/api/notes');
+                if (!resp.ok) throw new Error();
+                renderNoteList(await resp.json());
+            } catch(e) {
+                console.error('Failed to load notes:', e);
+            }
+        }
+
+        function openNote(id) {
+            editingNoteId = id;
+            document.getElementById('emptyNoteView').style.display = 'none';
+            document.getElementById('noteEditorContent').style.display = '';
+            document.getElementById('deleteNoteBtn').style.display = '';
+            document.getElementById('notePreview').style.display = 'none';
+            document.getElementById('previewToggle').textContent = 'Show Preview';
+
+            document.querySelectorAll('.note-list-item').forEach(function(el) {
+                el.classList.toggle('active', el.dataset.id === id);
+            });
+
+            fetch('/api/notes/' + id)
+                .then(function(r) { return r.json(); })
+                .then(function(note) {
+                    document.getElementById('noteTitleInput').value = note.title || '';
+                    document.getElementById('noteContentInput').value = note.content || '';
+                })
+                .catch(function() { showToast('Failed to load note', 'error'); });
+        }
+
+        function newNote() {
+            editingNoteId = null;
+            document.getElementById('emptyNoteView').style.display = 'none';
+            document.getElementById('noteEditorContent').style.display = '';
+            document.getElementById('deleteNoteBtn').style.display = 'none';
+            document.getElementById('noteTitleInput').value = '';
+            document.getElementById('noteContentInput').value = '';
+            document.getElementById('notePreview').style.display = 'none';
+            document.getElementById('previewToggle').textContent = 'Show Preview';
+            document.querySelectorAll('.note-list-item').forEach(function(el) { el.classList.remove('active'); });
+        }
+
+        async function saveNote() {
+            var title = document.getElementById('noteTitleInput').value.trim();
+            var content = document.getElementById('noteContentInput').value.trim();
+            if (!title) { showToast('Title is required', 'error'); return; }
+
+            try {
+                var url = editingNoteId ? '/api/notes/' + editingNoteId : '/api/notes';
+                var method = editingNoteId ? 'PUT' : 'POST';
+                var resp = await fetch(url, {
+                    method: method,
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ title: title, content: content })
+                });
+                if (!resp.ok) throw new Error();
+                showToast(editingNoteId ? 'Note updated' : 'Note created', 'success');
+                var note = await resp.json();
+                editingNoteId = note.id;
+                loadNotes();
+            } catch(e) {
+                showToast('Failed to save note', 'error');
+            }
+        }
+
+        async function deleteNote() {
+            if (!editingNoteId || !confirm('Delete this note?')) return;
+            try {
+                await fetch('/api/notes/' + editingNoteId, { method: 'DELETE' });
+                editingNoteId = null;
+                document.getElementById('noteEditorContent').style.display = 'none';
+                document.getElementById('emptyNoteView').style.display = 'flex';
+                showToast('Note deleted', 'success');
+                loadNotes();
+            } catch(e) {
+                showToast('Failed to delete note', 'error');
+            }
+        }
+
+        function cancelEdit() {
+            editingNoteId = null;
+            document.getElementById('noteEditorContent').style.display = 'none';
+            document.getElementById('emptyNoteView').style.display = 'flex';
+            document.querySelectorAll('.note-list-item').forEach(function(el) { el.classList.remove('active'); });
+        }
+
+        // Preview toggle - uses textContent for safety
+        document.getElementById('previewToggle').addEventListener('click', function() {
+            var preview = document.getElementById('notePreview');
+            if (preview.style.display === 'none' || !preview.style.display) {
+                var content = document.getElementById('noteContentInput').value;
+                // Safe preview using textContent - shows raw text with line breaks via pre-wrap
+                preview.textContent = content || '(Nothing to preview)';
+                preview.style.whiteSpace = 'pre-wrap';
+                preview.style.display = '';
+                this.textContent = 'Hide Preview';
+            } else {
+                preview.style.display = 'none';
+                this.textContent = 'Show Preview';
+            }
+        });
+
+        document.getElementById('newNoteBtn').addEventListener('click', newNote);
+        document.getElementById('saveNoteBtn').addEventListener('click', saveNote);
+        document.getElementById('deleteNoteBtn').addEventListener('click', deleteNote);
+        document.getElementById('cancelNoteBtn').addEventListener('click', cancelEdit);
+        document.getElementById('noteList').addEventListener('click', function(e) {
+            var item = e.target.closest('.note-list-item');
+            if (item) openNote(item.dataset.id);
+        });
+
+        loadNotes();
+    })();
+    </script>
+</body>
+</html>

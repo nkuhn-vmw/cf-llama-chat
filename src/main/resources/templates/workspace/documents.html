@@ -1,0 +1,340 @@
+<!DOCTYPE html>
+<html lang="en" xmlns:th="http://www.thymeleaf.org">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Documents - My Workspace</title>
+    <link rel="stylesheet" th:href="@{/css/style.css}">
+    <link rel="stylesheet" th:href="@{/css/admin.css}">
+    <style>
+        .upload-box {
+            background-color: var(--bg-secondary);
+            border: 2px dashed var(--border-color);
+            border-radius: 12px;
+            padding: 40px;
+            text-align: center;
+            cursor: pointer;
+            transition: border-color 0.2s, background-color 0.2s;
+            margin-top: 24px;
+        }
+        .upload-box:hover {
+            border-color: var(--accent-color);
+            background-color: var(--bg-tertiary);
+        }
+        .upload-box.drag-over {
+            border-color: var(--accent-color);
+            background-color: var(--bg-tertiary);
+        }
+        .upload-box svg {
+            color: var(--text-muted);
+            margin-bottom: 12px;
+        }
+        .upload-box p {
+            color: var(--text-secondary);
+            margin: 4px 0;
+        }
+        .upload-box .upload-hint {
+            font-size: 0.85rem;
+            color: var(--text-muted);
+        }
+        .upload-progress {
+            margin-top: 12px;
+            display: none;
+        }
+        .progress-bar {
+            height: 6px;
+            background-color: var(--bg-tertiary);
+            border-radius: 3px;
+            overflow: hidden;
+        }
+        .progress-fill {
+            height: 100%;
+            background-color: var(--accent-color);
+            width: 0%;
+            transition: width 0.3s;
+        }
+        .progress-text {
+            font-size: 0.85rem;
+            color: var(--text-muted);
+            margin-top: 6px;
+        }
+        .youtube-box {
+            background-color: var(--bg-secondary);
+            border: 1px solid var(--border-color);
+            border-radius: 12px;
+            padding: 20px;
+            margin-top: 16px;
+        }
+        .youtube-box h3 {
+            margin: 0 0 12px;
+            font-size: 1rem;
+        }
+        .youtube-input-row {
+            display: flex;
+            gap: 12px;
+        }
+        .youtube-input-row input {
+            flex: 1;
+            padding: 10px 14px;
+            border: 1px solid var(--border-color);
+            border-radius: 8px;
+            background-color: var(--bg-primary);
+            color: var(--text-primary);
+            font-size: 0.9rem;
+        }
+        .doc-card {
+            background-color: var(--bg-secondary);
+            border: 1px solid var(--border-color);
+            border-radius: 10px;
+            padding: 16px;
+            margin-bottom: 10px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            gap: 16px;
+        }
+        .doc-card-info {
+            flex: 1;
+            min-width: 0;
+        }
+        .doc-card-name {
+            font-weight: 600;
+            font-size: 0.95rem;
+            overflow: hidden;
+            text-overflow: ellipsis;
+            white-space: nowrap;
+        }
+        .doc-card-meta {
+            font-size: 0.8rem;
+            color: var(--text-muted);
+            margin-top: 4px;
+            display: flex;
+            gap: 12px;
+        }
+        .doc-card-actions {
+            display: flex;
+            gap: 8px;
+            flex-shrink: 0;
+        }
+    </style>
+</head>
+<body>
+    <div class="admin-container">
+        <header class="admin-header">
+            <h1>Documents</h1>
+            <a href="/workspace" class="back-link">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                    <line x1="19" y1="12" x2="5" y2="12"></line>
+                    <polyline points="12 19 5 12 12 5"></polyline>
+                </svg>
+                Back to Workspace
+            </a>
+        </header>
+
+        <div class="stats-cards">
+            <div class="stat-card">
+                <div class="stat-value" id="totalDocs">--</div>
+                <div class="stat-label">Documents</div>
+            </div>
+            <div class="stat-card">
+                <div class="stat-value" id="totalChunks">--</div>
+                <div class="stat-label">Chunks</div>
+            </div>
+        </div>
+
+        <!-- Upload Area -->
+        <div class="upload-box" id="uploadBox">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="48" height="48">
+                <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path>
+                <polyline points="17 8 12 3 7 8"></polyline>
+                <line x1="12" y1="3" x2="12" y2="15"></line>
+            </svg>
+            <p>Drop files here or click to upload</p>
+            <p class="upload-hint">PDF, Word, Text files up to 100MB</p>
+            <input type="file" id="fileInput" accept=".pdf,.doc,.docx,.txt,.md" multiple style="display: none;">
+        </div>
+        <div class="upload-progress" id="uploadProgress">
+            <div class="progress-bar">
+                <div class="progress-fill" id="progressFill"></div>
+            </div>
+            <p class="progress-text" id="progressText">Uploading...</p>
+        </div>
+
+        <!-- YouTube URL -->
+        <div class="youtube-box">
+            <h3>Import YouTube Transcript</h3>
+            <div class="youtube-input-row">
+                <input type="text" id="youtubeUrlInput" placeholder="Paste YouTube URL (e.g., https://youtube.com/watch?v=...)">
+                <button class="action-btn primary" id="importYoutubeBtn" style="padding: 10px 20px;">Import</button>
+            </div>
+        </div>
+
+        <!-- Document List -->
+        <div class="section-header" style="margin-top: 32px;">
+            <h2>Uploaded Documents</h2>
+        </div>
+        <div id="documentList" style="margin-top: 12px;">
+            <p style="color: var(--text-muted);">Loading documents...</p>
+        </div>
+    </div>
+
+    <div class="toast-container" id="toastContainer"></div>
+    <script th:src="@{/js/admin-theme.js}"></script>
+    <script th:src="@{/js/admin-toast.js}"></script>
+    <script>
+    // Documents page - uses safe DOM construction via textContent/createElement
+    (function() {
+        function showToast(msg, type) {
+            if (window.showAdminToast) window.showAdminToast(msg, type || 'info');
+        }
+
+        function createEl(tag, className, textContent) {
+            var el = document.createElement(tag);
+            if (className) el.className = className;
+            if (textContent) el.textContent = textContent;
+            return el;
+        }
+
+        function formatFileSize(bytes) {
+            if (!bytes) return '0 B';
+            var sizes = ['B', 'KB', 'MB', 'GB'];
+            var i = Math.floor(Math.log(bytes) / Math.log(1024));
+            return (bytes / Math.pow(1024, i)).toFixed(1) + ' ' + sizes[i];
+        }
+
+        function renderDocuments(docs) {
+            var list = document.getElementById('documentList');
+            list.textContent = '';
+            document.getElementById('totalDocs').textContent = docs.length;
+            var totalChunks = docs.reduce(function(sum, d) { return sum + (d.chunkCount || 0); }, 0);
+            document.getElementById('totalChunks').textContent = totalChunks;
+
+            if (docs.length === 0) {
+                list.appendChild(createEl('p', '', 'No documents uploaded yet.'));
+                list.firstChild.style.color = 'var(--text-muted)';
+                return;
+            }
+
+            docs.forEach(function(d) {
+                var card = createEl('div', 'doc-card');
+                card.dataset.id = d.id;
+
+                var info = createEl('div', 'doc-card-info');
+                info.appendChild(createEl('div', 'doc-card-name', d.fileName || d.name || 'Document'));
+
+                var meta = createEl('div', 'doc-card-meta');
+                meta.appendChild(createEl('span', '', formatFileSize(d.fileSize || d.size)));
+                meta.appendChild(createEl('span', '', (d.chunkCount || 0) + ' chunks'));
+                meta.appendChild(createEl('span', '', d.uploadedAt || d.createdAt ? new Date(d.uploadedAt || d.createdAt).toLocaleDateString() : ''));
+                info.appendChild(meta);
+
+                var actions = createEl('div', 'doc-card-actions');
+                var deleteBtn = createEl('button', 'action-btn danger delete-doc-btn', 'Delete');
+                deleteBtn.dataset.id = d.id;
+                actions.appendChild(deleteBtn);
+
+                card.appendChild(info);
+                card.appendChild(actions);
+                list.appendChild(card);
+            });
+        }
+
+        async function loadDocuments() {
+            try {
+                var resp = await fetch('/api/documents');
+                if (!resp.ok) throw new Error();
+                renderDocuments(await resp.json());
+            } catch(e) {
+                console.error('Failed to load documents:', e);
+            }
+        }
+
+        async function uploadFiles(files) {
+            if (!files || files.length === 0) return;
+            var progress = document.getElementById('uploadProgress');
+            var fill = document.getElementById('progressFill');
+            var text = document.getElementById('progressText');
+            progress.style.display = '';
+
+            for (var i = 0; i < files.length; i++) {
+                var file = files[i];
+                text.textContent = 'Uploading ' + file.name + '...';
+                fill.style.width = Math.round(((i) / files.length) * 100) + '%';
+
+                var formData = new FormData();
+                formData.append('file', file);
+                try {
+                    var resp = await fetch('/api/documents/upload', {
+                        method: 'POST',
+                        body: formData
+                    });
+                    if (!resp.ok) throw new Error('Upload failed for ' + file.name);
+                    fill.style.width = Math.round(((i + 1) / files.length) * 100) + '%';
+                } catch(e) {
+                    showToast('Failed to upload ' + file.name, 'error');
+                }
+            }
+
+            fill.style.width = '100%';
+            text.textContent = 'Upload complete!';
+            setTimeout(function() { progress.style.display = 'none'; fill.style.width = '0%'; }, 2000);
+            showToast(files.length + ' file(s) uploaded', 'success');
+            loadDocuments();
+        }
+
+        async function deleteDocument(id) {
+            if (!confirm('Delete this document?')) return;
+            try {
+                await fetch('/api/documents/' + id, { method: 'DELETE' });
+                showToast('Document deleted', 'success');
+                loadDocuments();
+            } catch(e) {
+                showToast('Failed to delete document', 'error');
+            }
+        }
+
+        async function importYouTube() {
+            var url = document.getElementById('youtubeUrlInput').value.trim();
+            if (!url) { showToast('Please enter a YouTube URL', 'error'); return; }
+
+            try {
+                var resp = await fetch('/api/documents/youtube', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ url: url })
+                });
+                if (!resp.ok) throw new Error();
+                document.getElementById('youtubeUrlInput').value = '';
+                showToast('YouTube transcript imported', 'success');
+                loadDocuments();
+            } catch(e) {
+                showToast('Failed to import YouTube transcript', 'error');
+            }
+        }
+
+        // Upload box click/drag
+        var uploadBox = document.getElementById('uploadBox');
+        var fileInput = document.getElementById('fileInput');
+
+        uploadBox.addEventListener('click', function() { fileInput.click(); });
+        fileInput.addEventListener('change', function() { uploadFiles(fileInput.files); fileInput.value = ''; });
+
+        uploadBox.addEventListener('dragover', function(e) { e.preventDefault(); uploadBox.classList.add('drag-over'); });
+        uploadBox.addEventListener('dragleave', function() { uploadBox.classList.remove('drag-over'); });
+        uploadBox.addEventListener('drop', function(e) {
+            e.preventDefault();
+            uploadBox.classList.remove('drag-over');
+            uploadFiles(e.dataTransfer.files);
+        });
+
+        document.getElementById('importYoutubeBtn').addEventListener('click', importYouTube);
+        document.getElementById('documentList').addEventListener('click', function(e) {
+            var btn = e.target.closest('.delete-doc-btn');
+            if (btn) deleteDocument(btn.dataset.id);
+        });
+
+        loadDocuments();
+    })();
+    </script>
+</body>
+</html>

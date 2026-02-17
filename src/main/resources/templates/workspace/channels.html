@@ -1,0 +1,374 @@
+<!DOCTYPE html>
+<html lang="en" xmlns:th="http://www.thymeleaf.org">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Channels - My Workspace</title>
+    <link rel="stylesheet" th:href="@{/css/style.css}">
+    <link rel="stylesheet" th:href="@{/css/admin.css}">
+    <style>
+        .channel-card {
+            background-color: var(--bg-secondary);
+            border: 1px solid var(--border-color);
+            border-radius: 12px;
+            padding: 16px;
+            margin-bottom: 12px;
+            cursor: pointer;
+            transition: border-color 0.2s, box-shadow 0.2s;
+        }
+        .channel-card:hover {
+            border-color: var(--accent-color);
+            box-shadow: 0 4px 12px rgba(0,0,0,0.1);
+        }
+        .channel-card.active {
+            border-color: var(--accent-color);
+            background-color: var(--bg-tertiary);
+        }
+        .channel-card-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 8px;
+        }
+        .channel-card-header h4 {
+            margin: 0;
+            font-size: 1rem;
+            font-weight: 600;
+        }
+        .channel-card-desc {
+            font-size: 0.85rem;
+            color: var(--text-secondary);
+        }
+        .channel-grid {
+            display: grid;
+            grid-template-columns: 300px 1fr;
+            gap: 24px;
+            margin-top: 24px;
+        }
+        @media (max-width: 768px) {
+            .channel-grid { grid-template-columns: 1fr; }
+        }
+        .channel-messages-box {
+            background-color: var(--bg-secondary);
+            border: 1px solid var(--border-color);
+            border-radius: 12px;
+            display: flex;
+            flex-direction: column;
+            height: 500px;
+        }
+        .channel-messages-box-header {
+            padding: 16px;
+            border-bottom: 1px solid var(--border-color);
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+        .channel-messages-box-header h3 {
+            margin: 0;
+            font-size: 1.1rem;
+        }
+        .channel-msg-list {
+            flex: 1;
+            overflow-y: auto;
+            padding: 16px;
+        }
+        .channel-msg {
+            margin-bottom: 12px;
+            padding: 10px 14px;
+            background-color: var(--bg-tertiary);
+            border-radius: 8px;
+        }
+        .channel-msg-author {
+            font-size: 0.8rem;
+            font-weight: 600;
+            color: var(--accent-color);
+            margin-bottom: 4px;
+        }
+        .channel-msg-text {
+            font-size: 0.9rem;
+            line-height: 1.5;
+        }
+        .channel-msg-time {
+            font-size: 0.75rem;
+            color: var(--text-muted);
+            margin-top: 4px;
+        }
+        .channel-input-box {
+            padding: 12px 16px;
+            border-top: 1px solid var(--border-color);
+            display: flex;
+            gap: 8px;
+        }
+        .channel-input-box input {
+            flex: 1;
+            padding: 10px 14px;
+            border: 1px solid var(--border-color);
+            border-radius: 8px;
+            background-color: var(--bg-primary);
+            color: var(--text-primary);
+            font-size: 0.9rem;
+        }
+        .channel-input-box button {
+            padding: 10px 20px;
+            border: none;
+            border-radius: 8px;
+            background-color: var(--accent-color);
+            color: white;
+            cursor: pointer;
+            font-weight: 500;
+        }
+        .channel-input-box button:hover {
+            opacity: 0.9;
+        }
+        .empty-channel-view {
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            height: 100%;
+            color: var(--text-muted);
+            font-size: 0.95rem;
+        }
+    </style>
+</head>
+<body>
+    <div class="admin-container">
+        <header class="admin-header">
+            <h1>Channels</h1>
+            <a href="/workspace" class="back-link">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                    <line x1="19" y1="12" x2="5" y2="12"></line>
+                    <polyline points="12 19 5 12 12 5"></polyline>
+                </svg>
+                Back to Workspace
+            </a>
+        </header>
+
+        <div class="stats-cards">
+            <div class="stat-card">
+                <div class="stat-value" id="totalChannels">--</div>
+                <div class="stat-label">Total Channels</div>
+            </div>
+        </div>
+
+        <!-- Create Channel -->
+        <div class="section-header" style="margin-top: 24px;">
+            <h2>Create Channel</h2>
+        </div>
+        <div style="display: flex; gap: 12px; margin-top: 12px; flex-wrap: wrap;">
+            <input type="text" id="channelNameInput" class="modal-input" placeholder="Channel name" style="flex: 1; min-width: 200px;">
+            <input type="text" id="channelDescInput" class="modal-input" placeholder="Description (optional)" style="flex: 2; min-width: 200px;">
+            <button class="action-btn primary" id="createChannelBtn" style="padding: 10px 24px; font-size: 0.95rem;">Create</button>
+        </div>
+
+        <!-- Channel Grid: list + messages -->
+        <div class="channel-grid">
+            <div>
+                <div class="section-header" style="margin-top: 0;">
+                    <h2>Your Channels</h2>
+                </div>
+                <div id="channelList">
+                    <p style="color: var(--text-muted); padding: 16px;">Loading channels...</p>
+                </div>
+            </div>
+            <div>
+                <div class="channel-messages-box" id="channelMessagesBox">
+                    <div class="empty-channel-view" id="emptyChannelView">
+                        Select a channel to view messages
+                    </div>
+                    <div id="channelViewContent" style="display: none; flex-direction: column; height: 100%;">
+                        <div class="channel-messages-box-header">
+                            <h3 id="channelViewName">Channel</h3>
+                            <button class="action-btn danger" id="deleteChannelBtn" title="Delete channel">Delete</button>
+                        </div>
+                        <div class="channel-msg-list" id="channelMsgList"></div>
+                        <div class="channel-input-box">
+                            <input type="text" id="channelMsgInput" placeholder="Type a message...">
+                            <button id="channelSendBtn">Send</button>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div class="toast-container" id="toastContainer"></div>
+    <script th:src="@{/js/admin-theme.js}"></script>
+    <script th:src="@{/js/admin-toast.js}"></script>
+    <script>
+    // Channels page - uses safe DOM construction via textContent/createElement
+    (function() {
+        var currentChannelId = null;
+        var eventSource = null;
+
+        function showToast(msg, type) {
+            if (window.showAdminToast) window.showAdminToast(msg, type || 'info');
+        }
+
+        function createEl(tag, className, textContent) {
+            var el = document.createElement(tag);
+            if (className) el.className = className;
+            if (textContent) el.textContent = textContent;
+            return el;
+        }
+
+        function renderChannelList(channels) {
+            var list = document.getElementById('channelList');
+            list.textContent = '';
+            document.getElementById('totalChannels').textContent = channels.length;
+            if (channels.length === 0) {
+                var p = createEl('p', '', 'No channels yet. Create one above.');
+                p.style.color = 'var(--text-muted)';
+                p.style.padding = '16px';
+                list.appendChild(p);
+                return;
+            }
+            channels.forEach(function(ch) {
+                var card = createEl('div', 'channel-card' + (ch.id === currentChannelId ? ' active' : ''));
+                card.dataset.id = ch.id;
+                var header = createEl('div', 'channel-card-header');
+                var h4 = createEl('h4', '', '#' + (ch.name || ''));
+                header.appendChild(h4);
+                card.appendChild(header);
+                if (ch.description) {
+                    card.appendChild(createEl('div', 'channel-card-desc', ch.description));
+                }
+                list.appendChild(card);
+            });
+        }
+
+        function renderMessages(messages) {
+            var msgList = document.getElementById('channelMsgList');
+            msgList.textContent = '';
+            messages.forEach(function(m) {
+                appendMessage(msgList, m);
+            });
+            msgList.scrollTop = msgList.scrollHeight;
+        }
+
+        function appendMessage(container, m) {
+            var div = createEl('div', 'channel-msg');
+            div.appendChild(createEl('div', 'channel-msg-author', m.authorName || m.username || 'User'));
+            div.appendChild(createEl('div', 'channel-msg-text', m.content || ''));
+            div.appendChild(createEl('div', 'channel-msg-time', m.createdAt ? new Date(m.createdAt).toLocaleString() : new Date().toLocaleString()));
+            container.appendChild(div);
+        }
+
+        async function loadChannels() {
+            try {
+                var resp = await fetch('/api/channels');
+                if (!resp.ok) throw new Error();
+                renderChannelList(await resp.json());
+            } catch (e) {
+                console.error('Failed to load channels:', e);
+            }
+        }
+
+        async function openChannel(id) {
+            currentChannelId = id;
+            document.getElementById('emptyChannelView').style.display = 'none';
+            var content = document.getElementById('channelViewContent');
+            content.style.display = 'flex';
+
+            document.querySelectorAll('.channel-card').forEach(function(c) {
+                c.classList.toggle('active', c.dataset.id === id);
+            });
+
+            try {
+                var resp = await fetch('/api/channels/' + id);
+                if (resp.ok) {
+                    var channel = await resp.json();
+                    document.getElementById('channelViewName').textContent = '#' + (channel.name || '');
+                }
+            } catch(e) {}
+
+            try {
+                var msgResp = await fetch('/api/channels/' + id + '/messages');
+                if (msgResp.ok) renderMessages(await msgResp.json());
+            } catch(e) {}
+
+            startSSE(id);
+        }
+
+        function startSSE(channelId) {
+            if (eventSource) eventSource.close();
+            try {
+                eventSource = new EventSource('/api/channels/' + channelId + '/stream');
+                eventSource.onmessage = function(event) {
+                    try {
+                        var msg = JSON.parse(event.data);
+                        var msgList = document.getElementById('channelMsgList');
+                        appendMessage(msgList, msg);
+                        msgList.scrollTop = msgList.scrollHeight;
+                    } catch(e) {}
+                };
+            } catch(e) {}
+        }
+
+        async function sendMessage() {
+            if (!currentChannelId) return;
+            var input = document.getElementById('channelMsgInput');
+            var content = input.value.trim();
+            if (!content) return;
+            input.value = '';
+            try {
+                await fetch('/api/channels/' + currentChannelId + '/messages', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ content: content })
+                });
+            } catch(e) {
+                showToast('Failed to send message', 'error');
+            }
+        }
+
+        async function createChannel() {
+            var name = document.getElementById('channelNameInput').value.trim();
+            if (!name) { showToast('Channel name is required', 'error'); return; }
+            var desc = document.getElementById('channelDescInput').value.trim();
+            try {
+                var resp = await fetch('/api/channels', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ name: name, description: desc })
+                });
+                if (!resp.ok) throw new Error();
+                document.getElementById('channelNameInput').value = '';
+                document.getElementById('channelDescInput').value = '';
+                showToast('Channel created', 'success');
+                loadChannels();
+            } catch(e) {
+                showToast('Failed to create channel', 'error');
+            }
+        }
+
+        async function deleteChannel() {
+            if (!currentChannelId || !confirm('Delete this channel?')) return;
+            try {
+                var resp = await fetch('/api/channels/' + currentChannelId, { method: 'DELETE' });
+                if (!resp.ok) throw new Error();
+                currentChannelId = null;
+                document.getElementById('channelViewContent').style.display = 'none';
+                document.getElementById('emptyChannelView').style.display = 'flex';
+                showToast('Channel deleted', 'success');
+                loadChannels();
+            } catch(e) {
+                showToast('Failed to delete channel', 'error');
+            }
+        }
+
+        document.getElementById('createChannelBtn').addEventListener('click', createChannel);
+        document.getElementById('deleteChannelBtn').addEventListener('click', deleteChannel);
+        document.getElementById('channelSendBtn').addEventListener('click', sendMessage);
+        document.getElementById('channelMsgInput').addEventListener('keydown', function(e) {
+            if (e.key === 'Enter') { e.preventDefault(); sendMessage(); }
+        });
+        document.getElementById('channelList').addEventListener('click', function(e) {
+            var card = e.target.closest('.channel-card');
+            if (card) openChannel(card.dataset.id);
+        });
+
+        loadChannels();
+    })();
+    </script>
+</body>
+</html>
