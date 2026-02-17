@@ -1569,7 +1569,8 @@ class ChatApp {
 
         // Upload area click
         if (this.uploadArea) {
-            this.uploadArea.addEventListener('click', () => {
+            this.uploadArea.addEventListener('click', (e) => {
+                if (e.target === this.fileInput) return;
                 this.fileInput.click();
             });
 
