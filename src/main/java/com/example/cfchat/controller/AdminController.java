@@ -619,7 +619,7 @@ public class AdminController {
         int enabledFeatures = 0;
         String[] featureKeys = {
             "feature.rag.enabled", "feature.tools.enabled", "feature.channels.enabled",
-            "feature.notes.enabled", "feature.memory.enabled", "feature.agentic_search.enabled",
+            "feature.notes.enabled", "feature.memory.enabled",
             "feature.temporary_chats.enabled"
         };
         for (String key : featureKeys) {
@@ -672,7 +672,6 @@ public class AdminController {
         defaults.put("feature.channels.enabled", "true");
         defaults.put("feature.notes.enabled", "true");
         defaults.put("feature.memory.enabled", "true");
-        defaults.put("feature.agentic_search.enabled", "true");
         defaults.put("feature.temporary_chats.enabled", "true");
         defaults.put("maintenance.enabled", "false");
         defaults.put("maintenance.message", "");
@@ -709,7 +708,7 @@ public class AdminController {
             "session.timeout", "email.verification.required", "default.model", "allowed.models",
             "max.tokens", "default.temperature", "moderation.enabled", "moderation.level",
             "feature.rag.enabled", "feature.tools.enabled", "feature.channels.enabled",
-            "feature.notes.enabled", "feature.memory.enabled", "feature.agentic_search.enabled",
+            "feature.notes.enabled", "feature.memory.enabled",
             "feature.temporary_chats.enabled", "maintenance.enabled", "maintenance.message",
             "banner.text", "banner.type", "prevent_chat_deletion"
         );

@@ -160,13 +160,6 @@
                 <div class="header-right">
                     <!-- Nav Links -->
                     <div class="nav-links">
-                        <button type="button" class="nav-link" id="agenticSearchBtn" title="Agent Search">
-                            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                                <circle cx="11" cy="11" r="8"></circle>
-                                <line x1="21" y1="21" x2="16.65" y2="16.65"></line>
-                            </svg>
-                            Search
-                        </button>
                         <a href="/workspace" class="nav-link" title="My Workspace">
                             <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
                                 <rect x="3" y="3" width="7" height="7"></rect>
@@ -462,44 +455,6 @@
             </div>
         </div>
 
-        <!-- Agent Search Modal -->
-        <div class="modal-overlay" id="agenticSearchModal">
-            <div class="modal agentic-search-modal" role="dialog" aria-modal="true" aria-labelledby="agenticSearchTitle">
-                <div class="modal-header-row">
-                    <h3 id="agenticSearchTitle">Agent Search</h3>
-                    <button class="modal-close-btn" data-action="closeAgenticSearch" aria-label="Close">
-                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="18" height="18">
-                            <line x1="18" y1="6" x2="6" y2="18"></line>
-                            <line x1="6" y1="6" x2="18" y2="18"></line>
-                        </svg>
-                    </button>
-                </div>
-                <div class="agentic-search-form">
-                    <input type="text" class="modal-input" id="agenticSearchInput" placeholder="Enter your research query...">
-                    <div class="agentic-search-settings">
-                        <div class="agentic-setting">
-                            <label for="maxIterationsSlider">Max Iterations: <span id="maxIterationsValue">5</span></label>
-                            <input type="range" id="maxIterationsSlider" min="1" max="10" value="5" class="agentic-slider">
-                        </div>
-                        <label class="agentic-toggle">
-                            <input type="checkbox" id="enableWebSearchToggle" checked>
-                            <span>Enable Web Search</span>
-                        </label>
-                    </div>
-                    <button class="modal-btn primary agentic-search-btn" id="runAgenticSearchBtn">
-                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="16" height="16">
-                            <circle cx="11" cy="11" r="8"></circle>
-                            <line x1="21" y1="21" x2="16.65" y2="16.65"></line>
-                        </svg>
-                        Search
-                    </button>
-                </div>
-                <div class="agentic-search-results" id="agenticSearchResults" style="display: none;">
-                    <div class="search-steps" id="searchSteps"></div>
-                    <div class="search-final-result" id="searchFinalResult"></div>
-                </div>
-            </div>
-        </div>
     </div>
 
     <!-- Hidden data for JavaScript -->

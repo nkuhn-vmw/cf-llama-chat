@@ -29,8 +29,6 @@ import org.springframework.stereotype.Service;
 import reactor.core.publisher.Flux;
 
 import com.example.cfchat.config.GenAiConfig;
-import com.example.cfchat.dto.AgenticSearchRequest;
-import com.example.cfchat.dto.AgenticSearchResponse;
 import com.example.cfchat.service.ExternalBindingService;
 
 import java.util.ArrayList;
@@ -63,7 +61,6 @@ public class ChatService {
     private final YouTubeTranscriptService youTubeTranscriptService;
     private final RagPromptBuilder ragPromptBuilder;
     private final WebContentService webContentService;
-    private final AgenticSearchService agenticSearchService;
 
     private static final Pattern YT_RAG_PATTERN = Pattern.compile("#\\s*(https?://(?:www\\.)?(?:youtube\\.com/watch\\?v=|youtu\\.be/)[\\w-]{11}\\S*)");
     private static final Pattern WEB_RAG_PATTERN = Pattern.compile("#\\s*(https?://\\S+)");
@@ -94,8 +91,7 @@ public class ChatService {
             @Autowired(required = false) ExternalBindingService externalBindingService,
             @Autowired(required = false) YouTubeTranscriptService youTubeTranscriptService,
             @Autowired(required = false) WebContentService webContentService,
-            RagPromptBuilder ragPromptBuilder,
-            @Autowired(required = false) AgenticSearchService agenticSearchService) {
+            RagPromptBuilder ragPromptBuilder) {
         this.primaryChatClient = primaryChatClient;
         // Use OpenAI model as primary for streaming
         this.primaryChatModel = openAiChatModel;
@@ -114,15 +110,13 @@ public class ChatService {
         this.youTubeTranscriptService = youTubeTranscriptService;
         this.ragPromptBuilder = ragPromptBuilder;
         this.webContentService = webContentService;
-        this.agenticSearchService = agenticSearchService;
 
-        log.info("ChatService initialized - primaryChatClient: {}, ollamaChatClient: {}, primaryChatModel: {}, mcpTools: {}, documentEmbedding: {}, externalBindings: {}, agenticSearch: {}",
+        log.info("ChatService initialized - primaryChatClient: {}, ollamaChatClient: {}, primaryChatModel: {}, mcpTools: {}, documentEmbedding: {}, externalBindings: {}",
                 primaryChatClient != null, ollamaChatClient != null,
                 openAiChatModel != null ? openAiChatModel.getClass().getSimpleName() : "null",
                 mcpToolCallbackCacheService != null ? mcpToolCallbackCacheService.getMcpServerServices().size() : 0,
                 documentEmbeddingService != null && documentEmbeddingService.isAvailable(),
-                externalBindingService != null,
-                agenticSearchService != null);
+                externalBindingService != null);
     }
 
     @Observed(name = "cfllama.chat",
@@ -172,12 +166,6 @@ public class ChatService {
         // Save user message (skip for temporary chats)
         if (!isTemporary) {
             conversationService.addMessage(conversationId, Message.MessageRole.USER, request.getMessage(), null);
-        }
-
-        // Delegate to agentic search if requested and available
-        if (request.isUseAgenticSearch() && agenticSearchService != null && agenticSearchService.isEnabled()) {
-            log.info("Delegating to agentic search for conversation: {}", conversationId);
-            return handleAgenticSearch(request, userId, conversationId, model, provider, isTemporary);
         }
 
         // Build prompt with conversation history (with optional skill and document context)
@@ -245,68 +233,6 @@ public class ChatService {
                 .messageId(messageId)
                 .content(response)
                 .htmlContent(markdownService.toHtml(response))
-                .model(model)
-                .complete(true)
-                .temporary(isTemporary)
-                .timeToFirstTokenMs(timeToFirstToken)
-                .tokensPerSecond(tokensPerSecond)
-                .totalResponseTimeMs(responseTime)
-                .build();
-    }
-
-    /**
-     * Handle a chat request using agentic search.
-     * Delegates to AgenticSearchService for multi-step query decomposition and synthesis,
-     * then wraps the result as a ChatResponse.
-     */
-    private ChatResponse handleAgenticSearch(ChatRequest request, UUID userId,
-                                              UUID conversationId, String model,
-                                              String provider, boolean isTemporary) {
-        long startTime = System.currentTimeMillis();
-
-        AgenticSearchRequest searchRequest = AgenticSearchRequest.builder()
-                .query(request.getMessage())
-                .model(model)
-                .provider(provider)
-                .includeWebSearch(false)
-                .conversationId(conversationId)
-                .build();
-
-        AgenticSearchResponse searchResponse = agenticSearchService.search(searchRequest, userId);
-
-        String response = searchResponse.getAnswer() != null
-                ? searchResponse.getAnswer()
-                : searchResponse.getError();
-
-        long responseTime = System.currentTimeMillis() - startTime;
-
-        // Save assistant message (skip for temporary chats)
-        UUID messageId = null;
-        if (!isTemporary) {
-            Message savedMessage = conversationService.addMessage(
-                    conversationId, Message.MessageRole.ASSISTANT, response, model);
-            messageId = savedMessage.getId();
-        }
-
-        // Record metrics
-        int promptTokens = estimateTokens(request.getMessage());
-        int completionTokens = estimateTokens(response);
-        Long timeToFirstToken = responseTime;
-        Double tokensPerSecond = responseTime > 0
-                ? (completionTokens / (responseTime / 1000.0)) : 0.0;
-
-        if (!isTemporary) {
-            metricsService.recordUsage(userId, conversationId, model, provider,
-                    promptTokens, completionTokens, responseTime, timeToFirstToken, tokensPerSecond);
-        }
-
-        return ChatResponse.builder()
-                .conversationId(isTemporary ? null : conversationId)
-                .messageId(messageId)
-                .content(response)
-                .htmlContent(searchResponse.getHtmlAnswer() != null
-                        ? searchResponse.getHtmlAnswer()
-                        : markdownService.toHtml(response))
                 .model(model)
                 .complete(true)
                 .temporary(isTemporary)

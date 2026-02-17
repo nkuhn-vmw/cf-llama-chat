@@ -181,13 +181,6 @@ translation:
   libretranslate:
     url: ${LIBRETRANSLATE_URL:http://localhost:5000}
 
-# Agentic Search configuration
-agentic-search:
-  enabled: ${AGENTIC_SEARCH_ENABLED:false}
-  max-iterations: ${AGENTIC_SEARCH_MAX_ITERATIONS:3}
-  max-sub-queries: ${AGENTIC_SEARCH_MAX_SUB_QUERIES:3}
-  top-k: ${AGENTIC_SEARCH_TOP_K:5}
-  max-snippet-length: ${AGENTIC_SEARCH_MAX_SNIPPET:500}
 
 # Storage configuration
 storage:
