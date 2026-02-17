@@ -127,6 +127,10 @@
                 <div class="stat-value" th:text="${genAiModelCount}">0</div>
                 <div class="stat-label">GenAI Services</div>
             </div>
+            <div class="stat-card">
+                <div class="stat-value" id="activeUsersCount">--</div>
+                <div class="stat-label">Active Users</div>
+            </div>
         </div>
 
         <nav class="admin-nav">
@@ -290,6 +294,20 @@
                     Manage active announcements
                 </div>
             </a>
+
+            <a href="/admin/webhooks" class="admin-nav-card">
+                <div class="card-icon">
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                        <path d="M10 13a5 5 0 0 0 7.54.54l3-3a5 5 0 0 0-7.07-7.07l-1.72 1.71"></path>
+                        <path d="M14 11a5 5 0 0 0-7.54-.54l-3 3a5 5 0 0 0 7.07 7.07l1.71-1.71"></path>
+                    </svg>
+                </div>
+                <h3>Webhooks</h3>
+                <p>Configure webhook endpoints to receive event notifications for chat messages, user activity, and more.</p>
+                <div class="card-stat">
+                    Manage event integrations
+                </div>
+            </a>
         </nav>
 
         <div class="environment-badge" th:classappend="${isCloudProfile} ? 'cloud' : ''">
@@ -307,5 +325,18 @@
 
     <script th:src="@{/js/admin-theme.js}"></script>
     <script th:src="@{/js/admin-toast.js}"></script>
+    <script>
+        fetch('/api/admin/active-users')
+            .then(function(res) {
+                if (!res.ok) throw new Error('Failed to load active users');
+                return res.json();
+            })
+            .then(function(data) {
+                document.getElementById('activeUsersCount').textContent = data.count != null ? data.count : data;
+            })
+            .catch(function() {
+                document.getElementById('activeUsersCount').textContent = '--';
+            });
+    </script>
 </body>
 </html>
