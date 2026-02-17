@@ -54,6 +54,23 @@
                 </button>
             </div>
 
+            <!-- Sidebar Search -->
+            <div class="sidebar-search">
+                <input type="text" id="sidebarSearch" placeholder="Search conversations..." aria-label="Search conversations">
+                <svg class="search-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="16" height="16">
+                    <circle cx="11" cy="11" r="8"></circle>
+                    <line x1="21" y1="21" x2="16.65" y2="16.65"></line>
+                </svg>
+            </div>
+
+            <!-- Sidebar Tabs -->
+            <div class="sidebar-tabs" id="sidebarTabs">
+                <button class="sidebar-tab active" data-tab="all" title="All chats">All</button>
+                <button class="sidebar-tab" data-tab="pinned" title="Pinned chats">Pinned</button>
+                <button class="sidebar-tab" data-tab="folders" title="Folders">Folders</button>
+                <button class="sidebar-tab" data-tab="archived" title="Archived">Archive</button>
+            </div>
+
             <div class="conversations-list" id="conversationsList">
                 <div th:each="conv : ${conversations}" class="conversation-item"
                      th:data-id="${conv.id}" th:classappend="${conversationId != null && conv.id.equals(conversationId)} ? 'active' : ''">
@@ -143,6 +160,37 @@
                 <div class="header-right">
                     <!-- Nav Links -->
                     <div class="nav-links">
+                        <button type="button" class="nav-link" id="channelsBtn" title="Channels">
+                            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="18" height="18">
+                                <path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"></path>
+                                <line x1="9" y1="10" x2="15" y2="10"></line>
+                                <line x1="12" y1="7" x2="12" y2="13"></line>
+                            </svg>
+                            Channels
+                        </button>
+                        <button type="button" class="nav-link" id="notesBtn" title="Notes">
+                            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="18" height="18">
+                                <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"></path>
+                                <polyline points="14 2 14 8 20 8"></polyline>
+                                <line x1="16" y1="13" x2="8" y2="13"></line>
+                                <line x1="16" y1="17" x2="8" y2="17"></line>
+                            </svg>
+                            Notes
+                        </button>
+                        <button type="button" class="nav-link" id="memoryBtn" title="Memory">
+                            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="18" height="18">
+                                <path d="M12 2a7 7 0 0 1 7 7c0 2.38-1.19 4.47-3 5.74V17a2 2 0 0 1-2 2H10a2 2 0 0 1-2-2v-2.26C6.19 13.47 5 11.38 5 9a7 7 0 0 1 7-7z"></path>
+                                <line x1="10" y1="21" x2="14" y2="21"></line>
+                            </svg>
+                            Memory
+                        </button>
+                        <button type="button" class="nav-link" id="agenticSearchBtn" title="Agentic Search">
+                            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                <circle cx="11" cy="11" r="8"></circle>
+                                <line x1="21" y1="21" x2="16.65" y2="16.65"></line>
+                            </svg>
+                            Search
+                        </button>
                         <a href="/metrics" class="nav-link">
                             <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
                                 <path d="M18 20V10"></path>
@@ -210,6 +258,13 @@
                                     </svg>
                                     Admin Portal
                                 </a>
+                                <a href="/settings" class="user-menu-item">
+                                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                        <circle cx="12" cy="12" r="3"></circle>
+                                        <path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1 0 2.83 2 2 0 0 1-2.83 0l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-2 2 2 2 0 0 1-2-2v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83 0 2 2 0 0 1 0-2.83l.06-.06A1.65 1.65 0 0 0 4.6 15a1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1-2-2 2 2 0 0 1 2-2h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 0-2.83 2 2 0 0 1 2.83 0l.06.06A1.65 1.65 0 0 0 9 4.6a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 2-2 2 2 0 0 1 2 2v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 0 2 2 0 0 1 0 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 2 2 2 2 0 0 1-2 2h-.09a1.65 1.65 0 0 0-1.51 1z"></path>
+                                    </svg>
+                                    Settings
+                                </a>
                                 <button th:if="${currentUser.authProvider.name() == 'LOCAL'}"
                                         type="button" class="user-menu-item"
                                         data-action="changePassword">
@@ -276,7 +331,8 @@
                     <!-- Messages display -->
                     <div class="messages" id="messages" th:if="${currentConversation != null}">
                         <div th:each="msg : ${currentConversation.messages}"
-                             th:class="'message ' + ${msg.role}">
+                             th:class="'message ' + ${msg.role}"
+                             th:data-message-id="${msg.id}">
                             <div class="message-avatar">
                                 <span th:if="${msg.role == 'user'}">U</span>
                                 <span th:if="${msg.role == 'assistant'}">AI</span>
@@ -342,6 +398,12 @@
                                         <path d="M14.7 6.3a1 1 0 0 0 0 1.4l1.6 1.6a1 1 0 0 0 1.4 0l3.77-3.77a6 6 0 0 1-7.94 7.94l-6.91 6.91a2.12 2.12 0 0 1-3-3l6.91-6.91a6 6 0 0 1 7.94-7.94l-3.76 3.76z"></path>
                                     </svg>
                                     Tools
+                                </button>
+                                <button type="button" class="prompts-btn" id="promptsBtn" title="Manage Prompt Presets">
+                                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="16" height="16">
+                                        <path d="M4 4h16v2H4zM4 10h10v2H4zM4 16h16v2H4z"></path>
+                                    </svg>
+                                    Prompts
                                 </button>
                             </div>
                         </div>
@@ -434,6 +496,110 @@
             </div>
         </div>
 
+        <!-- Channels Panel -->
+        <div class="channels-panel" id="channelsPanel">
+            <div class="channels-panel-header">
+                <h3>Channels</h3>
+                <button class="close-panel-btn" id="closeChannelsPanelBtn" aria-label="Close channels panel">
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="20" height="20">
+                        <line x1="18" y1="6" x2="6" y2="18"></line>
+                        <line x1="6" y1="6" x2="18" y2="18"></line>
+                    </svg>
+                </button>
+            </div>
+            <div class="channels-panel-content">
+                <div class="channel-create-section">
+                    <input type="text" id="channelNameInput" class="modal-input" placeholder="Channel name" style="margin-bottom: 8px;">
+                    <input type="text" id="channelDescInput" class="modal-input" placeholder="Description (optional)" style="margin-bottom: 8px;">
+                    <button type="button" class="modal-btn primary" id="createChannelBtn" style="width: 100%;">Create Channel</button>
+                </div>
+                <div class="channel-list" id="channelList">
+                    <p class="no-channels" id="noChannels">No channels yet</p>
+                </div>
+            </div>
+            <div class="channel-messages-area" id="channelMessagesArea" style="display: none;">
+                <div class="channel-messages-header">
+                    <button type="button" class="channel-back-btn" id="channelBackBtn">
+                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="18" height="18">
+                            <polyline points="15 18 9 12 15 6"></polyline>
+                        </svg>
+                    </button>
+                    <span class="channel-name" id="channelName">Channel</span>
+                    <button type="button" class="channel-delete-btn" id="channelDeleteBtn" title="Delete channel">
+                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="16" height="16">
+                            <polyline points="3 6 5 6 21 6"></polyline>
+                            <path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"></path>
+                        </svg>
+                    </button>
+                </div>
+                <div class="channel-messages" id="channelMessages"></div>
+                <div class="channel-input">
+                    <input type="text" id="channelMessageInput" placeholder="Type a message..." aria-label="Channel message">
+                    <button type="button" class="send-btn" id="channelSendBtn" aria-label="Send channel message">
+                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                            <line x1="22" y1="2" x2="11" y2="13"></line>
+                            <polygon points="22 2 15 22 11 13 2 9 22 2"></polygon>
+                        </svg>
+                    </button>
+                </div>
+            </div>
+        </div>
+
+        <!-- Notes Panel -->
+        <div class="notes-panel" id="notesPanel">
+            <div class="notes-panel-header">
+                <h3>Notes</h3>
+                <button class="close-panel-btn" id="closeNotesPanelBtn" aria-label="Close notes panel">
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="20" height="20">
+                        <line x1="18" y1="6" x2="6" y2="18"></line>
+                        <line x1="6" y1="6" x2="18" y2="18"></line>
+                    </svg>
+                </button>
+            </div>
+            <div class="notes-panel-content">
+                <div class="notes-list" id="notesList">
+                    <p class="no-notes" id="noNotes">No notes yet</p>
+                </div>
+                <div class="note-editor" id="noteEditor" style="display: none;">
+                    <input type="text" id="noteTitleInput" class="modal-input" placeholder="Note title">
+                    <textarea id="noteContentInput" class="note-textarea" placeholder="Write your note..." rows="10"></textarea>
+                    <div class="note-editor-actions">
+                        <button type="button" class="modal-btn cancel" id="cancelNoteBtn">Cancel</button>
+                        <button type="button" class="modal-btn primary" id="saveNoteBtn">Save Note</button>
+                    </div>
+                </div>
+                <button type="button" class="modal-btn primary" id="newNoteBtn" style="width: 100%; margin-top: 12px;">New Note</button>
+            </div>
+        </div>
+
+        <!-- Memory Panel -->
+        <div class="memory-panel" id="memoryPanel">
+            <div class="memory-panel-header">
+                <h3>Memory</h3>
+                <button class="close-panel-btn" id="closeMemoryPanelBtn" aria-label="Close memory panel">
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="20" height="20">
+                        <line x1="18" y1="6" x2="6" y2="18"></line>
+                        <line x1="6" y1="6" x2="18" y2="18"></line>
+                    </svg>
+                </button>
+            </div>
+            <div class="memory-panel-content">
+                <div class="memory-create-section">
+                    <textarea id="memoryContentInput" class="note-textarea" placeholder="Add a memory..." rows="3"></textarea>
+                    <select id="memoryCategorySelect" class="modal-input" style="margin-bottom: 8px;">
+                        <option value="general">General</option>
+                        <option value="preference">Preference</option>
+                        <option value="fact">Fact</option>
+                        <option value="instruction">Instruction</option>
+                    </select>
+                    <button type="button" class="modal-btn primary" id="addMemoryBtn" style="width: 100%;">Add Memory</button>
+                </div>
+                <div class="memory-list" id="memoryList">
+                    <p class="no-memory" id="noMemory">No memory entries yet</p>
+                </div>
+            </div>
+        </div>
+
         <!-- Change Password Modal -->
         <div class="modal-overlay" id="changePasswordModal">
             <div class="modal" role="dialog" aria-modal="true" aria-labelledby="changePasswordTitle">
@@ -449,6 +615,108 @@
                 <div class="modal-actions">
                     <button class="modal-btn cancel" data-action="cancelChangePassword">Cancel</button>
                     <button class="modal-btn primary" id="confirmChangePasswordBtn">Change Password</button>
+                </div>
+            </div>
+        </div>
+
+        <!-- Tags Modal -->
+        <div class="modal-overlay" id="tagsModal">
+            <div class="modal tag-assign-modal" role="dialog" aria-modal="true" aria-labelledby="tagsModalTitle">
+                <div class="modal-header-row">
+                    <h3 id="tagsModalTitle">Manage Tags</h3>
+                    <button class="modal-close-btn" data-action="closeTagsModal" aria-label="Close">
+                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="18" height="18">
+                            <line x1="18" y1="6" x2="6" y2="18"></line>
+                            <line x1="6" y1="6" x2="18" y2="18"></line>
+                        </svg>
+                    </button>
+                </div>
+                <div class="tag-create-form">
+                    <input type="text" class="modal-input" id="tagNameInput" placeholder="Tag name" maxlength="30">
+                    <div class="tag-color-row">
+                        <input type="color" id="tagColorInput" value="#10a37f" class="tag-color-picker">
+                        <button class="modal-btn primary" id="createTagBtn">Create Tag</button>
+                    </div>
+                </div>
+                <div class="tag-list" id="tagList">
+                    <p class="tag-list-empty">No tags yet</p>
+                </div>
+                <div class="tag-assign-section" id="tagAssignSection" style="display: none;">
+                    <h4 class="tag-assign-title">Assign to conversation</h4>
+                    <div class="tag-assign-list" id="tagAssignList"></div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Prompts Management Modal -->
+        <div class="modal-overlay" id="promptsModal">
+            <div class="modal prompts-modal" role="dialog" aria-modal="true" aria-labelledby="promptsModalTitle">
+                <div class="modal-header-row">
+                    <h3 id="promptsModalTitle">Prompt Presets</h3>
+                    <button class="modal-close-btn" data-action="closePromptsModal" aria-label="Close">
+                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="18" height="18">
+                            <line x1="18" y1="6" x2="6" y2="18"></line>
+                            <line x1="6" y1="6" x2="18" y2="18"></line>
+                        </svg>
+                    </button>
+                </div>
+                <div class="prompt-form" id="promptForm">
+                    <input type="text" class="modal-input" id="promptTitleInput" placeholder="Title (e.g. Summarize)">
+                    <input type="text" class="modal-input" id="promptCommandInput" placeholder="Command (e.g. /summarize)">
+                    <textarea class="modal-input prompt-content-input" id="promptContentInput" placeholder="Prompt content..." rows="3"></textarea>
+                    <input type="text" class="modal-input" id="promptDescInput" placeholder="Description (optional)">
+                    <div class="prompt-form-actions">
+                        <label class="prompt-shared-toggle">
+                            <input type="checkbox" id="promptSharedToggle">
+                            <span>Shared</span>
+                        </label>
+                        <div class="prompt-form-btns">
+                            <button class="modal-btn cancel" id="promptCancelEditBtn" style="display: none;">Cancel</button>
+                            <button class="modal-btn primary" id="promptSaveBtn">Create</button>
+                        </div>
+                    </div>
+                </div>
+                <div class="prompt-list" id="promptList">
+                    <p class="prompt-list-empty">No prompt presets yet</p>
+                </div>
+            </div>
+        </div>
+
+        <!-- Agentic Search Modal -->
+        <div class="modal-overlay" id="agenticSearchModal">
+            <div class="modal agentic-search-modal" role="dialog" aria-modal="true" aria-labelledby="agenticSearchTitle">
+                <div class="modal-header-row">
+                    <h3 id="agenticSearchTitle">Agentic Search</h3>
+                    <button class="modal-close-btn" data-action="closeAgenticSearch" aria-label="Close">
+                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="18" height="18">
+                            <line x1="18" y1="6" x2="6" y2="18"></line>
+                            <line x1="6" y1="6" x2="18" y2="18"></line>
+                        </svg>
+                    </button>
+                </div>
+                <div class="agentic-search-form">
+                    <input type="text" class="modal-input" id="agenticSearchInput" placeholder="Enter your research query...">
+                    <div class="agentic-search-settings">
+                        <div class="agentic-setting">
+                            <label for="maxIterationsSlider">Max Iterations: <span id="maxIterationsValue">5</span></label>
+                            <input type="range" id="maxIterationsSlider" min="1" max="10" value="5" class="agentic-slider">
+                        </div>
+                        <label class="agentic-toggle">
+                            <input type="checkbox" id="enableWebSearchToggle" checked>
+                            <span>Enable Web Search</span>
+                        </label>
+                    </div>
+                    <button class="modal-btn primary agentic-search-btn" id="runAgenticSearchBtn">
+                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="16" height="16">
+                            <circle cx="11" cy="11" r="8"></circle>
+                            <line x1="21" y1="21" x2="16.65" y2="16.65"></line>
+                        </svg>
+                        Search
+                    </button>
+                </div>
+                <div class="agentic-search-results" id="agenticSearchResults" style="display: none;">
+                    <div class="search-steps" id="searchSteps"></div>
+                    <div class="search-final-result" id="searchFinalResult"></div>
                 </div>
             </div>
         </div>

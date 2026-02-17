@@ -9,6 +9,8 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.time.LocalDateTime;
+import java.util.HashMap;
+import java.util.Map;
 import java.util.Optional;
 
 @Service
@@ -47,6 +49,13 @@ public class SystemSettingService {
         if (eventService != null) {
             eventService.broadcast("cache.settings", key);
         }
+    }
+
+    @Transactional(readOnly = true)
+    public Map<String, String> getAllSettings() {
+        Map<String, String> result = new HashMap<>();
+        systemSettingRepository.findAll().forEach(s -> result.put(s.getKey(), s.getValue()));
+        return result;
     }
 
     @Transactional(readOnly = true)

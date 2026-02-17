@@ -28,6 +28,14 @@ class ChatApp {
         this.initKeyboardShortcuts();
         this.initSettingsSearch();
         this.initQuickActions();
+        this.initSidebar();
+        this.initSlashCommands();
+        this.initChannels();
+        this.initNotes();
+        this.initMemory();
+        this.initTags();
+        this.initPromptsManager();
+        this.initAgenticSearch();
         this.restoreModelSelection();
         this.scrollToBottom();
     }
@@ -224,6 +232,18 @@ class ChatApp {
                 this.useTools = e.target.checked;
                 localStorage.setItem('useTools', this.useTools);
                 console.debug('Tools toggle changed:', this.useTools);
+            });
+        }
+
+        // Message action buttons
+        if (this.messagesContainer) {
+            this.messagesContainer.addEventListener('click', (e) => {
+                const actionBtn = e.target.closest('.msg-action-btn');
+                if (actionBtn) {
+                    const action = actionBtn.dataset.action;
+                    const messageEl = actionBtn.closest('.message');
+                    this.handleMessageAction(action, messageEl);
+                }
             });
         }
     }
@@ -679,8 +699,8 @@ class ChatApp {
         this.messageInput.style.height = Math.min(this.messageInput.scrollHeight, 200) + 'px';
     }
 
-    async sendMessage() {
-        const message = this.messageInput.value.trim();
+    async sendMessage(overrideText) {
+        const message = overrideText ? overrideText.trim() : this.messageInput.value.trim();
         if (!message || this.isWaiting) return;
 
         this.haptic();
@@ -989,7 +1009,7 @@ class ChatApp {
         this.hideCancelButton();
     }
 
-    addMessage(role, content, htmlContent = null, model = null, citations = null) {
+    addMessage(role, content, htmlContent = null, model = null, citations = null, messageId = null) {
         if (!this.messages) {
             const messagesDiv = document.createElement('div');
             messagesDiv.className = 'messages';
@@ -998,7 +1018,7 @@ class ChatApp {
             this.messages = messagesDiv;
         }
 
-        const messageEl = this.createMessageElement(role, content, htmlContent, model, citations);
+        const messageEl = this.createMessageElement(role, content, htmlContent, model, citations, messageId);
         this.messages.appendChild(messageEl);
         this.highlightCode(messageEl);
         this.renderMath(messageEl);
@@ -1006,9 +1026,10 @@ class ChatApp {
         this.scrollToBottom();
     }
 
-    createMessageElement(role, content, htmlContent = null, model = null, citations = null) {
+    createMessageElement(role, content, htmlContent = null, model = null, citations = null, messageId = null) {
         const div = document.createElement('div');
         div.className = `message ${role}`;
+        if (messageId) div.dataset.messageId = messageId;
 
         // Detect text direction for RTL language support
         const rawText = content || '';
@@ -1047,6 +1068,61 @@ class ChatApp {
             metaDiv.textContent = model;
             contentDiv.appendChild(metaDiv);
         }
+
+        // Add message actions toolbar
+        const actionsDiv = document.createElement('div');
+        actionsDiv.className = 'message-actions';
+
+        if (role === 'user') {
+            // Edit button for user messages
+            actionsDiv.innerHTML = `
+                <button class="msg-action-btn" data-action="edit" title="Edit message">
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="14" height="14">
+                        <path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"></path>
+                        <path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"></path>
+                    </svg>
+                </button>
+                <button class="msg-action-btn" data-action="copy" title="Copy message">
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="14" height="14">
+                        <rect x="9" y="9" width="13" height="13" rx="2" ry="2"></rect>
+                        <path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"></path>
+                    </svg>
+                </button>
+            `;
+        } else {
+            // Regenerate + copy + favorite for assistant messages
+            actionsDiv.innerHTML = `
+                <button class="msg-action-btn" data-action="regenerate" title="Regenerate response">
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="14" height="14">
+                        <polyline points="23 4 23 10 17 10"></polyline>
+                        <path d="M20.49 15a9 9 0 1 1-2.12-9.36L23 10"></path>
+                    </svg>
+                </button>
+                <button class="msg-action-btn" data-action="favorite" title="Favorite response">
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="14" height="14">
+                        <polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2"></polygon>
+                    </svg>
+                </button>
+                <button class="msg-action-btn" data-action="copy" title="Copy message">
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="14" height="14">
+                        <rect x="9" y="9" width="13" height="13" rx="2" ry="2"></rect>
+                        <path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"></path>
+                    </svg>
+                </button>
+                <button class="msg-action-btn" data-action="translate" title="Translate">
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="14" height="14">
+                        <path d="M5 8l6 6"></path>
+                        <path d="M4 14l6-6 2-3"></path>
+                        <path d="M2 5h12"></path>
+                        <path d="M7 2h1"></path>
+                        <path d="M22 22l-5-10-5 10"></path>
+                        <path d="M14 18h6"></path>
+                    </svg>
+                </button>
+            `;
+        }
+
+        contentDiv.appendChild(actionsDiv);
 
         div.appendChild(avatarDiv);
         div.appendChild(contentDiv);
@@ -1326,7 +1402,7 @@ class ChatApp {
 
             this.messages.innerHTML = '';
             conversation.messages?.forEach(msg => {
-                this.addMessage(msg.role, msg.content, msg.htmlContent, msg.modelUsed, msg.citations);
+                this.addMessage(msg.role, msg.content, msg.htmlContent, msg.modelUsed, msg.citations, msg.id);
             });
 
             this.sidebar.classList.remove('open');
@@ -2039,6 +2115,9 @@ class ChatApp {
     closePanels() {
         this.closeDocumentsPanel();
         this.closeToolsPanel();
+        this.closeChannelsPanel();
+        this.closeNotesPanel();
+        this.closeMemoryPanel();
         // Close user menu dropdown if open
         if (this.userMenuDropdown) {
             this.userMenuDropdown.classList.remove('open');
@@ -2130,6 +2209,1532 @@ class ChatApp {
                 this.haptic();
             }
         });
+    }
+
+    handleMessageAction(action, messageEl) {
+        const textEl = messageEl.querySelector('.message-text');
+        const rawText = textEl ? textEl.innerText : '';
+
+        switch(action) {
+            case 'copy':
+                navigator.clipboard.writeText(rawText).then(() => {
+                    this.showToast('Copied to clipboard');
+                });
+                break;
+            case 'edit':
+                // Put text in input and remove the message + subsequent messages
+                this.messageInput.value = rawText;
+                this.messageInput.focus();
+                this.autoResizeTextarea();
+                // Remove this message and all following
+                const messages = Array.from(this.messages.children);
+                const idx = messages.indexOf(messageEl);
+                for (let i = messages.length - 1; i >= idx; i--) {
+                    messages[i].remove();
+                }
+                break;
+            case 'regenerate':
+                // Re-send the last user message
+                const userMsgs = this.messages.querySelectorAll('.message.user');
+                const lastUserMsg = userMsgs[userMsgs.length - 1];
+                if (lastUserMsg) {
+                    const userText = lastUserMsg.querySelector('.message-text').innerText;
+                    // Remove the last assistant message
+                    messageEl.remove();
+                    // Re-send
+                    this.sendMessage(userText);
+                }
+                break;
+            case 'favorite':
+                this.toggleFavorite(messageEl);
+                break;
+            case 'translate':
+                this.showTranslateDropdown(messageEl);
+                break;
+        }
+    }
+
+    async toggleFavorite(messageEl) {
+        if (!this.conversationId) return;
+        const msgId = messageEl.dataset.messageId;
+        if (!msgId) return;
+        try {
+            const resp = await fetch(`/api/conversations/${this.conversationId}/messages/${msgId}/favorite`, {
+                method: 'PATCH'
+            });
+            if (resp.ok) {
+                const btn = messageEl.querySelector('[data-action="favorite"]');
+                btn.classList.toggle('active');
+                const svg = btn.querySelector('svg');
+                svg.setAttribute('fill', btn.classList.contains('active') ? 'currentColor' : 'none');
+            }
+        } catch(e) { console.error('Failed to toggle favorite:', e); }
+    }
+
+    showToast(message) {
+        const toast = document.createElement('div');
+        toast.className = 'toast-message';
+        toast.textContent = message;
+        document.body.appendChild(toast);
+        setTimeout(() => toast.classList.add('visible'), 10);
+        setTimeout(() => { toast.classList.remove('visible'); setTimeout(() => toast.remove(), 300); }, 2000);
+    }
+
+    initSidebar() {
+        // Search
+        const searchInput = document.getElementById('sidebarSearch');
+        if (searchInput) {
+            let debounceTimer;
+            searchInput.addEventListener('input', () => {
+                clearTimeout(debounceTimer);
+                debounceTimer = setTimeout(() => this.searchConversations(searchInput.value), 300);
+            });
+        }
+
+        // Tabs
+        const tabs = document.querySelectorAll('.sidebar-tab');
+        tabs.forEach(tab => {
+            tab.addEventListener('click', () => {
+                tabs.forEach(t => t.classList.remove('active'));
+                tab.classList.add('active');
+                this.loadSidebarTab(tab.dataset.tab);
+            });
+        });
+
+        // Load folders for the folders tab
+        this.folders = [];
+        this.loadFolders();
+    }
+
+    async searchConversations(query) {
+        if (!query.trim()) {
+            // Reset to show all
+            document.querySelectorAll('.conversation-item').forEach(el => el.style.display = '');
+            return;
+        }
+        try {
+            const resp = await fetch(`/api/conversations/search?q=${encodeURIComponent(query)}&size=20`);
+            if (resp.ok) {
+                const data = await resp.json();
+                const ids = new Set(data.content.map(c => c.id));
+                document.querySelectorAll('.conversation-item').forEach(el => {
+                    el.style.display = ids.has(el.dataset.id) ? '' : 'none';
+                });
+            }
+        } catch(e) { console.error('Search failed:', e); }
+    }
+
+    async loadSidebarTab(tab) {
+        const list = this.conversationsList;
+        if (!list) return;
+
+        switch(tab) {
+            case 'all':
+                document.querySelectorAll('.conversation-item').forEach(el => el.style.display = '');
+                document.querySelectorAll('.folder-section').forEach(el => el.style.display = 'none');
+                break;
+            case 'pinned':
+                try {
+                    const resp = await fetch('/api/conversations/pinned');
+                    if (resp.ok) {
+                        const pinned = await resp.json();
+                        const pinnedIds = new Set(pinned.map(c => c.id));
+                        document.querySelectorAll('.conversation-item').forEach(el => {
+                            el.style.display = pinnedIds.has(el.dataset.id) ? '' : 'none';
+                        });
+                        document.querySelectorAll('.folder-section').forEach(el => el.style.display = 'none');
+                    }
+                } catch(e) {}
+                break;
+            case 'folders':
+                this.showFolderView();
+                break;
+            case 'archived':
+                try {
+                    const resp = await fetch('/api/conversations/archived?size=50');
+                    if (resp.ok) {
+                        const data = await resp.json();
+                        // Hide all current, show archived
+                        document.querySelectorAll('.conversation-item').forEach(el => el.style.display = 'none');
+                        document.querySelectorAll('.folder-section').forEach(el => el.style.display = 'none');
+                        // Add archived items temporarily
+                        let archivedContainer = document.getElementById('archivedItems');
+                        if (!archivedContainer) {
+                            archivedContainer = document.createElement('div');
+                            archivedContainer.id = 'archivedItems';
+                            list.appendChild(archivedContainer);
+                        }
+                        archivedContainer.innerHTML = data.content.map(c => `
+                            <div class="conversation-item archived-item" data-id="${c.id}">
+                                <div class="conversation-title">${this.escapeHtml(c.title || 'Untitled')}</div>
+                                <div class="conversation-meta">
+                                    <span>Archived</span>
+                                    <button class="unarchive-btn" data-id="${c.id}" title="Unarchive">Restore</button>
+                                </div>
+                            </div>
+                        `).join('');
+                        archivedContainer.style.display = '';
+                    }
+                } catch(e) {}
+                break;
+        }
+    }
+
+    async loadFolders() {
+        try {
+            const resp = await fetch('/api/folders');
+            if (resp.ok) {
+                this.folders = await resp.json();
+            }
+        } catch(e) { this.folders = []; }
+    }
+
+    showFolderView() {
+        document.querySelectorAll('.conversation-item').forEach(el => el.style.display = 'none');
+        let existing = document.getElementById('archivedItems');
+        if (existing) existing.style.display = 'none';
+
+        let foldersContainer = document.getElementById('foldersView');
+        if (!foldersContainer) {
+            foldersContainer = document.createElement('div');
+            foldersContainer.id = 'foldersView';
+            this.conversationsList.appendChild(foldersContainer);
+        }
+
+        if (this.folders.length === 0) {
+            foldersContainer.innerHTML = '<div class="empty-state">No folders yet. Create one to organize your chats.</div>';
+        } else {
+            foldersContainer.innerHTML = this.folders.map(f => `
+                <div class="folder-section" data-folder-id="${f.id}">
+                    <div class="folder-header">
+                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="16" height="16">
+                            <path d="M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z"></path>
+                        </svg>
+                        <span>${this.escapeHtml(f.name)}</span>
+                        <span class="folder-count">${f.conversationCount || 0}</span>
+                    </div>
+                </div>
+            `).join('');
+        }
+        foldersContainer.style.display = '';
+    }
+
+    initSlashCommands() {
+        this.slashDropdown = null;
+        this.messageInput.addEventListener('input', () => {
+            const val = this.messageInput.value;
+            if (val.startsWith('/')) {
+                this.showSlashDropdown(val.substring(1));
+            } else {
+                this.hideSlashDropdown();
+            }
+        });
+
+        this.messageInput.addEventListener('keydown', (e) => {
+            if (this.slashDropdown && this.slashDropdown.style.display !== 'none') {
+                if (e.key === 'ArrowDown' || e.key === 'ArrowUp') {
+                    e.preventDefault();
+                    this.navigateSlashDropdown(e.key === 'ArrowDown' ? 1 : -1);
+                } else if (e.key === 'Tab' || (e.key === 'Enter' && !e.shiftKey)) {
+                    const active = this.slashDropdown.querySelector('.slash-item.active');
+                    if (active) {
+                        e.preventDefault();
+                        e.stopPropagation();
+                        active.click();
+                    }
+                } else if (e.key === 'Escape') {
+                    this.hideSlashDropdown();
+                }
+            }
+        });
+    }
+
+    async showSlashDropdown(query) {
+        try {
+            const resp = await fetch(`/api/prompts/search?q=${encodeURIComponent(query)}&size=8`);
+            if (!resp.ok) { this.hideSlashDropdown(); return; }
+            const presets = await resp.json();
+
+            if (presets.length === 0) { this.hideSlashDropdown(); return; }
+
+            if (!this.slashDropdown) {
+                this.slashDropdown = document.createElement('div');
+                this.slashDropdown.className = 'slash-dropdown';
+                this.messageInput.parentElement.parentElement.appendChild(this.slashDropdown);
+            }
+
+            this.slashDropdown.innerHTML = presets.map((p, i) => `
+                <div class="slash-item${i === 0 ? ' active' : ''}" data-content="${this.escapeHtml(p.content || p.promptText || '')}">
+                    <div class="slash-name">/${this.escapeHtml(p.name || p.title)}</div>
+                    <div class="slash-desc">${this.escapeHtml(p.description || '')}</div>
+                </div>
+            `).join('');
+
+            this.slashDropdown.style.display = 'block';
+
+            // Click handler
+            this.slashDropdown.querySelectorAll('.slash-item').forEach(item => {
+                item.addEventListener('click', () => {
+                    this.messageInput.value = item.dataset.content;
+                    this.hideSlashDropdown();
+                    this.messageInput.focus();
+                    this.autoResizeTextarea();
+                });
+            });
+        } catch(e) { this.hideSlashDropdown(); }
+    }
+
+    hideSlashDropdown() {
+        if (this.slashDropdown) this.slashDropdown.style.display = 'none';
+    }
+
+    navigateSlashDropdown(dir) {
+        const items = this.slashDropdown.querySelectorAll('.slash-item');
+        const activeIdx = Array.from(items).findIndex(i => i.classList.contains('active'));
+        items[activeIdx]?.classList.remove('active');
+        const newIdx = Math.max(0, Math.min(items.length - 1, activeIdx + dir));
+        items[newIdx]?.classList.add('active');
+        items[newIdx]?.scrollIntoView({ block: 'nearest' });
+    }
+
+    // --- Channels ---
+
+    initChannels() {
+        this.channelsPanel = document.getElementById('channelsPanel');
+        this.channelsPanelContent = this.channelsPanel?.querySelector('.channels-panel-content');
+        this.channelMessagesArea = document.getElementById('channelMessagesArea');
+        this.channelList = document.getElementById('channelList');
+        this.channelMessages = document.getElementById('channelMessages');
+        this.channelNameInput = document.getElementById('channelNameInput');
+        this.channelDescInput = document.getElementById('channelDescInput');
+        this.channelMessageInput = document.getElementById('channelMessageInput');
+        this.channelName = document.getElementById('channelName');
+        this.currentChannelId = null;
+        this.channelEventSource = null;
+
+        const channelsBtn = document.getElementById('channelsBtn');
+        if (channelsBtn) {
+            channelsBtn.addEventListener('click', () => {
+                this.toggleChannelsPanel();
+            });
+        }
+
+        const closeBtn = document.getElementById('closeChannelsPanelBtn');
+        if (closeBtn) {
+            closeBtn.addEventListener('click', () => {
+                this.closeChannelsPanel();
+            });
+        }
+
+        const createBtn = document.getElementById('createChannelBtn');
+        if (createBtn) {
+            createBtn.addEventListener('click', () => {
+                const name = this.channelNameInput?.value.trim();
+                const description = this.channelDescInput?.value.trim();
+                if (name) {
+                    this.createChannel(name, description);
+                }
+            });
+        }
+
+        const backBtn = document.getElementById('channelBackBtn');
+        if (backBtn) {
+            backBtn.addEventListener('click', () => {
+                this.closeChannelView();
+            });
+        }
+
+        const deleteBtn = document.getElementById('channelDeleteBtn');
+        if (deleteBtn) {
+            deleteBtn.addEventListener('click', () => {
+                if (this.currentChannelId && confirm('Delete this channel?')) {
+                    this.deleteChannel(this.currentChannelId);
+                }
+            });
+        }
+
+        const sendBtn = document.getElementById('channelSendBtn');
+        if (sendBtn) {
+            sendBtn.addEventListener('click', () => {
+                const content = this.channelMessageInput?.value.trim();
+                if (content && this.currentChannelId) {
+                    this.sendChannelMessage(this.currentChannelId, content);
+                }
+            });
+        }
+
+        if (this.channelMessageInput) {
+            this.channelMessageInput.addEventListener('keydown', (e) => {
+                if (e.key === 'Enter' && !e.shiftKey) {
+                    e.preventDefault();
+                    const content = this.channelMessageInput.value.trim();
+                    if (content && this.currentChannelId) {
+                        this.sendChannelMessage(this.currentChannelId, content);
+                    }
+                }
+            });
+        }
+    }
+
+    toggleChannelsPanel() {
+        if (this.channelsPanel) {
+            this.closeDocumentsPanel();
+            this.closeToolsPanel();
+            this.closeNotesPanel();
+            this.closeMemoryPanel();
+            this.channelsPanel.classList.toggle('open');
+            if (this.channelsPanel.classList.contains('open')) {
+                this.loadChannels();
+            }
+        }
+    }
+
+    closeChannelsPanel() {
+        if (this.channelsPanel) {
+            this.channelsPanel.classList.remove('open');
+        }
+        this.disconnectChannelStream();
+    }
+
+    closeChannelView() {
+        this.disconnectChannelStream();
+        this.currentChannelId = null;
+        if (this.channelMessagesArea) {
+            this.channelMessagesArea.style.display = 'none';
+        }
+        if (this.channelsPanelContent) {
+            this.channelsPanelContent.style.display = '';
+        }
+    }
+
+    disconnectChannelStream() {
+        if (this.channelEventSource) {
+            this.channelEventSource.close();
+            this.channelEventSource = null;
+        }
+    }
+
+    async loadChannels() {
+        try {
+            const response = await fetch('/api/channels');
+            if (!response.ok) return;
+            const channels = await response.json();
+
+            if (!this.channelList) return;
+
+            if (channels.length === 0) {
+                this.channelList.innerHTML = '<p class="no-channels">No channels yet</p>';
+                return;
+            }
+
+            this.channelList.innerHTML = channels.map(ch => `
+                <div class="channel-item" data-id="${ch.id}">
+                    <div class="channel-item-info">
+                        <div class="channel-item-name"># ${this.escapeHtml(ch.name)}</div>
+                        ${ch.description ? `<div class="channel-item-desc">${this.escapeHtml(ch.description)}</div>` : ''}
+                    </div>
+                </div>
+            `).join('');
+
+            this.channelList.querySelectorAll('.channel-item').forEach(item => {
+                item.addEventListener('click', () => {
+                    this.openChannel(item.dataset.id);
+                });
+            });
+        } catch (error) {
+            console.warn('Failed to load channels:', error);
+        }
+    }
+
+    async openChannel(id) {
+        this.disconnectChannelStream();
+        this.currentChannelId = id;
+
+        if (this.channelsPanelContent) {
+            this.channelsPanelContent.style.display = 'none';
+        }
+        if (this.channelMessagesArea) {
+            this.channelMessagesArea.style.display = 'flex';
+        }
+
+        try {
+            const channelResponse = await fetch(`/api/channels/${id}`);
+            if (channelResponse.ok) {
+                const channel = await channelResponse.json();
+                if (this.channelName) {
+                    this.channelName.textContent = '# ' + channel.name;
+                }
+            }
+
+            const messagesResponse = await fetch(`/api/channels/${id}/messages?limit=50`);
+            if (messagesResponse.ok) {
+                const messages = await messagesResponse.json();
+                this.renderChannelMessages(messages);
+            }
+
+            this.channelEventSource = new EventSource(`/api/channels/${id}/stream`);
+            this.channelEventSource.addEventListener('message', (event) => {
+                const msg = JSON.parse(event.data);
+                this.appendChannelMessage(msg);
+            });
+            this.channelEventSource.onerror = () => {
+                console.warn('Channel SSE connection error');
+            };
+        } catch (error) {
+            console.warn('Failed to open channel:', error);
+        }
+    }
+
+    renderChannelMessages(messages) {
+        if (!this.channelMessages) return;
+        this.channelMessages.innerHTML = messages.map(msg => this.buildChannelMessageHTML(msg)).join('');
+        this.channelMessages.scrollTop = this.channelMessages.scrollHeight;
+    }
+
+    appendChannelMessage(msg) {
+        if (!this.channelMessages) return;
+        this.channelMessages.insertAdjacentHTML('beforeend', this.buildChannelMessageHTML(msg));
+        this.channelMessages.scrollTop = this.channelMessages.scrollHeight;
+    }
+
+    buildChannelMessageHTML(msg) {
+        const author = msg.username || msg.author || 'Unknown';
+        const text = this.escapeHtml(msg.content || '');
+        const time = msg.createdAt ? new Date(msg.createdAt).toLocaleTimeString() : '';
+        return `
+            <div class="channel-message">
+                <div class="channel-message-author">${this.escapeHtml(author)}</div>
+                <div class="channel-message-text">${text}</div>
+                ${time ? `<div class="channel-message-time">${time}</div>` : ''}
+            </div>
+        `;
+    }
+
+    async sendChannelMessage(channelId, content) {
+        try {
+            const response = await fetch(`/api/channels/${channelId}/messages`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ content })
+            });
+            if (response.ok) {
+                if (this.channelMessageInput) {
+                    this.channelMessageInput.value = '';
+                }
+            }
+        } catch (error) {
+            console.warn('Failed to send channel message:', error);
+        }
+    }
+
+    async createChannel(name, description) {
+        try {
+            const response = await fetch('/api/channels', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ name, description })
+            });
+            if (response.ok) {
+                if (this.channelNameInput) this.channelNameInput.value = '';
+                if (this.channelDescInput) this.channelDescInput.value = '';
+                this.loadChannels();
+            }
+        } catch (error) {
+            console.warn('Failed to create channel:', error);
+        }
+    }
+
+    async deleteChannel(id) {
+        try {
+            const response = await fetch(`/api/channels/${id}`, { method: 'DELETE' });
+            if (response.ok) {
+                this.closeChannelView();
+                this.loadChannels();
+            }
+        } catch (error) {
+            console.warn('Failed to delete channel:', error);
+        }
+    }
+
+    // --- Notes ---
+
+    initNotes() {
+        this.notesPanel = document.getElementById('notesPanel');
+        this.notesList = document.getElementById('notesList');
+        this.noteEditor = document.getElementById('noteEditor');
+        this.noteTitleInput = document.getElementById('noteTitleInput');
+        this.noteContentInput = document.getElementById('noteContentInput');
+        this.editingNoteId = null;
+
+        const notesBtn = document.getElementById('notesBtn');
+        if (notesBtn) {
+            notesBtn.addEventListener('click', () => {
+                this.toggleNotesPanel();
+            });
+        }
+
+        const closeBtn = document.getElementById('closeNotesPanelBtn');
+        if (closeBtn) {
+            closeBtn.addEventListener('click', () => {
+                this.closeNotesPanel();
+            });
+        }
+
+        const newNoteBtn = document.getElementById('newNoteBtn');
+        if (newNoteBtn) {
+            newNoteBtn.addEventListener('click', () => {
+                this.showNoteEditor(null);
+            });
+        }
+
+        const saveNoteBtn = document.getElementById('saveNoteBtn');
+        if (saveNoteBtn) {
+            saveNoteBtn.addEventListener('click', () => {
+                const title = this.noteTitleInput?.value.trim() || 'Untitled';
+                const content = this.noteContentInput?.value.trim();
+                if (content) {
+                    this.saveNote(this.editingNoteId, title, content);
+                }
+            });
+        }
+
+        const cancelNoteBtn = document.getElementById('cancelNoteBtn');
+        if (cancelNoteBtn) {
+            cancelNoteBtn.addEventListener('click', () => {
+                this.hideNoteEditor();
+            });
+        }
+    }
+
+    toggleNotesPanel() {
+        if (this.notesPanel) {
+            this.closeDocumentsPanel();
+            this.closeToolsPanel();
+            this.closeChannelsPanel();
+            this.closeMemoryPanel();
+            this.notesPanel.classList.toggle('open');
+            if (this.notesPanel.classList.contains('open')) {
+                this.loadNotes();
+            }
+        }
+    }
+
+    closeNotesPanel() {
+        if (this.notesPanel) {
+            this.notesPanel.classList.remove('open');
+        }
+        this.hideNoteEditor();
+    }
+
+    showNoteEditor(note) {
+        if (note) {
+            this.editingNoteId = note.id;
+            if (this.noteTitleInput) this.noteTitleInput.value = note.title || '';
+            if (this.noteContentInput) this.noteContentInput.value = note.content || '';
+        } else {
+            this.editingNoteId = null;
+            if (this.noteTitleInput) this.noteTitleInput.value = '';
+            if (this.noteContentInput) this.noteContentInput.value = '';
+        }
+        if (this.noteEditor) this.noteEditor.style.display = '';
+        if (this.noteTitleInput) this.noteTitleInput.focus();
+    }
+
+    hideNoteEditor() {
+        this.editingNoteId = null;
+        if (this.noteEditor) this.noteEditor.style.display = 'none';
+    }
+
+    async loadNotes() {
+        try {
+            const response = await fetch('/api/notes');
+            if (!response.ok) return;
+            const notes = await response.json();
+
+            if (!this.notesList) return;
+
+            if (notes.length === 0) {
+                this.notesList.innerHTML = '<p class="no-notes">No notes yet</p>';
+                return;
+            }
+
+            this.notesList.innerHTML = notes.map(note => `
+                <div class="note-item" data-id="${note.id}">
+                    <div class="note-item-info">
+                        <div class="note-item-title">${this.escapeHtml(note.title || 'Untitled')}</div>
+                        <div class="note-item-preview">${this.escapeHtml((note.content || '').substring(0, 100))}</div>
+                        ${note.updatedAt ? `<div class="note-item-date">${new Date(note.updatedAt).toLocaleDateString()}</div>` : ''}
+                    </div>
+                    <button class="note-delete-btn" data-id="${note.id}" title="Delete note">
+                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="16" height="16">
+                            <polyline points="3 6 5 6 21 6"></polyline>
+                            <path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"></path>
+                        </svg>
+                    </button>
+                </div>
+            `).join('');
+
+            this.notesList.querySelectorAll('.note-item').forEach(item => {
+                item.addEventListener('click', (e) => {
+                    if (e.target.closest('.note-delete-btn')) return;
+                    const note = notes.find(n => n.id === item.dataset.id || n.id === parseInt(item.dataset.id));
+                    if (note) this.showNoteEditor(note);
+                });
+            });
+
+            this.notesList.querySelectorAll('.note-delete-btn').forEach(btn => {
+                btn.addEventListener('click', (e) => {
+                    e.stopPropagation();
+                    if (confirm('Delete this note?')) {
+                        this.deleteNote(btn.dataset.id);
+                    }
+                });
+            });
+        } catch (error) {
+            console.warn('Failed to load notes:', error);
+        }
+    }
+
+    async saveNote(id, title, content) {
+        try {
+            const url = id ? `/api/notes/${id}` : '/api/notes';
+            const method = id ? 'PUT' : 'POST';
+            const body = { title, content };
+
+            if (!id && this.conversationId) {
+                body.conversationId = this.conversationId;
+            }
+
+            const response = await fetch(url, {
+                method,
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify(body)
+            });
+
+            if (response.ok) {
+                this.hideNoteEditor();
+                this.loadNotes();
+            }
+        } catch (error) {
+            console.warn('Failed to save note:', error);
+        }
+    }
+
+    async deleteNote(id) {
+        try {
+            const response = await fetch(`/api/notes/${id}`, { method: 'DELETE' });
+            if (response.ok) {
+                this.loadNotes();
+            }
+        } catch (error) {
+            console.warn('Failed to delete note:', error);
+        }
+    }
+
+    // --- Memory ---
+
+    initMemory() {
+        this.memoryPanel = document.getElementById('memoryPanel');
+        this.memoryList = document.getElementById('memoryList');
+        this.memoryContentInput = document.getElementById('memoryContentInput');
+        this.memoryCategorySelect = document.getElementById('memoryCategorySelect');
+
+        const memoryBtn = document.getElementById('memoryBtn');
+        if (memoryBtn) {
+            memoryBtn.addEventListener('click', () => {
+                this.toggleMemoryPanel();
+            });
+        }
+
+        const closeBtn = document.getElementById('closeMemoryPanelBtn');
+        if (closeBtn) {
+            closeBtn.addEventListener('click', () => {
+                this.closeMemoryPanel();
+            });
+        }
+
+        const addBtn = document.getElementById('addMemoryBtn');
+        if (addBtn) {
+            addBtn.addEventListener('click', () => {
+                const content = this.memoryContentInput?.value.trim();
+                const category = this.memoryCategorySelect?.value || 'general';
+                if (content) {
+                    this.saveMemory(null, content, category);
+                }
+            });
+        }
+    }
+
+    toggleMemoryPanel() {
+        if (this.memoryPanel) {
+            this.closeDocumentsPanel();
+            this.closeToolsPanel();
+            this.closeChannelsPanel();
+            this.closeNotesPanel();
+            this.memoryPanel.classList.toggle('open');
+            if (this.memoryPanel.classList.contains('open')) {
+                this.loadMemory();
+            }
+        }
+    }
+
+    closeMemoryPanel() {
+        if (this.memoryPanel) {
+            this.memoryPanel.classList.remove('open');
+        }
+    }
+
+    async loadMemory() {
+        try {
+            const response = await fetch('/api/memory');
+            if (!response.ok) return;
+            const entries = await response.json();
+
+            if (!this.memoryList) return;
+
+            if (entries.length === 0) {
+                this.memoryList.innerHTML = '<p class="no-memory">No memory entries yet</p>';
+                return;
+            }
+
+            this.memoryList.innerHTML = entries.map(entry => `
+                <div class="memory-item" data-id="${entry.id}">
+                    <div class="memory-item-info">
+                        <div class="memory-item-content">${this.escapeHtml(entry.content)}</div>
+                        <span class="memory-category">${this.escapeHtml(entry.category || 'general')}</span>
+                    </div>
+                    <button class="memory-delete-btn" data-id="${entry.id}" title="Delete memory">
+                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="16" height="16">
+                            <polyline points="3 6 5 6 21 6"></polyline>
+                            <path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"></path>
+                        </svg>
+                    </button>
+                </div>
+            `).join('');
+
+            this.memoryList.querySelectorAll('.memory-delete-btn').forEach(btn => {
+                btn.addEventListener('click', (e) => {
+                    e.stopPropagation();
+                    if (confirm('Delete this memory?')) {
+                        this.deleteMemory(btn.dataset.id);
+                    }
+                });
+            });
+        } catch (error) {
+            console.warn('Failed to load memory:', error);
+        }
+    }
+
+    async saveMemory(id, content, category) {
+        try {
+            const url = id ? `/api/memory/${id}` : '/api/memory';
+            const method = id ? 'PUT' : 'POST';
+
+            const response = await fetch(url, {
+                method,
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ content, category })
+            });
+
+            if (response.ok) {
+                if (this.memoryContentInput) this.memoryContentInput.value = '';
+                this.loadMemory();
+            }
+        } catch (error) {
+            console.warn('Failed to save memory:', error);
+        }
+    }
+
+    async deleteMemory(id) {
+        try {
+            const response = await fetch(`/api/memory/${id}`, { method: 'DELETE' });
+            if (response.ok) {
+                this.loadMemory();
+            }
+        } catch (error) {
+            console.warn('Failed to delete memory:', error);
+        }
+    }
+
+    // --- Tags ---
+
+    initTags() {
+        this.tags = [];
+        this.tagsModalConvId = null;
+
+        const tagsModal = document.getElementById('tagsModal');
+        if (!tagsModal) return;
+
+        // Close button
+        const closeBtn = tagsModal.querySelector('[data-action="closeTagsModal"]');
+        if (closeBtn) {
+            closeBtn.addEventListener('click', () => tagsModal.classList.remove('open'));
+        }
+        tagsModal.addEventListener('click', (e) => {
+            if (e.target === tagsModal) tagsModal.classList.remove('open');
+        });
+
+        // Create tag
+        const createTagBtn = document.getElementById('createTagBtn');
+        if (createTagBtn) {
+            createTagBtn.addEventListener('click', () => {
+                const name = document.getElementById('tagNameInput').value.trim();
+                const color = document.getElementById('tagColorInput').value;
+                if (name) {
+                    this.createTag(name, color);
+                }
+            });
+        }
+
+        // Tag list click delegation (delete + assign)
+        const tagList = document.getElementById('tagList');
+        if (tagList) {
+            tagList.addEventListener('click', (e) => {
+                const deleteBtn = e.target.closest('.tag-item-delete');
+                if (deleteBtn) {
+                    this.deleteTag(deleteBtn.dataset.tagId);
+                }
+            });
+        }
+
+        const tagAssignList = document.getElementById('tagAssignList');
+        if (tagAssignList) {
+            tagAssignList.addEventListener('click', (e) => {
+                const tagItem = e.target.closest('.tag-item');
+                if (!tagItem || !this.tagsModalConvId) return;
+                const tagId = tagItem.dataset.tagId;
+                if (tagItem.classList.contains('assigned')) {
+                    this.untagConversation(tagId, this.tagsModalConvId);
+                } else {
+                    this.tagConversation(tagId, this.tagsModalConvId);
+                }
+            });
+        }
+
+        // Right-click on conversations for tagging
+        if (this.conversationsList) {
+            this.conversationsList.addEventListener('contextmenu', (e) => {
+                const item = e.target.closest('.conversation-item');
+                if (item) {
+                    e.preventDefault();
+                    const convId = item.dataset.id;
+                    this.showTagsModal(convId);
+                }
+            });
+        }
+    }
+
+    async loadTags() {
+        try {
+            const resp = await fetch('/api/tags');
+            if (!resp.ok) return;
+            this.tags = await resp.json();
+            this.renderTagList();
+        } catch (e) {
+            console.error('Failed to load tags:', e);
+        }
+    }
+
+    renderTagList() {
+        const tagList = document.getElementById('tagList');
+        if (!tagList) return;
+
+        if (this.tags.length === 0) {
+            tagList.innerHTML = '<p class="tag-list-empty">No tags yet</p>';
+            return;
+        }
+
+        tagList.innerHTML = this.tags.map(tag => `
+            <div class="tag-item" data-tag-id="${tag.id}">
+                <div class="tag-color" style="background-color: ${this.escapeHtml(tag.color || '#10a37f')}"></div>
+                <span class="tag-item-name">${this.escapeHtml(tag.name)}</span>
+                <button class="tag-item-delete" data-tag-id="${tag.id}" title="Delete tag">
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="14" height="14">
+                        <line x1="18" y1="6" x2="6" y2="18"></line>
+                        <line x1="6" y1="6" x2="18" y2="18"></line>
+                    </svg>
+                </button>
+            </div>
+        `).join('');
+    }
+
+    async createTag(name, color) {
+        try {
+            const resp = await fetch('/api/tags', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ name, color })
+            });
+            if (!resp.ok) throw new Error('Failed to create tag');
+            document.getElementById('tagNameInput').value = '';
+            this.showToast('Tag created');
+            await this.loadTags();
+            if (this.tagsModalConvId) {
+                this.renderTagAssignList(this.tagsModalConvId);
+            }
+        } catch (e) {
+            console.error('Failed to create tag:', e);
+            this.showToast('Failed to create tag');
+        }
+    }
+
+    async deleteTag(id) {
+        if (!confirm('Delete this tag?')) return;
+        try {
+            const resp = await fetch(`/api/tags/${id}`, { method: 'DELETE' });
+            if (!resp.ok) throw new Error('Failed to delete tag');
+            this.showToast('Tag deleted');
+            await this.loadTags();
+            if (this.tagsModalConvId) {
+                this.renderTagAssignList(this.tagsModalConvId);
+            }
+        } catch (e) {
+            console.error('Failed to delete tag:', e);
+            this.showToast('Failed to delete tag');
+        }
+    }
+
+    async tagConversation(tagId, convId) {
+        try {
+            const resp = await fetch(`/api/tags/${tagId}/conversations/${convId}`, { method: 'POST' });
+            if (!resp.ok) throw new Error('Failed to tag conversation');
+            this.showToast('Tag assigned');
+            this.renderTagAssignList(convId);
+        } catch (e) {
+            console.error('Failed to tag conversation:', e);
+        }
+    }
+
+    async untagConversation(tagId, convId) {
+        try {
+            const resp = await fetch(`/api/tags/${tagId}/conversations/${convId}`, { method: 'DELETE' });
+            if (!resp.ok) throw new Error('Failed to untag conversation');
+            this.showToast('Tag removed');
+            this.renderTagAssignList(convId);
+        } catch (e) {
+            console.error('Failed to untag conversation:', e);
+        }
+    }
+
+    async showTagsModal(convId) {
+        this.tagsModalConvId = convId || null;
+        const tagsModal = document.getElementById('tagsModal');
+        if (!tagsModal) return;
+
+        await this.loadTags();
+
+        const assignSection = document.getElementById('tagAssignSection');
+        if (convId && assignSection) {
+            assignSection.style.display = '';
+            this.renderTagAssignList(convId);
+        } else if (assignSection) {
+            assignSection.style.display = 'none';
+        }
+
+        tagsModal.classList.add('open');
+    }
+
+    async renderTagAssignList(convId) {
+        const assignList = document.getElementById('tagAssignList');
+        if (!assignList) return;
+
+        // Determine which tags are already on this conversation
+        const assignedTagIds = new Set();
+        for (const tag of this.tags) {
+            try {
+                const resp = await fetch(`/api/tags/${tag.id}/conversations`);
+                if (resp.ok) {
+                    const convs = await resp.json();
+                    if (convs.some(c => c.id === convId)) {
+                        assignedTagIds.add(tag.id);
+                    }
+                }
+            } catch (e) { /* skip */ }
+        }
+
+        assignList.innerHTML = this.tags.map(tag => `
+            <div class="tag-item ${assignedTagIds.has(tag.id) ? 'assigned' : ''}" data-tag-id="${tag.id}">
+                <div class="tag-color" style="background-color: ${this.escapeHtml(tag.color || '#10a37f')}"></div>
+                <span class="tag-item-name">${this.escapeHtml(tag.name)}</span>
+            </div>
+        `).join('');
+    }
+
+    // --- Prompts Manager ---
+
+    initPromptsManager() {
+        this.editingPromptId = null;
+
+        const promptsModal = document.getElementById('promptsModal');
+        if (!promptsModal) return;
+
+        // Close button
+        const closeBtn = promptsModal.querySelector('[data-action="closePromptsModal"]');
+        if (closeBtn) {
+            closeBtn.addEventListener('click', () => promptsModal.classList.remove('open'));
+        }
+        promptsModal.addEventListener('click', (e) => {
+            if (e.target === promptsModal) promptsModal.classList.remove('open');
+        });
+
+        // Prompts button in footer
+        const promptsBtn = document.getElementById('promptsBtn');
+        if (promptsBtn) {
+            promptsBtn.addEventListener('click', () => this.showPromptsModal());
+        }
+
+        // Save/Create button
+        const saveBtn = document.getElementById('promptSaveBtn');
+        if (saveBtn) {
+            saveBtn.addEventListener('click', () => this.savePrompt());
+        }
+
+        // Cancel edit
+        const cancelBtn = document.getElementById('promptCancelEditBtn');
+        if (cancelBtn) {
+            cancelBtn.addEventListener('click', () => this.resetPromptForm());
+        }
+
+        // Prompt list delegation
+        const promptList = document.getElementById('promptList');
+        if (promptList) {
+            promptList.addEventListener('click', (e) => {
+                const editBtn = e.target.closest('.prompt-item-btn.edit');
+                const deleteBtn = e.target.closest('.prompt-item-btn.delete');
+                if (editBtn) {
+                    this.editPrompt(editBtn.dataset.promptId);
+                } else if (deleteBtn) {
+                    this.deletePrompt(deleteBtn.dataset.promptId);
+                }
+            });
+        }
+    }
+
+    async loadPrompts() {
+        try {
+            const resp = await fetch('/api/prompts');
+            if (!resp.ok) return [];
+            const prompts = await resp.json();
+            this.renderPromptList(prompts);
+            return prompts;
+        } catch (e) {
+            console.error('Failed to load prompts:', e);
+            return [];
+        }
+    }
+
+    renderPromptList(prompts) {
+        const promptList = document.getElementById('promptList');
+        if (!promptList) return;
+
+        if (!prompts || prompts.length === 0) {
+            promptList.innerHTML = '<p class="prompt-list-empty">No prompt presets yet</p>';
+            return;
+        }
+
+        promptList.innerHTML = prompts.map(p => `
+            <div class="prompt-item" data-prompt-id="${p.id}">
+                <div class="prompt-item-info">
+                    <div class="prompt-item-title">${this.escapeHtml(p.title || p.name || '')}</div>
+                    <div class="prompt-item-command">${this.escapeHtml(p.command || '')}</div>
+                    <div class="prompt-item-desc">${this.escapeHtml(p.description || '')}</div>
+                </div>
+                <div class="prompt-item-actions">
+                    <button class="prompt-item-btn edit" data-prompt-id="${p.id}" title="Edit">
+                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="14" height="14">
+                            <path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"></path>
+                            <path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"></path>
+                        </svg>
+                    </button>
+                    <button class="prompt-item-btn delete" data-prompt-id="${p.id}" title="Delete">
+                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="14" height="14">
+                            <polyline points="3 6 5 6 21 6"></polyline>
+                            <path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"></path>
+                        </svg>
+                    </button>
+                </div>
+            </div>
+        `).join('');
+    }
+
+    async showPromptsModal() {
+        const promptsModal = document.getElementById('promptsModal');
+        if (!promptsModal) return;
+        this.resetPromptForm();
+        await this.loadPrompts();
+        promptsModal.classList.add('open');
+    }
+
+    async savePrompt() {
+        const title = document.getElementById('promptTitleInput').value.trim();
+        const command = document.getElementById('promptCommandInput').value.trim();
+        const content = document.getElementById('promptContentInput').value.trim();
+        const description = document.getElementById('promptDescInput').value.trim();
+        const isShared = document.getElementById('promptSharedToggle').checked;
+
+        if (!title || !content) {
+            this.showToast('Title and content are required');
+            return;
+        }
+
+        const data = { title, command, content, description, isShared };
+
+        if (this.editingPromptId) {
+            await this.updatePrompt(this.editingPromptId, data);
+        } else {
+            await this.createPrompt(data);
+        }
+    }
+
+    async createPrompt(data) {
+        try {
+            const resp = await fetch('/api/prompts', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify(data)
+            });
+            if (!resp.ok) throw new Error('Failed to create prompt');
+            this.showToast('Prompt created');
+            this.resetPromptForm();
+            await this.loadPrompts();
+        } catch (e) {
+            console.error('Failed to create prompt:', e);
+            this.showToast('Failed to create prompt');
+        }
+    }
+
+    async updatePrompt(id, data) {
+        try {
+            const resp = await fetch(`/api/prompts/${id}`, {
+                method: 'PUT',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify(data)
+            });
+            if (!resp.ok) throw new Error('Failed to update prompt');
+            this.showToast('Prompt updated');
+            this.resetPromptForm();
+            await this.loadPrompts();
+        } catch (e) {
+            console.error('Failed to update prompt:', e);
+            this.showToast('Failed to update prompt');
+        }
+    }
+
+    async deletePrompt(id) {
+        if (!confirm('Delete this prompt preset?')) return;
+        try {
+            const resp = await fetch(`/api/prompts/${id}`, { method: 'DELETE' });
+            if (!resp.ok) throw new Error('Failed to delete prompt');
+            this.showToast('Prompt deleted');
+            await this.loadPrompts();
+        } catch (e) {
+            console.error('Failed to delete prompt:', e);
+            this.showToast('Failed to delete prompt');
+        }
+    }
+
+    async editPrompt(id) {
+        try {
+            const prompts = await this.loadPrompts();
+            const prompt = prompts.find(p => p.id === id);
+            if (!prompt) return;
+
+            this.editingPromptId = id;
+            document.getElementById('promptTitleInput').value = prompt.title || prompt.name || '';
+            document.getElementById('promptCommandInput').value = prompt.command || '';
+            document.getElementById('promptContentInput').value = prompt.content || prompt.promptText || '';
+            document.getElementById('promptDescInput').value = prompt.description || '';
+            document.getElementById('promptSharedToggle').checked = prompt.isShared || false;
+
+            const saveBtn = document.getElementById('promptSaveBtn');
+            if (saveBtn) saveBtn.textContent = 'Update';
+            const cancelBtn = document.getElementById('promptCancelEditBtn');
+            if (cancelBtn) cancelBtn.style.display = '';
+        } catch (e) {
+            console.error('Failed to edit prompt:', e);
+        }
+    }
+
+    resetPromptForm() {
+        this.editingPromptId = null;
+        document.getElementById('promptTitleInput').value = '';
+        document.getElementById('promptCommandInput').value = '';
+        document.getElementById('promptContentInput').value = '';
+        document.getElementById('promptDescInput').value = '';
+        document.getElementById('promptSharedToggle').checked = false;
+        const saveBtn = document.getElementById('promptSaveBtn');
+        if (saveBtn) saveBtn.textContent = 'Create';
+        const cancelBtn = document.getElementById('promptCancelEditBtn');
+        if (cancelBtn) cancelBtn.style.display = 'none';
+    }
+
+    // --- Translation ---
+
+    showTranslateDropdown(messageEl) {
+        // Remove any existing dropdown
+        const existing = document.querySelector('.translate-dropdown');
+        if (existing) existing.remove();
+
+        const translateBtn = messageEl.querySelector('[data-action="translate"]');
+        if (!translateBtn) return;
+
+        const languages = [
+            { code: 'es', name: 'Spanish' },
+            { code: 'fr', name: 'French' },
+            { code: 'de', name: 'German' },
+            { code: 'it', name: 'Italian' },
+            { code: 'pt', name: 'Portuguese' },
+            { code: 'zh', name: 'Chinese' },
+            { code: 'ja', name: 'Japanese' },
+            { code: 'ko', name: 'Korean' },
+            { code: 'ar', name: 'Arabic' },
+            { code: 'hi', name: 'Hindi' },
+            { code: 'ru', name: 'Russian' },
+            { code: 'en', name: 'English' }
+        ];
+
+        const dropdown = document.createElement('div');
+        dropdown.className = 'translate-dropdown';
+        dropdown.innerHTML = languages.map(lang =>
+            `<button class="translate-dropdown-item" data-lang="${lang.code}">${lang.name}</button>`
+        ).join('');
+
+        translateBtn.style.position = 'relative';
+        translateBtn.appendChild(dropdown);
+
+        const handleClick = (e) => {
+            const item = e.target.closest('.translate-dropdown-item');
+            if (item) {
+                this.translateMessage(messageEl, item.dataset.lang);
+                dropdown.remove();
+            }
+        };
+        dropdown.addEventListener('click', handleClick);
+
+        // Close on outside click
+        const closeDropdown = (e) => {
+            if (!dropdown.contains(e.target) && e.target !== translateBtn) {
+                dropdown.remove();
+                document.removeEventListener('click', closeDropdown);
+            }
+        };
+        setTimeout(() => document.addEventListener('click', closeDropdown), 0);
+    }
+
+    async translateMessage(messageEl, targetLang) {
+        const textEl = messageEl.querySelector('.message-text');
+        if (!textEl) return;
+
+        const text = textEl.innerText;
+        if (!text.trim()) return;
+
+        // Remove any existing translation
+        const existingTranslation = messageEl.querySelector('.translated-text');
+        if (existingTranslation) existingTranslation.remove();
+
+        // Show loading
+        const loadingEl = document.createElement('div');
+        loadingEl.className = 'translated-text';
+        loadingEl.innerHTML = '<div class="search-loading"><div class="search-loading-spinner"></div> Translating...</div>';
+        textEl.after(loadingEl);
+
+        try {
+            const resp = await fetch('/api/translate', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ text, sourceLanguage: 'auto', targetLanguage: targetLang })
+            });
+            if (!resp.ok) throw new Error('Translation failed');
+            const result = await resp.json();
+
+            const langNames = {
+                es: 'Spanish', fr: 'French', de: 'German', it: 'Italian',
+                pt: 'Portuguese', zh: 'Chinese', ja: 'Japanese', ko: 'Korean',
+                ar: 'Arabic', hi: 'Hindi', ru: 'Russian', en: 'English'
+            };
+
+            loadingEl.innerHTML = `
+                <div class="translated-text-header">
+                    <span class="translated-text-label">Translated to ${langNames[targetLang] || targetLang}</span>
+                    <button class="translated-text-close" title="Remove translation">
+                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="14" height="14">
+                            <line x1="18" y1="6" x2="6" y2="18"></line>
+                            <line x1="6" y1="6" x2="18" y2="18"></line>
+                        </svg>
+                    </button>
+                </div>
+                <div>${this.escapeHtml(result.translatedText || result.translation || '')}</div>
+            `;
+
+            const closeBtn = loadingEl.querySelector('.translated-text-close');
+            if (closeBtn) {
+                closeBtn.addEventListener('click', () => loadingEl.remove());
+            }
+        } catch (e) {
+            console.error('Translation failed:', e);
+            loadingEl.remove();
+            this.showToast('Translation failed');
+        }
+    }
+
+    // --- Agentic Search ---
+
+    initAgenticSearch() {
+        const modal = document.getElementById('agenticSearchModal');
+        if (!modal) return;
+
+        // Close button
+        const closeBtn = modal.querySelector('[data-action="closeAgenticSearch"]');
+        if (closeBtn) {
+            closeBtn.addEventListener('click', () => modal.classList.remove('open'));
+        }
+        modal.addEventListener('click', (e) => {
+            if (e.target === modal) modal.classList.remove('open');
+        });
+
+        // Search button in header
+        const searchBtn = document.getElementById('agenticSearchBtn');
+        if (searchBtn) {
+            searchBtn.addEventListener('click', () => this.showAgenticSearch());
+        }
+
+        // Max iterations slider
+        const slider = document.getElementById('maxIterationsSlider');
+        const sliderValue = document.getElementById('maxIterationsValue');
+        if (slider && sliderValue) {
+            slider.addEventListener('input', () => {
+                sliderValue.textContent = slider.value;
+            });
+        }
+
+        // Run search
+        const runBtn = document.getElementById('runAgenticSearchBtn');
+        if (runBtn) {
+            runBtn.addEventListener('click', () => {
+                const query = document.getElementById('agenticSearchInput').value.trim();
+                if (!query) {
+                    this.showToast('Please enter a search query');
+                    return;
+                }
+                const maxIterations = parseInt(document.getElementById('maxIterationsSlider').value, 10);
+                const enableWebSearch = document.getElementById('enableWebSearchToggle').checked;
+                this.runAgenticSearch(query, { maxIterations, enableWebSearch });
+            });
+        }
+
+        // Enter key on search input
+        const searchInput = document.getElementById('agenticSearchInput');
+        if (searchInput) {
+            searchInput.addEventListener('keydown', (e) => {
+                if (e.key === 'Enter') {
+                    e.preventDefault();
+                    const runSearchBtn = document.getElementById('runAgenticSearchBtn');
+                    if (runSearchBtn) runSearchBtn.click();
+                }
+            });
+        }
+    }
+
+    showAgenticSearch() {
+        const modal = document.getElementById('agenticSearchModal');
+        if (!modal) return;
+
+        // Reset the UI
+        const results = document.getElementById('agenticSearchResults');
+        if (results) results.style.display = 'none';
+        const steps = document.getElementById('searchSteps');
+        if (steps) steps.innerHTML = '';
+        const finalResult = document.getElementById('searchFinalResult');
+        if (finalResult) finalResult.innerHTML = '';
+        const input = document.getElementById('agenticSearchInput');
+        if (input) input.value = '';
+
+        modal.classList.add('open');
+        if (input) input.focus();
+    }
+
+    async runAgenticSearch(query, options) {
+        const results = document.getElementById('agenticSearchResults');
+        const steps = document.getElementById('searchSteps');
+        const finalResult = document.getElementById('searchFinalResult');
+        const runBtn = document.getElementById('runAgenticSearchBtn');
+
+        if (!results || !steps || !finalResult) return;
+
+        results.style.display = '';
+        steps.innerHTML = '';
+        finalResult.innerHTML = '';
+
+        // Disable button
+        if (runBtn) {
+            runBtn.disabled = true;
+            runBtn.innerHTML = '<div class="search-loading-spinner"></div> Searching...';
+        }
+
+        // Add initial step
+        this.addSearchStep(steps, 1, 'Initiating search', `Query: "${this.escapeHtml(query)}"`, 'active');
+
+        try {
+            const resp = await fetch('/api/agentic-search', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                    query,
+                    maxIterations: options.maxIterations,
+                    enableWebSearch: options.enableWebSearch
+                })
+            });
+
+            if (!resp.ok) throw new Error('Search failed');
+            const data = await resp.json();
+
+            // Clear loading step
+            steps.innerHTML = '';
+
+            // Display steps from response
+            if (data.steps && data.steps.length > 0) {
+                data.steps.forEach((step, i) => {
+                    this.addSearchStep(steps, i + 1, step.title || step.action || `Step ${i + 1}`, step.detail || step.result || '', 'done');
+                });
+            } else {
+                this.addSearchStep(steps, 1, 'Search completed', '', 'done');
+            }
+
+            // Display final result
+            const resultText = data.result || data.answer || data.summary || '';
+            if (resultText) {
+                finalResult.innerHTML = this.escapeHtml(resultText);
+            }
+        } catch (e) {
+            console.error('Agentic search failed:', e);
+            steps.innerHTML = '';
+            this.addSearchStep(steps, 1, 'Search failed', e.message || 'An error occurred', '');
+            this.showToast('Agentic search failed');
+        } finally {
+            if (runBtn) {
+                runBtn.disabled = false;
+                runBtn.innerHTML = `
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="16" height="16">
+                        <circle cx="11" cy="11" r="8"></circle>
+                        <line x1="21" y1="21" x2="16.65" y2="16.65"></line>
+                    </svg>
+                    Search
+                `;
+            }
+        }
+    }
+
+    addSearchStep(container, number, title, detail, state) {
+        const step = document.createElement('div');
+        step.className = 'search-step';
+        step.innerHTML = `
+            <div class="search-step-icon ${state}">${number}</div>
+            <div class="search-step-content">
+                <div class="search-step-title">${this.escapeHtml(title)}</div>
+                ${detail ? `<div class="search-step-detail">${this.escapeHtml(detail)}</div>` : ''}
+            </div>
+        `;
+        container.appendChild(step);
     }
 
     formatFileSize(bytes) {

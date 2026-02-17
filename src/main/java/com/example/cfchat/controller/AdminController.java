@@ -579,6 +579,56 @@ public class AdminController {
         }
     }
 
+    @GetMapping("/admin/groups")
+    public String groups(Model model) {
+        Optional<User> currentUser = userService.getCurrentUser();
+        if (currentUser.isEmpty() || currentUser.get().getRole() != User.UserRole.ADMIN) {
+            return "redirect:/";
+        }
+
+        return "admin/groups";
+    }
+
+    @GetMapping("/admin/banners")
+    public String banners(Model model) {
+        Optional<User> currentUser = userService.getCurrentUser();
+        if (currentUser.isEmpty() || currentUser.get().getRole() != User.UserRole.ADMIN) {
+            return "redirect:/";
+        }
+
+        return "admin/banners";
+    }
+
+    @GetMapping("/admin/settings")
+    public String adminSettingsPage(Model model) {
+        Optional<User> currentUser = userService.getCurrentUser();
+        if (currentUser.isEmpty() || currentUser.get().getRole() != User.UserRole.ADMIN) {
+            return "redirect:/";
+        }
+
+        // Count enabled features for stats
+        int enabledFeatures = 0;
+        String[] featureKeys = {
+            "feature.rag.enabled", "feature.tools.enabled", "feature.channels.enabled",
+            "feature.notes.enabled", "feature.memory.enabled", "feature.agentic_search.enabled",
+            "feature.temporary_chats.enabled"
+        };
+        for (String key : featureKeys) {
+            if (systemSettingService.getBooleanSetting(key, true)) {
+                enabledFeatures++;
+            }
+        }
+
+        model.addAttribute("enabledFeatures", enabledFeatures);
+        model.addAttribute("totalFeatures", featureKeys.length);
+        model.addAttribute("maintenanceMode", systemSettingService.getBooleanSetting("maintenance.enabled", false));
+        model.addAttribute("rateLimitingEnabled", systemSettingService.getBooleanSetting("rate_limiting.enabled", false));
+        model.addAttribute("moderationEnabled", systemSettingService.getBooleanSetting("moderation.enabled", false));
+        model.addAttribute("models", chatService.getAvailableModels());
+
+        return "admin/settings";
+    }
+
     @GetMapping("/api/admin/settings")
     @ResponseBody
     public ResponseEntity<Map<String, Object>> getSettings() {
@@ -587,9 +637,82 @@ public class AdminController {
             return ResponseEntity.status(403).build();
         }
 
-        Map<String, Object> settings = new HashMap<>();
-        settings.put("prevent_chat_deletion", systemSettingService.getBooleanSetting("prevent_chat_deletion", false));
+        // Return all stored settings plus defaults for known keys
+        Map<String, String> allStored = systemSettingService.getAllSettings();
+        Map<String, Object> settings = new HashMap<>(allStored);
+
+        // Ensure all known keys have defaults
+        Map<String, String> defaults = new LinkedHashMap<>();
+        defaults.put("site.name", "CF Llama Chat");
+        defaults.put("site.welcome_message", "Welcome to CF Llama Chat");
+        defaults.put("registration.enabled", "true");
+        defaults.put("default.user_role", "USER");
+        defaults.put("rate_limiting.enabled", "false");
+        defaults.put("rate_limiting.requests_per_minute", "60");
+        defaults.put("max.message.length", "32000");
+        defaults.put("session.timeout", "30");
+        defaults.put("email.verification.required", "false");
+        defaults.put("default.model", "");
+        defaults.put("allowed.models", "");
+        defaults.put("max.tokens", "4096");
+        defaults.put("default.temperature", "0.7");
+        defaults.put("moderation.enabled", "false");
+        defaults.put("moderation.level", "medium");
+        defaults.put("feature.rag.enabled", "true");
+        defaults.put("feature.tools.enabled", "true");
+        defaults.put("feature.channels.enabled", "true");
+        defaults.put("feature.notes.enabled", "true");
+        defaults.put("feature.memory.enabled", "true");
+        defaults.put("feature.agentic_search.enabled", "true");
+        defaults.put("feature.temporary_chats.enabled", "true");
+        defaults.put("maintenance.enabled", "false");
+        defaults.put("maintenance.message", "");
+        defaults.put("banner.text", "");
+        defaults.put("banner.type", "info");
+        defaults.put("prevent_chat_deletion", "false");
+
+        for (Map.Entry<String, String> entry : defaults.entrySet()) {
+            settings.putIfAbsent(entry.getKey(), entry.getValue());
+        }
+
         return ResponseEntity.ok(settings);
+    }
+
+    @PostMapping("/api/admin/settings")
+    @ResponseBody
+    public ResponseEntity<Map<String, Object>> saveSetting(@RequestBody Map<String, String> body) {
+        Optional<User> currentUser = userService.getCurrentUser();
+        if (currentUser.isEmpty() || currentUser.get().getRole() != User.UserRole.ADMIN) {
+            return ResponseEntity.status(403).body(Map.of("error", "Forbidden"));
+        }
+
+        String key = body.get("key");
+        String value = body.get("value");
+
+        if (key == null || key.isBlank()) {
+            return ResponseEntity.badRequest().body(Map.of("error", "Setting key is required"));
+        }
+
+        // Validate key against known setting keys to prevent arbitrary writes
+        Set<String> validKeys = Set.of(
+            "site.name", "site.welcome_message", "registration.enabled", "default.user_role",
+            "rate_limiting.enabled", "rate_limiting.requests_per_minute", "max.message.length",
+            "session.timeout", "email.verification.required", "default.model", "allowed.models",
+            "max.tokens", "default.temperature", "moderation.enabled", "moderation.level",
+            "feature.rag.enabled", "feature.tools.enabled", "feature.channels.enabled",
+            "feature.notes.enabled", "feature.memory.enabled", "feature.agentic_search.enabled",
+            "feature.temporary_chats.enabled", "maintenance.enabled", "maintenance.message",
+            "banner.text", "banner.type", "prevent_chat_deletion"
+        );
+
+        if (!validKeys.contains(key)) {
+            return ResponseEntity.badRequest().body(Map.of("error", "Unknown setting key: " + key));
+        }
+
+        systemSettingService.setSetting(key, value != null ? value : "");
+        log.info("Admin {} updated setting {} = {}", currentUser.get().getUsername(), key, value);
+
+        return ResponseEntity.ok(Map.of("success", true, "key", key, "value", value != null ? value : ""));
     }
 
     @PostMapping("/api/admin/settings/prevent-deletion")

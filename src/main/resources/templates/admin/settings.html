@@ -1,0 +1,917 @@
+<!DOCTYPE html>
+<html lang="en" xmlns:th="http://www.thymeleaf.org">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>System Settings - Admin Portal</title>
+    <link rel="stylesheet" th:href="@{/css/style.css}">
+    <link rel="stylesheet" th:href="@{/css/admin.css}">
+    <style>
+        .admin-container {
+            max-width: 960px;
+        }
+
+        .settings-section {
+            background-color: var(--bg-secondary);
+            border: 1px solid var(--border-color);
+            border-radius: 12px;
+            padding: 24px;
+            margin-bottom: 24px;
+        }
+
+        .settings-section-title {
+            font-size: 1.2rem;
+            font-weight: 600;
+            margin-bottom: 4px;
+            display: flex;
+            align-items: center;
+            gap: 10px;
+        }
+
+        .settings-section-title svg {
+            width: 20px;
+            height: 20px;
+            color: var(--accent-color);
+        }
+
+        .settings-section-desc {
+            font-size: 0.85rem;
+            color: var(--text-muted);
+            margin-bottom: 20px;
+        }
+
+        .setting-row {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding: 14px 0;
+            border-bottom: 1px solid var(--border-color);
+        }
+
+        .setting-row:last-child {
+            border-bottom: none;
+            padding-bottom: 0;
+        }
+
+        .setting-row:first-of-type {
+            padding-top: 0;
+        }
+
+        .setting-info {
+            flex: 1;
+            min-width: 0;
+            padding-right: 16px;
+        }
+
+        .setting-label {
+            font-size: 0.95rem;
+            font-weight: 500;
+            color: var(--text-primary);
+        }
+
+        .setting-desc {
+            font-size: 0.8rem;
+            color: var(--text-muted);
+            margin-top: 2px;
+        }
+
+        .setting-control {
+            flex-shrink: 0;
+            display: flex;
+            align-items: center;
+            gap: 10px;
+        }
+
+        .setting-input {
+            padding: 8px 12px;
+            background-color: var(--bg-tertiary);
+            border: 1px solid var(--border-color);
+            border-radius: 8px;
+            color: var(--text-primary);
+            font-size: 0.9rem;
+            width: 200px;
+        }
+
+        .setting-input:focus {
+            outline: none;
+            border-color: var(--accent-color);
+        }
+
+        .setting-input.narrow {
+            width: 100px;
+        }
+
+        .setting-input.wide {
+            width: 280px;
+        }
+
+        textarea.setting-input {
+            width: 320px;
+            min-height: 70px;
+            resize: vertical;
+            font-family: inherit;
+        }
+
+        .setting-select {
+            padding: 8px 12px;
+            background-color: var(--bg-tertiary);
+            border: 1px solid var(--border-color);
+            border-radius: 8px;
+            color: var(--text-primary);
+            font-size: 0.9rem;
+            cursor: pointer;
+            min-width: 140px;
+        }
+
+        .setting-select:focus {
+            outline: none;
+            border-color: var(--accent-color);
+        }
+
+        /* Slider */
+        .slider-container {
+            display: flex;
+            align-items: center;
+            gap: 12px;
+        }
+
+        .setting-slider {
+            -webkit-appearance: none;
+            appearance: none;
+            width: 160px;
+            height: 6px;
+            border-radius: 3px;
+            background: var(--bg-tertiary);
+            outline: none;
+        }
+
+        .setting-slider::-webkit-slider-thumb {
+            -webkit-appearance: none;
+            appearance: none;
+            width: 18px;
+            height: 18px;
+            border-radius: 50%;
+            background: var(--accent-color);
+            cursor: pointer;
+        }
+
+        .setting-slider::-moz-range-thumb {
+            width: 18px;
+            height: 18px;
+            border-radius: 50%;
+            background: var(--accent-color);
+            cursor: pointer;
+            border: none;
+        }
+
+        .slider-value {
+            font-size: 0.9rem;
+            font-weight: 500;
+            color: var(--accent-color);
+            min-width: 32px;
+            text-align: center;
+        }
+
+        /* Checkbox Grid for model whitelisting */
+        .checkbox-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
+            gap: 8px;
+            margin-top: 8px;
+        }
+
+        .checkbox-item {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            padding: 8px 12px;
+            background-color: var(--bg-tertiary);
+            border: 1px solid var(--border-color);
+            border-radius: 8px;
+            font-size: 0.85rem;
+            cursor: pointer;
+            transition: border-color 0.2s;
+        }
+
+        .checkbox-item:hover {
+            border-color: var(--accent-color);
+        }
+
+        .checkbox-item input[type="checkbox"] {
+            accent-color: var(--accent-color);
+            width: 16px;
+            height: 16px;
+            cursor: pointer;
+        }
+
+        .checkbox-item label {
+            cursor: pointer;
+            white-space: nowrap;
+            overflow: hidden;
+            text-overflow: ellipsis;
+        }
+
+        /* Full-width setting row variant */
+        .setting-row.stacked {
+            flex-direction: column;
+            align-items: flex-start;
+        }
+
+        .setting-row.stacked .setting-control {
+            width: 100%;
+            margin-top: 12px;
+        }
+
+        .setting-row.stacked textarea.setting-input {
+            width: 100%;
+        }
+
+        /* Inline toggle with label */
+        .toggle-inline {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+
+        .toggle-status {
+            font-size: 0.8rem;
+            color: var(--text-muted);
+        }
+
+        /* Conditional sub-settings */
+        .sub-settings {
+            margin-left: 0;
+            padding-left: 16px;
+            border-left: 2px solid var(--border-color);
+        }
+
+        .sub-settings .setting-row {
+            padding: 10px 0;
+        }
+
+        .sub-settings[data-hidden="true"] {
+            display: none;
+        }
+
+        /* Warning indicator for dangerous settings */
+        .setting-label .warning-badge {
+            display: inline-block;
+            padding: 2px 6px;
+            border-radius: 4px;
+            font-size: 0.7rem;
+            font-weight: 600;
+            text-transform: uppercase;
+            background-color: rgba(251, 191, 36, 0.2);
+            color: #fbbf24;
+            margin-left: 8px;
+        }
+
+        .setting-label .danger-badge {
+            display: inline-block;
+            padding: 2px 6px;
+            border-radius: 4px;
+            font-size: 0.7rem;
+            font-weight: 600;
+            text-transform: uppercase;
+            background-color: rgba(239, 68, 68, 0.2);
+            color: #ef4444;
+            margin-left: 8px;
+        }
+
+        /* Stat card enhancements */
+        .stat-card.warning .stat-value {
+            color: #fbbf24;
+        }
+
+        .stat-card.danger .stat-value {
+            color: #ef4444;
+        }
+
+        .stat-card.success .stat-value {
+            color: var(--accent-color);
+        }
+
+        /* Save indicator */
+        .save-indicator {
+            display: inline-flex;
+            align-items: center;
+            gap: 6px;
+            font-size: 0.8rem;
+            color: var(--accent-color);
+            opacity: 0;
+            transition: opacity 0.3s;
+        }
+
+        .save-indicator.visible {
+            opacity: 1;
+        }
+
+        .save-indicator svg {
+            width: 14px;
+            height: 14px;
+        }
+
+        /* Confirmation dialog */
+        .confirm-overlay {
+            display: none;
+            position: fixed;
+            top: 0;
+            left: 0;
+            right: 0;
+            bottom: 0;
+            background-color: rgba(0, 0, 0, 0.5);
+            z-index: 1000;
+            align-items: center;
+            justify-content: center;
+        }
+
+        .confirm-overlay.open {
+            display: flex;
+        }
+
+        .confirm-dialog {
+            background-color: var(--bg-secondary);
+            border: 1px solid var(--border-color);
+            border-radius: 16px;
+            padding: 24px;
+            max-width: 440px;
+            width: 90%;
+        }
+
+        .confirm-dialog h3 {
+            margin-bottom: 12px;
+            font-size: 1.1rem;
+        }
+
+        .confirm-dialog p {
+            color: var(--text-secondary);
+            font-size: 0.9rem;
+            line-height: 1.5;
+            margin-bottom: 20px;
+        }
+
+        .confirm-actions {
+            display: flex;
+            gap: 12px;
+            justify-content: flex-end;
+        }
+
+        .confirm-btn {
+            padding: 10px 20px;
+            border-radius: 8px;
+            border: none;
+            cursor: pointer;
+            font-size: 0.9rem;
+            font-weight: 500;
+        }
+
+        .confirm-btn.cancel {
+            background-color: var(--bg-tertiary);
+            color: var(--text-primary);
+        }
+
+        .confirm-btn.proceed {
+            background-color: var(--error-color);
+            color: white;
+        }
+
+        .confirm-btn.proceed-warning {
+            background-color: #fbbf24;
+            color: #1a1a1a;
+        }
+
+        /* Import Drop Zone */
+        .import-drop-zone {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            padding: 24px;
+            border: 2px dashed var(--border-color);
+            border-radius: 12px;
+            cursor: pointer;
+            transition: border-color 0.2s, background-color 0.2s;
+            text-align: center;
+            width: 100%;
+        }
+
+        .import-drop-zone:hover,
+        .import-drop-zone.drag-over {
+            border-color: var(--accent-color);
+            background-color: rgba(16, 163, 127, 0.05);
+        }
+
+        @media (max-width: 768px) {
+            .setting-row {
+                flex-direction: column;
+                align-items: flex-start;
+                gap: 10px;
+            }
+
+            .setting-control {
+                width: 100%;
+            }
+
+            .setting-input,
+            .setting-input.narrow,
+            .setting-input.wide,
+            textarea.setting-input,
+            .setting-select {
+                width: 100%;
+            }
+
+            .checkbox-grid {
+                grid-template-columns: 1fr;
+            }
+        }
+    </style>
+</head>
+<body>
+    <div class="admin-container">
+        <header class="admin-header">
+            <h1>System Settings</h1>
+            <div class="header-nav">
+                <a href="/admin" class="back-link">
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                        <line x1="19" y1="12" x2="5" y2="12"></line>
+                        <polyline points="12 19 5 12 12 5"></polyline>
+                    </svg>
+                    Back to Admin
+                </a>
+                <a href="/" class="back-link">
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                        <path d="M3 9l9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"></path>
+                        <polyline points="9 22 9 12 15 12 15 22"></polyline>
+                    </svg>
+                    Chat
+                </a>
+            </div>
+        </header>
+
+        <div class="stats-cards">
+            <div class="stat-card success">
+                <div class="stat-value" th:text="${enabledFeatures} + '/' + ${totalFeatures}">5/7</div>
+                <div class="stat-label">Features Enabled</div>
+            </div>
+            <div th:class="${maintenanceMode} ? 'stat-card danger' : 'stat-card success'">
+                <div class="stat-value" th:text="${maintenanceMode} ? 'ON' : 'OFF'">OFF</div>
+                <div class="stat-label">Maintenance Mode</div>
+            </div>
+            <div th:class="${rateLimitingEnabled} ? 'stat-card success' : 'stat-card'">
+                <div class="stat-value" th:text="${rateLimitingEnabled} ? 'ON' : 'OFF'">OFF</div>
+                <div class="stat-label">Rate Limiting</div>
+            </div>
+            <div th:class="${moderationEnabled} ? 'stat-card success' : 'stat-card'">
+                <div class="stat-value" th:text="${moderationEnabled} ? 'ON' : 'OFF'">OFF</div>
+                <div class="stat-label">Content Moderation</div>
+            </div>
+        </div>
+
+        <!-- General Settings -->
+        <div class="settings-section">
+            <div class="settings-section-title">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                    <circle cx="12" cy="12" r="3"></circle>
+                    <path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1 0 2.83 2 2 0 0 1-2.83 0l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-2 2 2 2 0 0 1-2-2v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83 0 2 2 0 0 1 0-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1-2-2 2 2 0 0 1 2-2h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 0-2.83 2 2 0 0 1 2.83 0l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 2-2 2 2 0 0 1 2 2v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 0 2 2 0 0 1 0 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 2 2 2 2 0 0 1-2 2h-.09a1.65 1.65 0 0 0-1.51 1z"></path>
+                </svg>
+                General Settings
+            </div>
+            <div class="settings-section-desc">Basic application configuration and branding.</div>
+
+            <div class="setting-row">
+                <div class="setting-info">
+                    <div class="setting-label">Site Name</div>
+                    <div class="setting-desc">Displayed in the browser title and header.</div>
+                </div>
+                <div class="setting-control">
+                    <input type="text" class="setting-input" data-key="site.name" placeholder="CF Llama Chat">
+                </div>
+            </div>
+
+            <div class="setting-row stacked">
+                <div class="setting-info">
+                    <div class="setting-label">Welcome Message</div>
+                    <div class="setting-desc">Shown to users on the landing page before they start a conversation.</div>
+                </div>
+                <div class="setting-control">
+                    <textarea class="setting-input" data-key="site.welcome_message" placeholder="Welcome to CF Llama Chat" rows="3"></textarea>
+                </div>
+            </div>
+
+            <div class="setting-row">
+                <div class="setting-info">
+                    <div class="setting-label">Registration Enabled <span class="warning-badge">Sensitive</span></div>
+                    <div class="setting-desc">Allow new users to sign up for accounts.</div>
+                </div>
+                <div class="setting-control">
+                    <label class="toggle-switch">
+                        <input type="checkbox" data-key="registration.enabled" data-confirm="disable-registration">
+                        <span class="toggle-slider"></span>
+                    </label>
+                </div>
+            </div>
+
+            <div class="setting-row">
+                <div class="setting-info">
+                    <div class="setting-label">Default User Role</div>
+                    <div class="setting-desc">Role assigned to newly registered users.</div>
+                </div>
+                <div class="setting-control">
+                    <select class="setting-select" data-key="default.user_role">
+                        <option value="USER">User</option>
+                        <option value="ADMIN">Admin</option>
+                    </select>
+                </div>
+            </div>
+        </div>
+
+        <!-- Security Settings -->
+        <div class="settings-section">
+            <div class="settings-section-title">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                    <rect x="3" y="11" width="18" height="11" rx="2" ry="2"></rect>
+                    <path d="M7 11V7a5 5 0 0 1 10 0v4"></path>
+                </svg>
+                Security Settings
+            </div>
+            <div class="settings-section-desc">Rate limiting, session management, and security controls.</div>
+
+            <div class="setting-row">
+                <div class="setting-info">
+                    <div class="setting-label">Rate Limiting</div>
+                    <div class="setting-desc">Limit the number of API requests per user per minute.</div>
+                </div>
+                <div class="setting-control">
+                    <label class="toggle-switch">
+                        <input type="checkbox" data-key="rate_limiting.enabled" data-toggle-target="rate-limit-sub">
+                        <span class="toggle-slider"></span>
+                    </label>
+                </div>
+            </div>
+            <div class="sub-settings" id="rate-limit-sub" data-hidden="true">
+                <div class="setting-row">
+                    <div class="setting-info">
+                        <div class="setting-label">Requests Per Minute</div>
+                        <div class="setting-desc">Maximum number of requests allowed per user per minute.</div>
+                    </div>
+                    <div class="setting-control">
+                        <input type="number" class="setting-input narrow" data-key="rate_limiting.requests_per_minute" min="1" max="1000" placeholder="60">
+                    </div>
+                </div>
+            </div>
+
+            <div class="setting-row">
+                <div class="setting-info">
+                    <div class="setting-label">Max Message Length</div>
+                    <div class="setting-desc">Maximum number of characters allowed per message.</div>
+                </div>
+                <div class="setting-control">
+                    <input type="number" class="setting-input narrow" data-key="max.message.length" min="100" max="100000" placeholder="32000">
+                </div>
+            </div>
+
+            <div class="setting-row">
+                <div class="setting-info">
+                    <div class="setting-label">Session Timeout (minutes)</div>
+                    <div class="setting-desc">How long before inactive sessions expire.</div>
+                </div>
+                <div class="setting-control">
+                    <input type="number" class="setting-input narrow" data-key="session.timeout" min="5" max="1440" placeholder="30">
+                </div>
+            </div>
+
+            <div class="setting-row">
+                <div class="setting-info">
+                    <div class="setting-label">Require Email Verification</div>
+                    <div class="setting-desc">Users must verify their email before accessing the application.</div>
+                </div>
+                <div class="setting-control">
+                    <label class="toggle-switch">
+                        <input type="checkbox" data-key="email.verification.required">
+                        <span class="toggle-slider"></span>
+                    </label>
+                </div>
+            </div>
+
+            <div class="setting-row">
+                <div class="setting-info">
+                    <div class="setting-label">Prevent Chat Deletion</div>
+                    <div class="setting-desc">Disable users from deleting their own conversations.</div>
+                </div>
+                <div class="setting-control">
+                    <label class="toggle-switch">
+                        <input type="checkbox" data-key="prevent_chat_deletion">
+                        <span class="toggle-slider"></span>
+                    </label>
+                </div>
+            </div>
+        </div>
+
+        <!-- AI / Model Settings -->
+        <div class="settings-section">
+            <div class="settings-section-title">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                    <path d="M21 16V8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16z"></path>
+                    <polyline points="3.27 6.96 12 12.01 20.73 6.96"></polyline>
+                    <line x1="12" y1="22.08" x2="12" y2="12"></line>
+                </svg>
+                AI / Model Settings
+            </div>
+            <div class="settings-section-desc">Configure default models, token limits, and content moderation.</div>
+
+            <div class="setting-row">
+                <div class="setting-info">
+                    <div class="setting-label">Default Model</div>
+                    <div class="setting-desc">The model selected by default for new conversations.</div>
+                </div>
+                <div class="setting-control">
+                    <select class="setting-select" data-key="default.model" id="defaultModelSelect">
+                        <option value="">-- System Default --</option>
+                        <option th:each="m : ${models}" th:value="${m.name}" th:text="${m.name}">model-name</option>
+                    </select>
+                </div>
+            </div>
+
+            <div class="setting-row stacked">
+                <div class="setting-info">
+                    <div class="setting-label">Allowed Models (Whitelist)</div>
+                    <div class="setting-desc">Select which models users are allowed to use. Uncheck models to restrict access. If none are selected, all models are available.</div>
+                </div>
+                <div class="setting-control">
+                    <div class="checkbox-grid" id="modelWhitelist">
+                        <div class="checkbox-item" th:each="m : ${models}">
+                            <input type="checkbox" th:id="'model-' + ${m.name}" th:value="${m.name}" class="model-checkbox" checked>
+                            <label th:for="'model-' + ${m.name}" th:text="${m.name}">model-name</label>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <div class="setting-row">
+                <div class="setting-info">
+                    <div class="setting-label">Max Tokens Per Request</div>
+                    <div class="setting-desc">Maximum number of tokens the AI can generate per response.</div>
+                </div>
+                <div class="setting-control">
+                    <input type="number" class="setting-input narrow" data-key="max.tokens" min="256" max="128000" placeholder="4096">
+                </div>
+            </div>
+
+            <div class="setting-row">
+                <div class="setting-info">
+                    <div class="setting-label">Default Temperature</div>
+                    <div class="setting-desc">Controls randomness. Lower is more focused, higher is more creative.</div>
+                </div>
+                <div class="setting-control">
+                    <div class="slider-container">
+                        <input type="range" class="setting-slider" data-key="default.temperature" min="0" max="2" step="0.1" value="0.7">
+                        <span class="slider-value">0.7</span>
+                    </div>
+                </div>
+            </div>
+
+            <div class="setting-row">
+                <div class="setting-info">
+                    <div class="setting-label">Content Moderation</div>
+                    <div class="setting-desc">Filter AI responses for inappropriate content.</div>
+                </div>
+                <div class="setting-control">
+                    <label class="toggle-switch">
+                        <input type="checkbox" data-key="moderation.enabled" data-toggle-target="moderation-sub">
+                        <span class="toggle-slider"></span>
+                    </label>
+                </div>
+            </div>
+            <div class="sub-settings" id="moderation-sub" data-hidden="true">
+                <div class="setting-row">
+                    <div class="setting-info">
+                        <div class="setting-label">Moderation Level</div>
+                        <div class="setting-desc">How strictly to filter content.</div>
+                    </div>
+                    <div class="setting-control">
+                        <select class="setting-select" data-key="moderation.level">
+                            <option value="low">Low</option>
+                            <option value="medium">Medium</option>
+                            <option value="high">High</option>
+                        </select>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Feature Flags -->
+        <div class="settings-section">
+            <div class="settings-section-title">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                    <path d="M4 15s1-1 4-1 5 2 8 2 4-1 4-1V3s-1 1-4 1-5-2-8-2-4 1-4 1z"></path>
+                    <line x1="4" y1="22" x2="4" y2="15"></line>
+                </svg>
+                Feature Flags
+            </div>
+            <div class="settings-section-desc">Enable or disable application features globally for all users.</div>
+
+            <div class="setting-row">
+                <div class="setting-info">
+                    <div class="setting-label">RAG / Documents</div>
+                    <div class="setting-desc">Allow users to upload documents and use retrieval-augmented generation.</div>
+                </div>
+                <div class="setting-control">
+                    <label class="toggle-switch">
+                        <input type="checkbox" data-key="feature.rag.enabled">
+                        <span class="toggle-slider"></span>
+                    </label>
+                </div>
+            </div>
+
+            <div class="setting-row">
+                <div class="setting-info">
+                    <div class="setting-label">Tools / MCP</div>
+                    <div class="setting-desc">Enable tool usage and MCP server integrations in conversations.</div>
+                </div>
+                <div class="setting-control">
+                    <label class="toggle-switch">
+                        <input type="checkbox" data-key="feature.tools.enabled">
+                        <span class="toggle-slider"></span>
+                    </label>
+                </div>
+            </div>
+
+            <div class="setting-row">
+                <div class="setting-info">
+                    <div class="setting-label">Channels</div>
+                    <div class="setting-desc">Enable shared channel conversations for team collaboration.</div>
+                </div>
+                <div class="setting-control">
+                    <label class="toggle-switch">
+                        <input type="checkbox" data-key="feature.channels.enabled">
+                        <span class="toggle-slider"></span>
+                    </label>
+                </div>
+            </div>
+
+            <div class="setting-row">
+                <div class="setting-info">
+                    <div class="setting-label">Notes</div>
+                    <div class="setting-desc">Enable the personal notes feature for users.</div>
+                </div>
+                <div class="setting-control">
+                    <label class="toggle-switch">
+                        <input type="checkbox" data-key="feature.notes.enabled">
+                        <span class="toggle-slider"></span>
+                    </label>
+                </div>
+            </div>
+
+            <div class="setting-row">
+                <div class="setting-info">
+                    <div class="setting-label">Memory System</div>
+                    <div class="setting-desc">Enable AI memory to retain context across conversations.</div>
+                </div>
+                <div class="setting-control">
+                    <label class="toggle-switch">
+                        <input type="checkbox" data-key="feature.memory.enabled">
+                        <span class="toggle-slider"></span>
+                    </label>
+                </div>
+            </div>
+
+            <div class="setting-row">
+                <div class="setting-info">
+                    <div class="setting-label">Agentic Search</div>
+                    <div class="setting-desc">Enable AI-powered web search in conversations.</div>
+                </div>
+                <div class="setting-control">
+                    <label class="toggle-switch">
+                        <input type="checkbox" data-key="feature.agentic_search.enabled">
+                        <span class="toggle-slider"></span>
+                    </label>
+                </div>
+            </div>
+
+            <div class="setting-row">
+                <div class="setting-info">
+                    <div class="setting-label">Temporary Chats</div>
+                    <div class="setting-desc">Allow users to create conversations that are not persisted.</div>
+                </div>
+                <div class="setting-control">
+                    <label class="toggle-switch">
+                        <input type="checkbox" data-key="feature.temporary_chats.enabled">
+                        <span class="toggle-slider"></span>
+                    </label>
+                </div>
+            </div>
+        </div>
+
+        <!-- System Backup -->
+        <div class="settings-section">
+            <div class="settings-section-title">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                    <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path>
+                    <polyline points="7 10 12 15 17 10"></polyline>
+                    <line x1="12" y1="15" x2="12" y2="3"></line>
+                </svg>
+                System Backup
+            </div>
+            <div class="settings-section-desc">Export or import your system configuration as a JSON file.</div>
+
+            <div class="setting-row">
+                <div class="setting-info">
+                    <div class="setting-label">Export Configuration</div>
+                    <div class="setting-desc">Download the current system configuration as a JSON file.</div>
+                </div>
+                <div class="setting-control">
+                    <button class="action-btn primary" id="exportConfigBtn">
+                        Export JSON
+                    </button>
+                </div>
+            </div>
+
+            <div class="setting-row stacked">
+                <div class="setting-info">
+                    <div class="setting-label">Import Configuration <span class="danger-badge">Caution</span></div>
+                    <div class="setting-desc">Upload a previously exported configuration file. This will overwrite all current settings.</div>
+                </div>
+                <div class="setting-control">
+                    <div class="import-drop-zone" id="importDropZone">
+                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="width: 32px; height: 32px; color: var(--text-muted); margin-bottom: 8px;">
+                            <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path>
+                            <polyline points="17 8 12 3 7 8"></polyline>
+                            <line x1="12" y1="3" x2="12" y2="15"></line>
+                        </svg>
+                        <div style="font-size: 0.9rem; color: var(--text-secondary);">Drag and drop a .json file here, or click to select</div>
+                        <input type="file" id="importFileInput" accept=".json" style="display: none;">
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Maintenance -->
+        <div class="settings-section">
+            <div class="settings-section-title">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                    <path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"></path>
+                    <line x1="12" y1="9" x2="12" y2="13"></line>
+                    <line x1="12" y1="17" x2="12.01" y2="17"></line>
+                </svg>
+                Maintenance
+            </div>
+            <div class="settings-section-desc">Control maintenance mode and system-wide announcements.</div>
+
+            <div class="setting-row">
+                <div class="setting-info">
+                    <div class="setting-label">Maintenance Mode <span class="danger-badge">Caution</span></div>
+                    <div class="setting-desc">When enabled, users will see a maintenance page instead of the application.</div>
+                </div>
+                <div class="setting-control">
+                    <label class="toggle-switch">
+                        <input type="checkbox" data-key="maintenance.enabled" data-confirm="maintenance-mode" data-toggle-target="maintenance-sub">
+                        <span class="toggle-slider"></span>
+                    </label>
+                </div>
+            </div>
+            <div class="sub-settings" id="maintenance-sub" data-hidden="true">
+                <div class="setting-row stacked">
+                    <div class="setting-info">
+                        <div class="setting-label">Maintenance Message</div>
+                        <div class="setting-desc">Message shown to users during maintenance.</div>
+                    </div>
+                    <div class="setting-control">
+                        <textarea class="setting-input" data-key="maintenance.message" placeholder="We are performing scheduled maintenance. Please check back later." rows="3"></textarea>
+                    </div>
+                </div>
+            </div>
+
+            <div class="setting-row stacked">
+                <div class="setting-info">
+                    <div class="setting-label">System Announcement Banner</div>
+                    <div class="setting-desc">Display a banner at the top of the application. Leave empty to hide.</div>
+                </div>
+                <div class="setting-control" style="display: flex; gap: 12px; align-items: flex-start; flex-wrap: wrap;">
+                    <textarea class="setting-input" data-key="banner.text" placeholder="Enter announcement text..." rows="2" style="flex: 1; min-width: 200px;"></textarea>
+                    <select class="setting-select" data-key="banner.type" style="flex-shrink: 0;">
+                        <option value="info">Info</option>
+                        <option value="warning">Warning</option>
+                        <option value="error">Error</option>
+                    </select>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Confirmation Dialog -->
+    <div class="confirm-overlay" id="confirmDialog">
+        <div class="confirm-dialog">
+            <h3 id="confirmTitle">Confirm Action</h3>
+            <p id="confirmMessage">Are you sure you want to proceed?</p>
+            <div class="confirm-actions">
+                <button class="confirm-btn cancel" id="confirmCancel">Cancel</button>
+                <button class="confirm-btn proceed" id="confirmProceed">Confirm</button>
+            </div>
+        </div>
+    </div>
+
+    <script th:src="@{/js/csrf.js}"></script>
+    <script th:src="@{/js/admin-toast.js}"></script>
+    <script th:src="@{/js/admin-settings.js}"></script>
+</body>
+</html>

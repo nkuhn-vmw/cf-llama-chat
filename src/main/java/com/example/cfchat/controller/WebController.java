@@ -122,6 +122,18 @@ public class WebController {
         return "index";
     }
 
+    @GetMapping("/settings")
+    public String settings(Model model) {
+        Optional<User> currentUser = userService.getCurrentUser();
+        if (currentUser.isEmpty()) {
+            return "redirect:/login.html";
+        }
+
+        model.addAttribute("currentUser", currentUser.get());
+        model.addAttribute("models", chatService.getAvailableModels());
+        return "settings";
+    }
+
     @GetMapping("/chat/{id}")
     public String chat(@PathVariable UUID id, Model model) {
         Optional<User> currentUser = userService.getCurrentUser();
