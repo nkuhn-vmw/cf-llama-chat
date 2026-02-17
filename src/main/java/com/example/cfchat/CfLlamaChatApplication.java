@@ -18,6 +18,15 @@ public class CfLlamaChatApplication {
         List<String> excludes = new ArrayList<>();
         excludes.add("org.springframework.ai.vectorstore.pgvector.autoconfigure.PgVectorStoreAutoConfiguration");
 
+        // Dynamically exclude Redis auto-configuration if no host is set
+        String redisHost = System.getenv("REDIS_HOST");
+        if (redisHost == null || redisHost.isEmpty()) {
+            excludes.add("org.springframework.boot.autoconfigure.data.redis.RedisAutoConfiguration");
+            excludes.add("org.springframework.boot.autoconfigure.data.redis.RedisReactiveAutoConfiguration");
+            excludes.add("org.springframework.boot.actuate.autoconfigure.data.redis.RedisHealthContributorAutoConfiguration");
+            excludes.add("org.springframework.boot.actuate.autoconfigure.data.redis.RedisReactiveHealthContributorAutoConfiguration");
+        }
+
         // Dynamically exclude OpenAI auto-configuration if no API key is set
         String openAiKey = System.getenv("OPENAI_API_KEY");
         if (openAiKey == null || openAiKey.isEmpty() || openAiKey.isBlank()) {

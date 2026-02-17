@@ -250,7 +250,7 @@ class ChatApp {
 
     async loadUserThemePreference() {
         try {
-            const response = await fetch('/api/preferences/theme');
+            const response = await fetch('/api/user/preferences');
             if (!response.ok) return;
             const data = await response.json();
             if (data && data.theme) {
@@ -402,8 +402,8 @@ class ChatApp {
                 document.body.setAttribute('data-theme', theme.id);
                 localStorage.setItem('theme', theme.id);
                 // Save to server for per-user persistence
-                fetch('/api/preferences/theme', {
-                    method: 'POST',
+                fetch('/api/user/preferences/theme', {
+                    method: 'PUT',
                     headers: { 'Content-Type': 'application/json' },
                     body: JSON.stringify({ theme: theme.id })
                 }).catch(() => {});

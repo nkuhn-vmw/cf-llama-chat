@@ -77,4 +77,36 @@ class UserDocumentTest {
 
         assertThat(doc.getErrorMessage()).isEqualTo("Failed to parse document");
     }
+
+    @Test
+    void shared_defaultsToNull() {
+        UserDocument doc = UserDocument.builder()
+                .filename("test.pdf")
+                .originalFilename("test.pdf")
+                .build();
+
+        assertThat(doc.getShared()).isNull();
+    }
+
+    @Test
+    void shared_canBeSetToTrue() {
+        UserDocument doc = UserDocument.builder()
+                .filename("test.pdf")
+                .originalFilename("test.pdf")
+                .shared(Boolean.TRUE)
+                .build();
+
+        assertThat(doc.getShared()).isTrue();
+    }
+
+    @Test
+    void shared_canBeSetToFalse() {
+        UserDocument doc = UserDocument.builder()
+                .filename("test.pdf")
+                .originalFilename("test.pdf")
+                .shared(Boolean.FALSE)
+                .build();
+
+        assertThat(doc.getShared()).isFalse();
+    }
 }

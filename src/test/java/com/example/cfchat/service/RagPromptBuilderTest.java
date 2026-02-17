@@ -2,6 +2,7 @@ package com.example.cfchat.service;
 
 import org.junit.jupiter.api.Test;
 import org.springframework.ai.document.Document;
+import org.springframework.test.util.ReflectionTestUtils;
 
 import java.util.HashMap;
 import java.util.List;
@@ -149,6 +150,124 @@ class RagPromptBuilderTest {
 
         assertThat(result).extracting(RagPromptBuilder.CitationInfo::sourceNumber)
                 .containsExactly(1, 2, 3);
+    }
+
+    // --- Transcript tests ---
+
+    @Test
+    void buildPromptWithTranscript_includesTranscriptAsSource() {
+        String result = ragPromptBuilder.buildPromptWithTranscript(
+                "Summarize", "This is a transcript of the video", "https://youtube.com/watch?v=abc", null);
+
+        assertThat(result).contains("[Source 1]");
+        assertThat(result).contains("youtube.com/watch?v=abc");
+        assertThat(result).contains("This is a transcript of the video");
+        assertThat(result).contains("Question: Summarize");
+    }
+
+    @Test
+    void buildPromptWithTranscript_nullTranscript_includesOnlyDocuments() {
+        Document doc = createDocument("doc content", "test.pdf", 0.85);
+        String result = ragPromptBuilder.buildPromptWithTranscript(
+                "Query", null, "https://example.com", List.of(doc));
+
+        assertThat(result).contains("[Source 1]");
+        assertThat(result).contains("test.pdf");
+        assertThat(result).contains("doc content");
+        assertThat(result).doesNotContain("[Source 2]");
+    }
+
+    @Test
+    void buildPromptWithTranscript_emptyTranscript_includesOnlyDocuments() {
+        Document doc = createDocument("doc content", "test.pdf", 0.85);
+        String result = ragPromptBuilder.buildPromptWithTranscript(
+                "Query", "", "https://example.com", List.of(doc));
+
+        assertThat(result).contains("[Source 1]");
+        assertThat(result).contains("test.pdf");
+        assertThat(result).doesNotContain("[Source 2]");
+    }
+
+    @Test
+    void buildPromptWithTranscript_transcriptAndDocuments_numberedSequentially() {
+        Document doc = createDocument("document text", "report.pdf", 0.90);
+        String result = ragPromptBuilder.buildPromptWithTranscript(
+                "Explain", "Video transcript text", "https://youtube.com/watch?v=xyz",
+                List.of(doc));
+
+        assertThat(result).contains("[Source 1]");
+        assertThat(result).contains("Video transcript text");
+        assertThat(result).contains("[Source 2]");
+        assertThat(result).contains("report.pdf");
+        assertThat(result).contains("document text");
+        assertThat(result).contains("Question: Explain");
+    }
+
+    @Test
+    void buildPromptWithTranscript_noTranscriptNoDocuments_stillIncludesQuery() {
+        String result = ragPromptBuilder.buildPromptWithTranscript(
+                "Some question", null, null, null);
+
+        assertThat(result).contains("Question: Some question");
+    }
+
+    @Test
+    void buildPromptWithTranscript_nullDocuments_onlyTranscript() {
+        String result = ragPromptBuilder.buildPromptWithTranscript(
+                "What happened?", "Transcript content here", "https://example.com/video", null);
+
+        assertThat(result).contains("[Source 1]");
+        assertThat(result).contains("Transcript content here");
+        assertThat(result).doesNotContain("[Source 2]");
+    }
+
+    // --- Full-document retrieval mode tests ---
+
+    @Test
+    void buildPromptWithCitations_fullMode_groupsChunksByDocumentId() {
+        ReflectionTestUtils.setField(ragPromptBuilder, "defaultRetrievalMode", "snippet");
+
+        Map<String, Object> meta1 = new HashMap<>();
+        meta1.put("filename", "report.pdf");
+        meta1.put("document_id", "doc-1");
+        meta1.put("chunk_index", 0);
+
+        Map<String, Object> meta2 = new HashMap<>();
+        meta2.put("filename", "report.pdf");
+        meta2.put("document_id", "doc-1");
+        meta2.put("chunk_index", 1);
+
+        Document chunk1 = Document.builder().text("First chunk").metadata(meta1).score(0.9).build();
+        Document chunk2 = Document.builder().text("Second chunk").metadata(meta2).score(0.8).build();
+
+        String result = ragPromptBuilder.buildPromptWithCitations("query", List.of(chunk1, chunk2), "full");
+
+        // In full mode, both chunks should be grouped under a single source
+        assertThat(result).contains("[Source 1]");
+        assertThat(result).contains("Full document");
+        assertThat(result).contains("First chunk");
+        assertThat(result).contains("Second chunk");
+        assertThat(result).doesNotContain("[Source 2]");
+    }
+
+    @Test
+    void buildPromptWithCitations_snippetMode_eachChunkIsSeparateSource() {
+        Document doc1 = createDocument("Chunk A", "file.txt", 0.9);
+        Document doc2 = createDocument("Chunk B", "file.txt", 0.8);
+
+        String result = ragPromptBuilder.buildPromptWithCitations("query", List.of(doc1, doc2), "snippet");
+
+        assertThat(result).contains("[Source 1]");
+        assertThat(result).contains("[Source 2]");
+        assertThat(result).contains("Chunk A");
+        assertThat(result).contains("Chunk B");
+    }
+
+    @Test
+    void getDefaultRetrievalMode_returnsConfiguredMode() {
+        ReflectionTestUtils.setField(ragPromptBuilder, "defaultRetrievalMode", "full");
+
+        assertThat(ragPromptBuilder.getDefaultRetrievalMode()).isEqualTo("full");
     }
 
     private Document createDocument(String content, String filename, double score) {
