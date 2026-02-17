@@ -59,8 +59,10 @@ public class ChatService {
     private final ExternalBindingService externalBindingService;
     private final YouTubeTranscriptService youTubeTranscriptService;
     private final RagPromptBuilder ragPromptBuilder;
+    private final WebContentService webContentService;
 
     private static final Pattern YT_RAG_PATTERN = Pattern.compile("#\\s*(https?://(?:www\\.)?(?:youtube\\.com/watch\\?v=|youtu\\.be/)[\\w-]{11}\\S*)");
+    private static final Pattern WEB_RAG_PATTERN = Pattern.compile("#\\s*(https?://\\S+)");
 
     @Value("${spring.profiles.active:default}")
     private String activeProfile;
@@ -87,6 +89,7 @@ public class ChatService {
             @Autowired(required = false) DocumentEmbeddingService documentEmbeddingService,
             @Autowired(required = false) ExternalBindingService externalBindingService,
             @Autowired(required = false) YouTubeTranscriptService youTubeTranscriptService,
+            @Autowired(required = false) WebContentService webContentService,
             RagPromptBuilder ragPromptBuilder) {
         this.primaryChatClient = primaryChatClient;
         // Use OpenAI model as primary for streaming
@@ -105,6 +108,7 @@ public class ChatService {
         this.externalBindingService = externalBindingService;
         this.youTubeTranscriptService = youTubeTranscriptService;
         this.ragPromptBuilder = ragPromptBuilder;
+        this.webContentService = webContentService;
 
         log.info("ChatService initialized - primaryChatClient: {}, ollamaChatClient: {}, primaryChatModel: {}, mcpTools: {}, documentEmbedding: {}, externalBindings: {}",
                 primaryChatClient != null, ollamaChatClient != null,
@@ -717,6 +721,39 @@ public class ChatService {
                     }
                 } catch (Exception e) {
                     log.warn("Failed to extract YouTube transcript for {}: {}", ytUrl, e.getMessage());
+                }
+            }
+        }
+
+
+        // Check for generic web URLs prefixed with # for web content RAG injection
+        if (webContentService != null && processedMessage.equals(currentMessage)) {
+            // Only run if YouTube didn't already process this message
+            Matcher webMatcher = WEB_RAG_PATTERN.matcher(currentMessage);
+            if (webMatcher.find()) {
+                String webUrl = webMatcher.group(1);
+                // Skip YouTube URLs (already handled above)
+                if (!webUrl.contains("youtube.com") && !webUrl.contains("youtu.be")) {
+                    log.info("Detected Web URL RAG request for URL: {}", webUrl);
+                    try {
+                        WebContentService.WebPageContent webContent = webContentService.fetch(webUrl);
+                        if (webContent != null && webContent.text() != null 
+                                && !webContent.text().isEmpty() 
+                                && !webContent.text().startsWith("Failed to fetch")) {
+                            String queryWithoutUrl = currentMessage.replaceAll("#\\s*https?://\\S+", "").trim();
+                            if (queryWithoutUrl.isEmpty()) {
+                                queryWithoutUrl = "Summarize the content of this web page.";
+                            }
+                            processedMessage = ragPromptBuilder.buildPromptWithTranscript(
+                                    queryWithoutUrl, webContent.text(), webUrl, null);
+                            log.info("Injected web content from '{}' ({} chars) as RAG context", 
+                                    webContent.title(), webContent.text().length());
+                        } else {
+                            log.warn("No usable content from URL: {}", webUrl);
+                        }
+                    } catch (Exception e) {
+                        log.warn("Failed to fetch web content for {}: {}", webUrl, e.getMessage());
+                    }
                 }
             }
         }

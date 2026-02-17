@@ -615,4 +615,19 @@ public class DocumentEmbeddingService {
         }
         return "unknown";
     }
+
+    /**
+     * Get shared documents, optionally filtered by filename query.
+     */
+    public List<UserDocumentDto> getSharedDocuments(String query, int limit) {
+        List<UserDocument> sharedDocs = documentRepository.findBySharedTrueOrderByCreatedAtDesc();
+
+        return sharedDocs.stream()
+                .filter(doc -> query == null || query.isEmpty()
+                        || doc.getOriginalFilename().toLowerCase().contains(query.toLowerCase()))
+                .limit(limit)
+                .map(UserDocumentDto::fromEntity)
+                .collect(Collectors.toList());
+    }
+
 }

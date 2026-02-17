@@ -3,6 +3,7 @@ package com.example.cfchat.service;
 import com.example.cfchat.model.SystemSetting;
 import com.example.cfchat.repository.SystemSettingRepository;
 import lombok.RequiredArgsConstructor;
+import org.springframework.beans.factory.annotation.Autowired;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -16,6 +17,9 @@ import java.util.Optional;
 public class SystemSettingService {
 
     private final SystemSettingRepository systemSettingRepository;
+
+    @Autowired(required = false)
+    private EventService eventService;
 
     @Transactional(readOnly = true)
     public String getSetting(String key, String defaultValue) {
@@ -40,6 +44,9 @@ public class SystemSettingService {
             systemSettingRepository.save(setting);
         }
         log.info("System setting updated: {} = {}", key, value);
+        if (eventService != null) {
+            eventService.broadcast("cache.settings", key);
+        }
     }
 
     @Transactional(readOnly = true)

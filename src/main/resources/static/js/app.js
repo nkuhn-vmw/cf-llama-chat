@@ -107,6 +107,7 @@ class ChatApp {
 
         // Sidebar toggle for mobile
         this.sidebarToggle.addEventListener('click', () => {
+            this.haptic();
             this.sidebar.classList.toggle('open');
             const overlay = document.getElementById('sidebarOverlay');
             if (overlay) overlay.classList.toggle('visible', this.sidebar.classList.contains('open'));
@@ -242,6 +243,27 @@ class ChatApp {
 
         // Load organization theme if user is part of an organization
         this.loadOrganizationTheme();
+
+        // Load user's saved theme preference
+        this.loadUserThemePreference();
+    }
+
+    async loadUserThemePreference() {
+        try {
+            const response = await fetch('/api/preferences/theme');
+            if (!response.ok) return;
+            const data = await response.json();
+            if (data && data.theme) {
+                document.body.setAttribute('data-theme', data.theme);
+                localStorage.setItem('theme', data.theme);
+                if (this.themeToggle) {
+                    const themeNames = { dark: 'Dark', light: 'Light', oled: 'OLED Dark' };
+                    this.themeToggle.title = `Theme: ${themeNames[data.theme] || data.theme} (click to switch)`;
+                }
+            }
+        } catch (e) {
+            // Fall back to localStorage
+        }
     }
 
     async loadOrganizationTheme() {
@@ -351,19 +373,69 @@ class ChatApp {
     }
 
     toggleTheme() {
-        const currentTheme = document.body.getAttribute('data-theme') || 'dark';
-        // Cycle: dark -> light -> oled -> dark
-        const themeOrder = ['dark', 'light', 'oled'];
-        const currentIndex = themeOrder.indexOf(currentTheme);
-        const newTheme = themeOrder[(currentIndex + 1) % themeOrder.length];
-        document.body.setAttribute('data-theme', newTheme);
-        localStorage.setItem('theme', newTheme);
+        // Show theme selector popup instead of just cycling
+        this.showThemeSelector();
+    }
 
-        // Update tooltip to show current theme name
+    showThemeSelector() {
+        // Remove existing popup if any
+        const existing = document.getElementById('theme-selector-popup');
+        if (existing) { existing.remove(); return; }
+
+        const popup = document.createElement('div');
+        popup.id = 'theme-selector-popup';
+        popup.className = 'theme-selector-popup';
+
+        const themes = [
+            { id: 'dark', name: 'Dark', icon: '\u{1F319}', desc: 'Easy on the eyes' },
+            { id: 'light', name: 'Light', icon: '\u{2600}\u{FE0F}', desc: 'Classic bright mode' },
+            { id: 'oled', name: 'OLED Dark', icon: '\u{1F5A5}\u{FE0F}', desc: 'True black background' }
+        ];
+
+        const currentTheme = document.body.getAttribute('data-theme') || 'dark';
+
+        themes.forEach(theme => {
+            const option = document.createElement('button');
+            option.className = 'theme-option' + (theme.id === currentTheme ? ' active' : '');
+            option.innerHTML = `<span class="theme-icon">${theme.icon}</span><span class="theme-name">${theme.name}</span><span class="theme-desc">${theme.desc}</span>`;
+            option.addEventListener('click', () => {
+                document.body.setAttribute('data-theme', theme.id);
+                localStorage.setItem('theme', theme.id);
+                // Save to server for per-user persistence
+                fetch('/api/preferences/theme', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ theme: theme.id })
+                }).catch(() => {});
+                if (this.themeToggle) {
+                    const themeNames = { dark: 'Dark', light: 'Light', oled: 'OLED Dark' };
+                    this.themeToggle.title = 'Theme: ' + (themeNames[theme.id] || theme.id);
+                }
+                popup.remove();
+                this.haptic();
+            });
+            popup.appendChild(option);
+        });
+
+        // Position near the theme toggle button
         if (this.themeToggle) {
-            const themeNames = { dark: 'Dark', light: 'Light', oled: 'OLED Dark' };
-            this.themeToggle.title = `Theme: ${themeNames[newTheme]} (click to switch)`;
+            const rect = this.themeToggle.getBoundingClientRect();
+            popup.style.position = 'fixed';
+            popup.style.top = (rect.bottom + 4) + 'px';
+            popup.style.left = rect.left + 'px';
+            popup.style.zIndex = '10000';
         }
+
+        document.body.appendChild(popup);
+
+        // Close on outside click
+        const closeHandler = (e) => {
+            if (!popup.contains(e.target) && e.target !== this.themeToggle) {
+                popup.remove();
+                document.removeEventListener('click', closeHandler);
+            }
+        };
+        setTimeout(() => document.addEventListener('click', closeHandler), 10);
     }
 
     // DOMPurify config that allows KaTeX MathML output
@@ -688,7 +760,7 @@ class ChatApp {
             this.updateURL(data.conversationId);
             this.refreshConversationsList();
         }
-        this.addMessage('assistant', data.content, data.htmlContent, data.model);
+        this.addMessage('assistant', data.content, data.htmlContent, data.model, data.citations);
     }
 
     async sendStreamingMessage(request, typingIndicator) {
@@ -774,7 +846,11 @@ class ChatApp {
                                 if (streamRenderTimer) { clearTimeout(streamRenderTimer); streamRenderTimer = null; }
                                 // Final message with full HTML content from backend
                                 if (data.htmlContent) {
-                                    textEl.innerHTML = this.sanitizeHtml(data.htmlContent);
+                                    let finalHtml = this.sanitizeHtml(data.htmlContent);
+                                    if (data.citations && data.citations.length > 0) {
+                                        finalHtml = this.renderCitations(finalHtml, data.citations);
+                                    }
+                                    textEl.innerHTML = finalHtml;
                                 }
                                 this.highlightCode(textEl);
                                 this.renderMath(textEl);
@@ -844,7 +920,11 @@ class ChatApp {
                             const data = JSON.parse(jsonStr);
                             if (data.complete && data.htmlContent) {
                                 streamComplete = true;
-                                textEl.innerHTML = this.sanitizeHtml(data.htmlContent);
+                                let finalHtml = this.sanitizeHtml(data.htmlContent);
+                                if (data.citations && data.citations.length > 0) {
+                                    finalHtml = this.renderCitations(finalHtml, data.citations);
+                                }
+                                textEl.innerHTML = finalHtml;
                                 this.highlightCode(textEl);
                                 this.renderMath(textEl);
                                 this.renderArtifacts(textEl);
@@ -900,7 +980,7 @@ class ChatApp {
         this.hideCancelButton();
     }
 
-    addMessage(role, content, htmlContent = null, model = null) {
+    addMessage(role, content, htmlContent = null, model = null, citations = null) {
         if (!this.messages) {
             const messagesDiv = document.createElement('div');
             messagesDiv.className = 'messages';
@@ -909,7 +989,7 @@ class ChatApp {
             this.messages = messagesDiv;
         }
 
-        const messageEl = this.createMessageElement(role, content, htmlContent, model);
+        const messageEl = this.createMessageElement(role, content, htmlContent, model, citations);
         this.messages.appendChild(messageEl);
         this.highlightCode(messageEl);
         this.renderMath(messageEl);
@@ -917,7 +997,7 @@ class ChatApp {
         this.scrollToBottom();
     }
 
-    createMessageElement(role, content, htmlContent = null, model = null) {
+    createMessageElement(role, content, htmlContent = null, model = null, citations = null) {
         const div = document.createElement('div');
         div.className = `message ${role}`;
 
@@ -944,6 +1024,11 @@ class ChatApp {
         textDiv.className = 'message-text';
         // displayContent is sanitized via DOMPurify in renderMarkdownWithLatex / sanitizeHtml
         textDiv.innerHTML = displayContent;
+
+        // Apply citation rendering if citations are provided
+        if (citations && citations.length > 0 && role === 'assistant') {
+            textDiv.innerHTML = this.renderCitations(textDiv.innerHTML, citations);
+        }
 
         contentDiv.appendChild(textDiv);
 
@@ -1177,6 +1262,7 @@ class ChatApp {
     }
 
     startNewChat() {
+        this.haptic();
         this.conversationId = null;
         window.history.pushState({}, '', '/');
 
@@ -1231,7 +1317,7 @@ class ChatApp {
 
             this.messages.innerHTML = '';
             conversation.messages?.forEach(msg => {
-                this.addMessage(msg.role, msg.content, msg.htmlContent, msg.modelUsed);
+                this.addMessage(msg.role, msg.content, msg.htmlContent, msg.modelUsed, msg.citations);
             });
 
             this.sidebar.classList.remove('open');
@@ -1242,6 +1328,7 @@ class ChatApp {
     }
 
     async deleteConversation(id) {
+        this.haptic('heavy');
         if (!confirm('Are you sure you want to delete this conversation?')) {
             return;
         }
@@ -1270,6 +1357,7 @@ class ChatApp {
     }
 
     async clearAllHistory() {
+        this.haptic('heavy');
         const conversationCount = this.conversationsList?.querySelectorAll('.conversation-item').length || 0;
         if (conversationCount === 0) {
             alert('No conversations to clear.');
@@ -1744,6 +1832,7 @@ class ChatApp {
             const result = await response.json();
 
             if (response.ok && result.status === 'COMPLETED') {
+                this.haptic();
                 this.progressText.textContent = `${file.name} uploaded successfully!`;
                 this.progressFill.style.width = '100%';
             } else {

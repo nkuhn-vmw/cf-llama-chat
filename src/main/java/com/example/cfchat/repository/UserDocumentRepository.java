@@ -62,4 +62,9 @@ public interface UserDocumentRepository extends JpaRepository<UserDocument, UUID
      * Delete all documents for a user.
      */
     void deleteByUserId(UUID userId);
+
+    /**
+     * Find all shared documents, ordered by creation date descending.
+     */
+    List<UserDocument> findBySharedTrueOrderByCreatedAtDesc();
 }

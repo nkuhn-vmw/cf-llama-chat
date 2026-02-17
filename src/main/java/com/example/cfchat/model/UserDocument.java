@@ -63,6 +63,9 @@ public class UserDocument {
     @Column(name = "storage_path")
     private String storagePath;
 
+    @Column(name = "shared")
+    private Boolean shared;
+
     @Column(name = "created_at", nullable = false, updatable = false)
     private LocalDateTime createdAt;
 

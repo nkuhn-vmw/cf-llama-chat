@@ -1983,3 +1983,58 @@ pre.editing .edit-code-btn {
     pointer-events: none;
 }
 
+
+/* Theme selector popup */
+.theme-selector-popup {
+    background: var(--bg-secondary);
+    border: 1px solid var(--border-color);
+    border-radius: 12px;
+    padding: 8px;
+    min-width: 200px;
+    box-shadow: 0 8px 32px rgba(0,0,0,0.3);
+}
+
+.theme-option {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    width: 100%;
+    padding: 10px 12px;
+    background: none;
+    border: none;
+    border-radius: 8px;
+    color: var(--text-primary);
+    cursor: pointer;
+    font-size: 14px;
+    text-align: left;
+    transition: background 0.15s;
+}
+
+.theme-option:hover {
+    background: var(--bg-hover);
+}
+
+.theme-option.active {
+    background: var(--accent-color);
+    color: white;
+}
+
+.theme-icon {
+    font-size: 18px;
+    width: 24px;
+    text-align: center;
+}
+
+.theme-name {
+    font-weight: 500;
+    flex: 1;
+}
+
+.theme-desc {
+    font-size: 12px;
+    color: var(--text-muted);
+}
+
+.theme-option.active .theme-desc {
+    color: rgba(255,255,255,0.7);
+}

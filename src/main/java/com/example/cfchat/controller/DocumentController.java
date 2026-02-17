@@ -248,4 +248,22 @@ public class DocumentController {
 
         return ResponseEntity.ok(response);
     }
+
+    /**
+     * Browse the shared document library (all users' shared documents).
+     * Returns documents that are marked as shared (shared=true).
+     */
+    @GetMapping("/library")
+    public ResponseEntity<List<UserDocumentDto>> getSharedLibrary(
+            @RequestParam(defaultValue = "") String query,
+            @RequestParam(defaultValue = "20") int limit) {
+
+        // Ensure user is authenticated
+        userService.getCurrentUser()
+                .orElseThrow(() -> new IllegalStateException("User not authenticated"));
+
+        List<UserDocumentDto> sharedDocs = documentService.getSharedDocuments(query, limit);
+        return ResponseEntity.ok(sharedDocs);
+    }
+
 }
