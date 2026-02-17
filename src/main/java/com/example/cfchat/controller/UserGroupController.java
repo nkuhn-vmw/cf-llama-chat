@@ -35,9 +35,9 @@ public class UserGroupController {
      * POST /api/admin/groups - Create a new group.
      */
     @PostMapping
-    public ResponseEntity<Map<String, Object>> createGroup(@RequestBody Map<String, String> body) {
-        String name = body.get("name");
-        String description = body.get("description");
+    public ResponseEntity<Map<String, Object>> createGroup(@RequestBody Map<String, Object> body) {
+        String name = body.get("name") != null ? body.get("name").toString() : null;
+        String description = body.get("description") != null ? body.get("description").toString() : null;
 
         if (name == null || name.isBlank()) {
             return ResponseEntity.badRequest().body(Map.of("error", "Group name is required"));
@@ -57,9 +57,9 @@ public class UserGroupController {
      */
     @PutMapping("/{id}")
     public ResponseEntity<Map<String, Object>> updateGroup(@PathVariable Long id,
-                                                            @RequestBody Map<String, String> body) {
-        String name = body.get("name");
-        String description = body.get("description");
+                                                            @RequestBody Map<String, Object> body) {
+        String name = body.get("name") != null ? body.get("name").toString() : null;
+        String description = body.get("description") != null ? body.get("description").toString() : null;
 
         try {
             UserGroup group = userGroupService.updateGroup(id, name, description);

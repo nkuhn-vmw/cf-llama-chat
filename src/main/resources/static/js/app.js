@@ -2921,8 +2921,8 @@ class ChatApp {
                 })
             });
 
-            if (!resp.ok) throw new Error('Search failed');
             const data = await resp.json();
+            if (!resp.ok) throw new Error(data.error || 'Search failed');
 
             // Clear loading step
             steps.innerHTML = '';
