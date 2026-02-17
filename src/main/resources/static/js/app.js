@@ -2424,6 +2424,7 @@ class ChatApp {
             this.archiveConversation(convId);
         });
         menu.querySelector('[data-action="folder"]').addEventListener('click', (e) => {
+            e.stopPropagation();
             menu.style.display = 'none';
             this.showFolderPicker(e.clientX, e.clientY, convId);
         });
@@ -2520,9 +2521,12 @@ class ChatApp {
         } catch(e) { this.showToast('Failed to restore'); }
     }
 
-    showFolderPicker(x, y, convId) {
+    async showFolderPicker(x, y, convId) {
         const existing = document.getElementById('folderPicker');
         if (existing) existing.remove();
+
+        // Refresh folders list before showing picker
+        await this.loadFolders();
 
         const picker = document.createElement('div');
         picker.id = 'folderPicker';
