@@ -106,6 +106,10 @@
                 <div class="stat-value" id="documentCount">--</div>
                 <div class="stat-label">Documents</div>
             </div>
+            <div class="stat-card">
+                <div class="stat-value" id="toolCount">--</div>
+                <div class="stat-label">Tools</div>
+            </div>
         </div>
 
         <nav class="admin-nav">
@@ -167,6 +171,19 @@
                 </div>
             </a>
 
+            <a href="/workspace/tools" class="admin-nav-card">
+                <div class="card-icon">
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                        <path d="M14.7 6.3a1 1 0 0 0 0 1.4l1.6 1.6a1 1 0 0 0 1.4 0l3.77-3.77a6 6 0 0 1-7.94 7.94l-6.91 6.91a2.12 2.12 0 0 1-3-3l6.91-6.91a6 6 0 0 1 7.94-7.94l-3.76 3.76z"></path>
+                    </svg>
+                </div>
+                <h3>Tools</h3>
+                <p>Manage MCP and custom tools. Enable or disable individual tools that the AI can use during conversations.</p>
+                <div class="card-stat">
+                    <strong id="toolCountStat">--</strong> tools available
+                </div>
+            </a>
+
             <a href="/workspace/documents" class="admin-nav-card">
                 <div class="card-icon">
                     <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
@@ -194,31 +211,36 @@
             fetch('/api/notes').then(r => r.ok ? r.json() : []),
             fetch('/api/memory').then(r => r.ok ? r.json() : []),
             fetch('/api/prompts').then(r => r.ok ? r.json() : []),
-            fetch('/api/documents').then(r => r.ok ? r.json() : [])
+            fetch('/api/documents').then(r => r.ok ? r.json() : []),
+            fetch('/api/chat/available-tools').then(r => r.ok ? r.json() : [])
         ]).then(function(results) {
             var channels = results[0].status === 'fulfilled' ? results[0].value : [];
             var notes = results[1].status === 'fulfilled' ? results[1].value : [];
             var memories = results[2].status === 'fulfilled' ? results[2].value : [];
             var prompts = results[3].status === 'fulfilled' ? results[3].value : [];
             var docs = results[4].status === 'fulfilled' ? results[4].value : [];
+            var tools = results[5].status === 'fulfilled' ? results[5].value : [];
 
             var channelLen = Array.isArray(channels) ? channels.length : 0;
             var noteLen = Array.isArray(notes) ? notes.length : 0;
             var memoryLen = Array.isArray(memories) ? memories.length : 0;
             var promptLen = Array.isArray(prompts) ? prompts.length : 0;
             var docLen = Array.isArray(docs) ? docs.length : 0;
+            var toolLen = Array.isArray(tools) ? tools.length : 0;
 
             document.getElementById('channelCount').textContent = channelLen;
             document.getElementById('noteCount').textContent = noteLen;
             document.getElementById('memoryCount').textContent = memoryLen;
             document.getElementById('promptCount').textContent = promptLen;
             document.getElementById('documentCount').textContent = docLen;
+            document.getElementById('toolCount').textContent = toolLen;
 
             document.getElementById('channelCountStat').textContent = channelLen;
             document.getElementById('noteCountStat').textContent = noteLen;
             document.getElementById('memoryCountStat').textContent = memoryLen;
             document.getElementById('promptCountStat').textContent = promptLen;
             document.getElementById('documentCountStat').textContent = docLen;
+            document.getElementById('toolCountStat').textContent = toolLen;
         });
     </script>
 </body>

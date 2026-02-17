@@ -73,8 +73,12 @@
 
             <div class="conversations-list" id="conversationsList">
                 <div th:each="conv : ${conversations}" class="conversation-item"
-                     th:data-id="${conv.id}" th:classappend="${conversationId != null && conv.id.equals(conversationId)} ? 'active' : ''">
-                    <div class="conversation-title" th:text="${conv.title}">Conversation</div>
+                     th:data-id="${conv.id}" th:data-pinned="${conv.pinned}"
+                     th:classappend="${conversationId != null && conv.id.equals(conversationId)} ? 'active' : ''">
+                    <div class="conversation-title">
+                        <span th:text="${conv.title}">Conversation</span>
+                        <span th:if="${conv.pinned}" class="pin-indicator">&#x1F4CC;</span>
+                    </div>
                     <div class="conversation-meta">
                         <span th:text="${conv.messageCount} + ' messages'">0 messages</span>
                     </div>
@@ -85,6 +89,51 @@
                         </svg>
                     </button>
                 </div>
+            </div>
+
+            <!-- Conversation Context Menu -->
+            <div class="conv-context-menu" id="convContextMenu" style="display: none;">
+                <button class="ctx-menu-item" data-action="pin">
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="14" height="14">
+                        <path d="M12 2L12 22M12 2L8 6M12 2L16 6"></path>
+                    </svg>
+                    <span id="ctxPinLabel">Pin</span>
+                </button>
+                <button class="ctx-menu-item" data-action="rename">
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="14" height="14">
+                        <path d="M17 3a2.83 2.83 0 1 1 4 4L7.5 20.5 2 22l1.5-5.5L17 3z"></path>
+                    </svg>
+                    Rename
+                </button>
+                <button class="ctx-menu-item" data-action="archive">
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="14" height="14">
+                        <polyline points="21 8 21 21 3 21 3 8"></polyline>
+                        <rect x="1" y="3" width="22" height="5"></rect>
+                        <line x1="10" y1="12" x2="14" y2="12"></line>
+                    </svg>
+                    Archive
+                </button>
+                <button class="ctx-menu-item" data-action="folder">
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="14" height="14">
+                        <path d="M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z"></path>
+                    </svg>
+                    Move to Folder
+                </button>
+                <button class="ctx-menu-item" data-action="tag">
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="14" height="14">
+                        <path d="M20.59 13.41l-7.17 7.17a2 2 0 0 1-2.83 0L2 12V2h10l8.59 8.59a2 2 0 0 1 0 2.82z"></path>
+                        <line x1="7" y1="7" x2="7.01" y2="7"></line>
+                    </svg>
+                    Tag
+                </button>
+                <div class="ctx-menu-divider"></div>
+                <button class="ctx-menu-item danger" data-action="delete">
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="14" height="14">
+                        <polyline points="3 6 5 6 21 6"></polyline>
+                        <path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"></path>
+                    </svg>
+                    Delete
+                </button>
             </div>
 
             <div class="sidebar-footer">
@@ -358,7 +407,7 @@
                                     <input type="checkbox" id="streamToggle" checked>
                                     <span>Stream</span>
                                 </label>
-                                <label class="doc-toggle" id="docToggleLabel" style="display: none;">
+                                <label class="doc-toggle" id="docToggleLabel">
                                     <input type="checkbox" id="useDocumentsToggle">
                                     <span>Use My Docs</span>
                                 </label>
@@ -371,41 +420,12 @@
                                     <span>Temporary</span>
                                     <span class="temp-chat-indicator" id="tempChatIndicator" style="display: none;" title="Messages will not be saved">&#128683;</span>
                                 </label>
-                                <button type="button" class="tools-btn" id="toolsBtn" title="Manage Tools" style="display: none;">
-                                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="16" height="16">
-                                        <path d="M14.7 6.3a1 1 0 0 0 0 1.4l1.6 1.6a1 1 0 0 0 1.4 0l3.77-3.77a6 6 0 0 1-7.94 7.94l-6.91 6.91a2.12 2.12 0 0 1-3-3l6.91-6.91a6 6 0 0 1 7.94-7.94l-3.76 3.76z"></path>
-                                    </svg>
-                                    Tools
-                                </button>
                             </div>
                         </div>
                     </form>
                 </div>
             </div>
         </main>
-
-        <!-- Tools Panel -->
-        <div class="tools-panel" id="toolsPanel">
-            <div class="tools-panel-header">
-                <h3>Available Tools</h3>
-                <button class="close-panel-btn" id="closeToolsPanelBtn" aria-label="Close tools panel">
-                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="20" height="20">
-                        <line x1="18" y1="6" x2="6" y2="18"></line>
-                        <line x1="6" y1="6" x2="18" y2="18"></line>
-                    </svg>
-                </button>
-            </div>
-            <div class="tools-panel-content">
-                <p class="tools-description">Enable or disable individual tools for chat. Disabled tools will not be available to the AI.</p>
-                <div class="tools-stats" id="toolsStats">
-                    <span id="toolCount">0 tools</span>
-                    <span id="enabledToolCount">0 enabled</span>
-                </div>
-                <div class="tools-list" id="toolsList">
-                    <p class="no-tools" id="noTools">No tools available</p>
-                </div>
-            </div>
-        </div>
 
         <!-- Change Password Modal -->
         <div class="modal-overlay" id="changePasswordModal">

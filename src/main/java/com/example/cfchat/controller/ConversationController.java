@@ -101,6 +101,11 @@ public class ConversationController {
                 conversationService.unarchiveConversation(id);
             }
         }
+        if (body.containsKey("folderId")) {
+            Object folderIdObj = body.get("folderId");
+            String folderId = folderIdObj != null ? folderIdObj.toString() : null;
+            conversationService.setFolderId(id, folderId);
+        }
         return ResponseEntity.ok().build();
     }
 

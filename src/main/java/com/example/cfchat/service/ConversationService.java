@@ -169,6 +169,13 @@ public class ConversationService {
         });
     }
 
+    public void setFolderId(UUID id, String folderId) {
+        conversationRepository.findById(id).ifPresent(c -> {
+            c.setFolderId(folderId);
+            conversationRepository.save(c);
+        });
+    }
+
     @Transactional(readOnly = true)
     public List<ConversationDto> getPinnedConversations(UUID userId) {
         return conversationRepository.findByUserIdAndPinnedTrueOrderByUpdatedAtDesc(userId)

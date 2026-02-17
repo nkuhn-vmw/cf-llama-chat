@@ -172,6 +172,16 @@ public class WebController {
         return "workspace/prompts";
     }
 
+    @GetMapping("/workspace/tools")
+    public String workspaceTools(Model model) {
+        Optional<User> currentUser = userService.getCurrentUser();
+        if (currentUser.isEmpty()) {
+            return "redirect:/login.html";
+        }
+        model.addAttribute("currentUser", currentUser.get());
+        return "workspace/tools";
+    }
+
     @GetMapping("/workspace/documents")
     public String workspaceDocuments(Model model) {
         Optional<User> currentUser = userService.getCurrentUser();

@@ -83,12 +83,6 @@ class ChatApp {
         // Tools elements
         this.useToolsToggle = document.getElementById('useToolsToggle');
         this.toolsToggleLabel = document.getElementById('toolsToggleLabel');
-        this.toolsPanel = document.getElementById('toolsPanel');
-        this.toolsBtn = document.getElementById('toolsBtn');
-        this.closeToolsPanelBtn = document.getElementById('closeToolsPanelBtn');
-        this.toolsList = document.getElementById('toolsList');
-        this.toolCount = document.getElementById('toolCount');
-        this.enabledToolCount = document.getElementById('enabledToolCount');
     }
 
     initEventListeners() {
@@ -140,14 +134,39 @@ class ChatApp {
         this.conversationsList.addEventListener('click', (e) => {
             const item = e.target.closest('.conversation-item');
             const deleteBtn = e.target.closest('.delete-btn');
+            const unarchiveBtn = e.target.closest('.unarchive-btn');
 
-            if (deleteBtn) {
+            if (unarchiveBtn) {
+                e.stopPropagation();
+                this.unarchiveConversation(unarchiveBtn.dataset.id);
+            } else if (deleteBtn) {
                 e.stopPropagation();
                 const id = deleteBtn.dataset.id;
                 this.deleteConversation(id);
             } else if (item) {
                 const id = item.dataset.id;
                 this.loadConversation(id);
+            }
+        });
+
+        // Right-click context menu on conversations
+        this.conversationsList.addEventListener('contextmenu', (e) => {
+            const item = e.target.closest('.conversation-item');
+            if (item && !item.classList.contains('archived-item')) {
+                e.preventDefault();
+                this.showConvContextMenu(e.clientX, e.clientY, item.dataset.id);
+            }
+        });
+
+        // Close context menu on click elsewhere
+        document.addEventListener('click', (e) => {
+            const ctxMenu = document.getElementById('convContextMenu');
+            if (ctxMenu && !ctxMenu.contains(e.target)) {
+                ctxMenu.style.display = 'none';
+            }
+            const picker = document.getElementById('folderPicker');
+            if (picker && !picker.contains(e.target)) {
+                picker.remove();
             }
         });
 
@@ -1677,11 +1696,7 @@ class ChatApp {
                 this.renderDocuments(documents);
                 this.updateDocumentStats(stats);
 
-                // Show "Use My Docs" toggle if user has documents
                 this.documentsAvailable = stats.completedDocuments > 0;
-                if (this.docToggleLabel) {
-                    this.docToggleLabel.style.display = this.documentsAvailable ? 'flex' : 'none';
-                }
             }
         } catch (error) {
             console.error('Error loading documents:', error);
@@ -1704,11 +1719,6 @@ class ChatApp {
                     this.toolsToggleLabel.style.display = this.toolsAvailable ? 'flex' : 'none';
                 }
 
-                // Show Tools button if tools are available
-                if (this.toolsBtn) {
-                    this.toolsBtn.style.display = this.toolsAvailable ? 'flex' : 'none';
-                }
-
                 // Set initial toggle state from saved preference (defaults to true from constructor)
                 const savedPref = localStorage.getItem('useTools');
                 if (savedPref !== null) {
@@ -1717,125 +1727,12 @@ class ChatApp {
                 if (this.useToolsToggle) {
                     this.useToolsToggle.checked = this.useTools;
                 }
-
-                // Set up tools panel if tools are available
-                if (this.toolsAvailable) {
-                    this.initToolsEventListeners();
-                    this.renderTools();
-                    this.updateToolStats();
-                }
             }
         } catch (error) {
             console.warn('Could not check tools availability:', error);
-            // Hide the toggle and button if we can't determine availability
             if (this.toolsToggleLabel) {
                 this.toolsToggleLabel.style.display = 'none';
             }
-            if (this.toolsBtn) {
-                this.toolsBtn.style.display = 'none';
-            }
-        }
-    }
-
-    initToolsEventListeners() {
-        // Tools button
-        if (this.toolsBtn) {
-            this.toolsBtn.addEventListener('click', () => {
-                this.toggleToolsPanel();
-            });
-        }
-
-        // Close tools panel button
-        if (this.closeToolsPanelBtn) {
-            this.closeToolsPanelBtn.addEventListener('click', () => {
-                this.closeToolsPanel();
-            });
-        }
-    }
-
-    toggleToolsPanel() {
-        if (this.toolsPanel) {
-            // Close documents panel if open
-            this.closeDocumentsPanel();
-            this.toolsPanel.classList.toggle('open');
-            if (this.toolsPanel.classList.contains('open')) {
-                this.loadTools();
-            }
-        }
-    }
-
-    closeToolsPanel() {
-        if (this.toolsPanel) {
-            this.toolsPanel.classList.remove('open');
-        }
-    }
-
-    async loadTools() {
-        try {
-            const response = await fetch('/api/chat/available-tools');
-            if (response.ok) {
-                this.tools = await response.json();
-                this.renderTools();
-                this.updateToolStats();
-            }
-        } catch (error) {
-            console.error('Error loading tools:', error);
-        }
-    }
-
-    renderTools() {
-        if (!this.toolsList) return;
-
-        if (this.tools.length === 0) {
-            this.toolsList.innerHTML = '<p class="no-tools">No tools available</p>';
-            return;
-        }
-
-        this.toolsList.innerHTML = this.tools.map(tool => {
-            const isEnabled = this.isToolEnabled(tool.id);
-            const badgeClass = tool.type === 'MCP' ? 'mcp' : 'custom';
-            const serverInfo = tool.mcpServerName ? `<div class="tool-server">Server: ${this.escapeHtml(tool.mcpServerName)}</div>` : '';
-
-            return `
-                <div class="tool-item" data-id="${tool.id}">
-                    <div class="tool-icon">
-                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="20" height="20">
-                            <path d="M14.7 6.3a1 1 0 0 0 0 1.4l1.6 1.6a1 1 0 0 0 1.4 0l3.77-3.77a6 6 0 0 1-7.94 7.94l-6.91 6.91a2.12 2.12 0 0 1-3-3l6.91-6.91a6 6 0 0 1 7.94-7.94l-3.76 3.76z"></path>
-                        </svg>
-                    </div>
-                    <div class="tool-info">
-                        <div class="tool-header">
-                            <span class="tool-name" title="${this.escapeHtml(tool.displayName || tool.name)}">${this.escapeHtml(tool.displayName || tool.name)}</span>
-                            <span class="tool-badge ${badgeClass}">${tool.type}</span>
-                        </div>
-                        ${tool.description ? `<div class="tool-description" title="${this.escapeHtml(tool.description)}">${this.escapeHtml(tool.description)}</div>` : ''}
-                        ${serverInfo}
-                    </div>
-                    <div class="tool-toggle">
-                        <input type="checkbox" ${isEnabled ? 'checked' : ''}
-                               data-tool-id="${tool.id}"
-                               title="${isEnabled ? 'Disable tool' : 'Enable tool'}">
-                    </div>
-                </div>
-            `;
-        }).join('');
-
-        // Attach event listeners (CSP-compliant, no inline handlers)
-        this.toolsList.querySelectorAll('input[data-tool-id]').forEach(checkbox => {
-            checkbox.addEventListener('change', () => {
-                this.toggleToolEnabled(checkbox);
-            });
-        });
-    }
-
-    updateToolStats() {
-        const enabledCount = this.tools.filter(tool => this.isToolEnabled(tool.id)).length;
-
-        if (this.toolCount) {
-            this.toolCount.textContent = `${this.tools.length} tool${this.tools.length !== 1 ? 's' : ''}`;
-        }
-        if (this.enabledToolCount) {
-            this.enabledToolCount.textContent = `${enabledCount} enabled`;
         }
     }
 
@@ -2329,6 +2226,8 @@ class ChatApp {
             case 'all':
                 document.querySelectorAll('.conversation-item').forEach(el => el.style.display = '');
                 document.querySelectorAll('.folder-section').forEach(el => el.style.display = 'none');
+                { const fv = document.getElementById('foldersView'); if (fv) fv.style.display = 'none'; }
+                { const ai = document.getElementById('archivedItems'); if (ai) ai.style.display = 'none'; }
                 break;
             case 'pinned':
                 try {
@@ -2340,6 +2239,8 @@ class ChatApp {
                             el.style.display = pinnedIds.has(el.dataset.id) ? '' : 'none';
                         });
                         document.querySelectorAll('.folder-section').forEach(el => el.style.display = 'none');
+                        { const fv = document.getElementById('foldersView'); if (fv) fv.style.display = 'none'; }
+                        { const ai = document.getElementById('archivedItems'); if (ai) ai.style.display = 'none'; }
                     }
                 } catch(e) {}
                 break;
@@ -2398,22 +2299,282 @@ class ChatApp {
             this.conversationsList.appendChild(foldersContainer);
         }
 
+        // Build folder view with New Folder button using safe DOM methods
+        foldersContainer.textContent = '';
+
+        const newBtn = document.createElement('button');
+        newBtn.className = 'new-folder-btn';
+        const plusSvg = document.createElementNS('http://www.w3.org/2000/svg', 'svg');
+        plusSvg.setAttribute('viewBox', '0 0 24 24');
+        plusSvg.setAttribute('fill', 'none');
+        plusSvg.setAttribute('stroke', 'currentColor');
+        plusSvg.setAttribute('stroke-width', '2');
+        plusSvg.setAttribute('width', '16');
+        plusSvg.setAttribute('height', '16');
+        const l1 = document.createElementNS('http://www.w3.org/2000/svg', 'line');
+        l1.setAttribute('x1', '12'); l1.setAttribute('y1', '5'); l1.setAttribute('x2', '12'); l1.setAttribute('y2', '19');
+        const l2 = document.createElementNS('http://www.w3.org/2000/svg', 'line');
+        l2.setAttribute('x1', '5'); l2.setAttribute('y1', '12'); l2.setAttribute('x2', '19'); l2.setAttribute('y2', '12');
+        plusSvg.appendChild(l1);
+        plusSvg.appendChild(l2);
+        newBtn.appendChild(plusSvg);
+        newBtn.appendChild(document.createTextNode(' New Folder'));
+        newBtn.addEventListener('click', () => this.createFolder());
+        foldersContainer.appendChild(newBtn);
+
         if (this.folders.length === 0) {
-            foldersContainer.innerHTML = '<div class="empty-state">No folders yet. Create one to organize your chats.</div>';
+            const empty = document.createElement('div');
+            empty.className = 'empty-state';
+            empty.textContent = 'No folders yet. Create one to organize your chats.';
+            foldersContainer.appendChild(empty);
         } else {
-            foldersContainer.innerHTML = this.folders.map(f => `
-                <div class="folder-section" data-folder-id="${f.id}">
-                    <div class="folder-header">
-                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="16" height="16">
-                            <path d="M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z"></path>
-                        </svg>
-                        <span>${this.escapeHtml(f.name)}</span>
-                        <span class="folder-count">${f.conversationCount || 0}</span>
-                    </div>
-                </div>
-            `).join('');
+            this.folders.forEach(f => {
+                const section = document.createElement('div');
+                section.className = 'folder-section';
+                section.dataset.folderId = f.id;
+
+                const header = document.createElement('div');
+                header.className = 'folder-header';
+
+                const folderSvg = document.createElementNS('http://www.w3.org/2000/svg', 'svg');
+                folderSvg.setAttribute('viewBox', '0 0 24 24');
+                folderSvg.setAttribute('fill', 'none');
+                folderSvg.setAttribute('stroke', 'currentColor');
+                folderSvg.setAttribute('stroke-width', '2');
+                folderSvg.setAttribute('width', '16');
+                folderSvg.setAttribute('height', '16');
+                const path = document.createElementNS('http://www.w3.org/2000/svg', 'path');
+                path.setAttribute('d', 'M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z');
+                folderSvg.appendChild(path);
+                header.appendChild(folderSvg);
+
+                const nameSpan = document.createElement('span');
+                nameSpan.textContent = f.name;
+                header.appendChild(nameSpan);
+
+                const countSpan = document.createElement('span');
+                countSpan.className = 'folder-count';
+                countSpan.textContent = f.conversationCount || 0;
+                header.appendChild(countSpan);
+
+                section.appendChild(header);
+                foldersContainer.appendChild(section);
+            });
         }
         foldersContainer.style.display = '';
+    }
+
+    async createFolder() {
+        const name = prompt('Folder name:');
+        if (!name || !name.trim()) return;
+        try {
+            const resp = await fetch('/api/folders', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ name: name.trim() })
+            });
+            if (resp.ok) {
+                await this.loadFolders();
+                this.showFolderView();
+                this.showToast('Folder created');
+            }
+        } catch(e) {
+            console.error('Failed to create folder:', e);
+            this.showToast('Failed to create folder');
+        }
+    }
+
+    // --- Conversation Context Menu ---
+
+    showConvContextMenu(x, y, convId) {
+        const menu = document.getElementById('convContextMenu');
+        if (!menu) return;
+        this.ctxMenuConvId = convId;
+
+        // Determine if already pinned
+        const item = document.querySelector(`.conversation-item[data-id="${convId}"]`);
+        const isPinned = item && item.dataset.pinned === 'true';
+        const pinLabel = document.getElementById('ctxPinLabel');
+        if (pinLabel) pinLabel.textContent = isPinned ? 'Unpin' : 'Pin';
+
+        // Position
+        menu.style.display = 'block';
+        const menuRect = menu.getBoundingClientRect();
+        const maxX = window.innerWidth - menuRect.width - 8;
+        const maxY = window.innerHeight - menuRect.height - 8;
+        menu.style.left = Math.min(x, maxX) + 'px';
+        menu.style.top = Math.min(y, maxY) + 'px';
+
+        // Attach action handlers (remove old ones by cloning)
+        menu.querySelectorAll('.ctx-menu-item').forEach(btn => {
+            const clone = btn.cloneNode(true);
+            btn.parentNode.replaceChild(clone, btn);
+        });
+
+        menu.querySelector('[data-action="pin"]').addEventListener('click', () => {
+            menu.style.display = 'none';
+            this.togglePinConversation(convId);
+        });
+        menu.querySelector('[data-action="rename"]').addEventListener('click', () => {
+            menu.style.display = 'none';
+            this.renameConversation(convId);
+        });
+        menu.querySelector('[data-action="archive"]').addEventListener('click', () => {
+            menu.style.display = 'none';
+            this.archiveConversation(convId);
+        });
+        menu.querySelector('[data-action="folder"]').addEventListener('click', (e) => {
+            menu.style.display = 'none';
+            this.showFolderPicker(e.clientX, e.clientY, convId);
+        });
+        menu.querySelector('[data-action="delete"]').addEventListener('click', () => {
+            menu.style.display = 'none';
+            this.deleteConversation(convId);
+        });
+        const tagBtn = menu.querySelector('[data-action="tag"]');
+        if (tagBtn) {
+            tagBtn.addEventListener('click', () => {
+                menu.style.display = 'none';
+                this.showTagsModal(convId);
+            });
+        }
+    }
+
+    async togglePinConversation(convId) {
+        const item = document.querySelector(`.conversation-item[data-id="${convId}"]`);
+        const isPinned = item && item.dataset.pinned === 'true';
+        try {
+            const resp = await fetch(`/api/conversations/${convId}`, {
+                method: 'PATCH',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ pinned: !isPinned })
+            });
+            if (resp.ok) {
+                if (item) {
+                    item.dataset.pinned = String(!isPinned);
+                    let indicator = item.querySelector('.pin-indicator');
+                    if (!isPinned) {
+                        if (!indicator) {
+                            indicator = document.createElement('span');
+                            indicator.className = 'pin-indicator';
+                            indicator.textContent = '\u{1F4CC}';
+                            item.querySelector('.conversation-title').appendChild(indicator);
+                        }
+                    } else {
+                        if (indicator) indicator.remove();
+                    }
+                }
+                this.showToast(isPinned ? 'Unpinned' : 'Pinned');
+            }
+        } catch(e) { this.showToast('Failed to update pin'); }
+    }
+
+    async renameConversation(convId) {
+        const item = document.querySelector(`.conversation-item[data-id="${convId}"]`);
+        const titleEl = item ? item.querySelector('.conversation-title') : null;
+        const currentTitle = titleEl ? titleEl.textContent.replace('\u{1F4CC}', '').trim() : '';
+        const newTitle = prompt('Rename conversation:', currentTitle);
+        if (!newTitle || newTitle.trim() === currentTitle) return;
+        try {
+            const resp = await fetch(`/api/conversations/${convId}`, {
+                method: 'PATCH',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ title: newTitle.trim() })
+            });
+            if (resp.ok && titleEl) {
+                titleEl.textContent = newTitle.trim();
+                if (item && item.dataset.pinned === 'true') {
+                    const indicator = document.createElement('span');
+                    indicator.className = 'pin-indicator';
+                    indicator.textContent = '\u{1F4CC}';
+                    titleEl.appendChild(indicator);
+                }
+                this.showToast('Renamed');
+            }
+        } catch(e) { this.showToast('Failed to rename'); }
+    }
+
+    async archiveConversation(convId) {
+        try {
+            const resp = await fetch(`/api/conversations/${convId}/archive`, { method: 'POST' });
+            if (resp.ok) {
+                const item = document.querySelector(`.conversation-item[data-id="${convId}"]`);
+                if (item) item.remove();
+                if (this.conversationId === convId) {
+                    this.startNewChat();
+                }
+                this.showToast('Archived');
+            }
+        } catch(e) { this.showToast('Failed to archive'); }
+    }
+
+    async unarchiveConversation(convId) {
+        try {
+            const resp = await fetch(`/api/conversations/${convId}/unarchive`, { method: 'POST' });
+            if (resp.ok) {
+                const item = document.querySelector(`.archived-item[data-id="${convId}"]`);
+                if (item) item.remove();
+                this.showToast('Restored');
+                window.location.reload();
+            }
+        } catch(e) { this.showToast('Failed to restore'); }
+    }
+
+    showFolderPicker(x, y, convId) {
+        const existing = document.getElementById('folderPicker');
+        if (existing) existing.remove();
+
+        const picker = document.createElement('div');
+        picker.id = 'folderPicker';
+        picker.className = 'folder-picker';
+
+        const noFolder = document.createElement('button');
+        noFolder.className = 'folder-picker-item remove-folder';
+        noFolder.textContent = 'No folder';
+        noFolder.addEventListener('click', () => {
+            this.moveToFolder(convId, null);
+            picker.remove();
+        });
+        picker.appendChild(noFolder);
+
+        if (this.folders.length === 0) {
+            const empty = document.createElement('div');
+            empty.style.cssText = 'padding: 8px 12px; color: var(--text-muted); font-size: 0.85rem;';
+            empty.textContent = 'No folders. Create one in the Folders tab.';
+            picker.appendChild(empty);
+        } else {
+            this.folders.forEach(f => {
+                const item = document.createElement('button');
+                item.className = 'folder-picker-item';
+                item.textContent = f.name;
+                item.addEventListener('click', () => {
+                    this.moveToFolder(convId, f.id);
+                    picker.remove();
+                });
+                picker.appendChild(item);
+            });
+        }
+
+        document.body.appendChild(picker);
+        const pickerRect = picker.getBoundingClientRect();
+        const maxX = window.innerWidth - pickerRect.width - 8;
+        const maxY = window.innerHeight - pickerRect.height - 8;
+        picker.style.left = Math.min(x, maxX) + 'px';
+        picker.style.top = Math.min(y, maxY) + 'px';
+    }
+
+    async moveToFolder(convId, folderId) {
+        try {
+            const resp = await fetch(`/api/conversations/${convId}`, {
+                method: 'PATCH',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ folderId: folderId })
+            });
+            if (resp.ok) {
+                this.showToast(folderId ? 'Moved to folder' : 'Removed from folder');
+                await this.loadFolders();
+            }
+        } catch(e) { this.showToast('Failed to move'); }
     }
 
     initSlashCommands() {
@@ -2494,11 +2655,12 @@ class ChatApp {
         items[newIdx]?.scrollIntoView({ block: 'nearest' });
     }
 
-    // Channels, Notes, Memory, Prompts — managed via /workspace sub-pages
+    // Channels, Notes, Memory, Prompts, Tools — managed via /workspace sub-pages
     // Stub methods to prevent errors from any remaining references
     closeChannelsPanel() {}
     closeNotesPanel() {}
     closeMemoryPanel() {}
+    closeToolsPanel() {}
 
     // --- Tags ---
 
@@ -2555,17 +2717,7 @@ class ChatApp {
             });
         }
 
-        // Right-click on conversations for tagging
-        if (this.conversationsList) {
-            this.conversationsList.addEventListener('contextmenu', (e) => {
-                const item = e.target.closest('.conversation-item');
-                if (item) {
-                    e.preventDefault();
-                    const convId = item.dataset.id;
-                    this.showTagsModal(convId);
-                }
-            });
-        }
+        // Tag action is now handled by the unified context menu (showConvContextMenu)
     }
 
     async loadTags() {
