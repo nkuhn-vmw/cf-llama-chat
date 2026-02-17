@@ -2358,6 +2358,53 @@ class ChatApp {
                 header.appendChild(countSpan);
 
                 section.appendChild(header);
+
+                // Click to expand/collapse folder and show conversations
+                header.style.cursor = 'pointer';
+                const convContainer = document.createElement('div');
+                convContainer.className = 'folder-conversations';
+                convContainer.style.display = 'none';
+                section.appendChild(convContainer);
+
+                header.addEventListener('click', async () => {
+                    if (convContainer.style.display === 'none') {
+                        convContainer.textContent = 'Loading...';
+                        convContainer.style.display = '';
+                        try {
+                            const resp = await fetch(`/api/folders/${f.id}/conversations`);
+                            if (resp.ok) {
+                                const convs = await resp.json();
+                                convContainer.textContent = '';
+                                if (convs.length === 0) {
+                                    const empty = document.createElement('div');
+                                    empty.className = 'empty-state';
+                                    empty.textContent = 'No conversations in this folder.';
+                                    convContainer.appendChild(empty);
+                                } else {
+                                    convs.forEach(c => {
+                                        const item = document.createElement('div');
+                                        item.className = 'conversation-item folder-conv-item';
+                                        item.dataset.id = c.id;
+                                        item.style.cursor = 'pointer';
+                                        const title = document.createElement('span');
+                                        title.textContent = c.title;
+                                        item.appendChild(title);
+                                        item.addEventListener('click', (e) => {
+                                            e.stopPropagation();
+                                            this.loadConversation(c.id);
+                                        });
+                                        convContainer.appendChild(item);
+                                    });
+                                }
+                            }
+                        } catch(e) {
+                            convContainer.textContent = 'Failed to load conversations.';
+                        }
+                    } else {
+                        convContainer.style.display = 'none';
+                    }
+                });
+
                 foldersContainer.appendChild(section);
             });
         }

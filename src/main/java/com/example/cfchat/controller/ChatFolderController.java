@@ -4,6 +4,7 @@ import com.example.cfchat.auth.UserService;
 import com.example.cfchat.model.ChatFolder;
 import com.example.cfchat.model.User;
 import com.example.cfchat.repository.ChatFolderRepository;
+import com.example.cfchat.repository.ConversationRepository;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
@@ -17,6 +18,7 @@ import java.util.UUID;
 public class ChatFolderController {
 
     private final ChatFolderRepository folderRepo;
+    private final ConversationRepository conversationRepo;
     private final UserService userService;
 
     @GetMapping
@@ -46,6 +48,15 @@ public class ChatFolderController {
         return ResponseEntity.ok(toDto(folderRepo.save(folder)));
     }
 
+    @GetMapping("/{id}/conversations")
+    public ResponseEntity<List<FolderConversationDto>> getConversations(@PathVariable UUID id) {
+        ChatFolder folder = folderRepo.findById(id).orElseThrow();
+        if (!folder.getUserId().equals(getCurrentUserId())) throw new SecurityException("Access denied");
+        return ResponseEntity.ok(conversationRepo.findByFolderIdOrderByUpdatedAtDesc(id.toString())
+                .stream().map(c -> new FolderConversationDto(c.getId(), c.getTitle(), c.getMessages() != null ? c.getMessages().size() : 0))
+                .toList());
+    }
+
     @DeleteMapping("/{id}")
     public ResponseEntity<Void> delete(@PathVariable UUID id) {
         ChatFolder folder = folderRepo.findById(id).orElseThrow();
@@ -60,10 +71,12 @@ public class ChatFolderController {
     }
 
     private FolderDto toDto(ChatFolder f) {
-        return new FolderDto(f.getId(), f.getName(), f.getParentFolderId(), f.getSortOrder(), f.getCreatedAt());
+        long count = conversationRepo.countByFolderId(f.getId().toString());
+        return new FolderDto(f.getId(), f.getName(), f.getParentFolderId(), f.getSortOrder(), f.getCreatedAt(), count);
     }
 
-    public record FolderDto(UUID id, String name, UUID parentFolderId, int sortOrder, java.time.LocalDateTime createdAt) {}
+    public record FolderDto(UUID id, String name, UUID parentFolderId, int sortOrder, java.time.LocalDateTime createdAt, long conversationCount) {}
+    public record FolderConversationDto(UUID id, String title, int messageCount) {}
     public record CreateFolderRequest(String name, UUID parentFolderId, Integer sortOrder) {}
     public record UpdateFolderRequest(String name, Integer sortOrder) {}
 }

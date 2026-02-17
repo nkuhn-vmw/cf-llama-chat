@@ -53,4 +53,8 @@ public interface ConversationRepository extends JpaRepository<Conversation, UUID
     @Modifying
     @Query("UPDATE Conversation c SET c.archived = true WHERE c.userId = :uid AND (c.archived = false OR c.archived IS NULL)")
     int archiveAllByUserId(@Param("uid") UUID uid);
+
+    long countByFolderId(String folderId);
+
+    List<Conversation> findByFolderIdOrderByUpdatedAtDesc(String folderId);
 }

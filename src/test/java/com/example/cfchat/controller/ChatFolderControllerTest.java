@@ -4,6 +4,7 @@ import com.example.cfchat.auth.UserService;
 import com.example.cfchat.model.ChatFolder;
 import com.example.cfchat.model.User;
 import com.example.cfchat.repository.ChatFolderRepository;
+import com.example.cfchat.repository.ConversationRepository;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -37,6 +38,9 @@ class ChatFolderControllerTest {
 
     @MockBean
     private ChatFolderRepository folderRepo;
+
+    @MockBean
+    private ConversationRepository conversationRepo;
 
     @MockBean
     private UserService userService;
