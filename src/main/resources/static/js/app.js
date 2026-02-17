@@ -2299,9 +2299,15 @@ class ChatApp {
             this.conversationsList.appendChild(foldersContainer);
         }
 
-        // Build folder view with New Folder button using safe DOM methods
         foldersContainer.textContent = '';
+        this._buildFolderListView(foldersContainer);
+        foldersContainer.style.display = '';
+    }
 
+    _buildFolderListView(container) {
+        container.textContent = '';
+
+        // New Folder button
         const newBtn = document.createElement('button');
         newBtn.className = 'new-folder-btn';
         const plusSvg = document.createElementNS('http://www.w3.org/2000/svg', 'svg');
@@ -2320,21 +2326,18 @@ class ChatApp {
         newBtn.appendChild(plusSvg);
         newBtn.appendChild(document.createTextNode(' New Folder'));
         newBtn.addEventListener('click', () => this.createFolder());
-        foldersContainer.appendChild(newBtn);
+        container.appendChild(newBtn);
 
         if (this.folders.length === 0) {
             const empty = document.createElement('div');
             empty.className = 'empty-state';
             empty.textContent = 'No folders yet. Create one to organize your chats.';
-            foldersContainer.appendChild(empty);
+            container.appendChild(empty);
         } else {
             this.folders.forEach(f => {
-                const section = document.createElement('div');
-                section.className = 'folder-section';
-                section.dataset.folderId = f.id;
-
-                const header = document.createElement('div');
-                header.className = 'folder-header';
+                const row = document.createElement('div');
+                row.className = 'folder-row';
+                row.dataset.folderId = f.id;
 
                 const folderSvg = document.createElementNS('http://www.w3.org/2000/svg', 'svg');
                 folderSvg.setAttribute('viewBox', '0 0 24 24');
@@ -2346,69 +2349,158 @@ class ChatApp {
                 const path = document.createElementNS('http://www.w3.org/2000/svg', 'path');
                 path.setAttribute('d', 'M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z');
                 folderSvg.appendChild(path);
-                header.appendChild(folderSvg);
+                row.appendChild(folderSvg);
 
                 const nameSpan = document.createElement('span');
+                nameSpan.className = 'folder-name';
                 nameSpan.textContent = f.name;
-                header.appendChild(nameSpan);
+                row.appendChild(nameSpan);
 
                 const countSpan = document.createElement('span');
                 countSpan.className = 'folder-count';
                 countSpan.textContent = f.conversationCount || 0;
-                header.appendChild(countSpan);
+                row.appendChild(countSpan);
 
-                section.appendChild(header);
+                // Chevron right arrow
+                const chevron = document.createElementNS('http://www.w3.org/2000/svg', 'svg');
+                chevron.setAttribute('viewBox', '0 0 24 24');
+                chevron.setAttribute('fill', 'none');
+                chevron.setAttribute('stroke', 'currentColor');
+                chevron.setAttribute('stroke-width', '2');
+                chevron.setAttribute('width', '14');
+                chevron.setAttribute('height', '14');
+                chevron.classList.add('folder-chevron');
+                const chevPath = document.createElementNS('http://www.w3.org/2000/svg', 'path');
+                chevPath.setAttribute('d', 'M9 18l6-6-6-6');
+                chevron.appendChild(chevPath);
+                row.appendChild(chevron);
 
-                // Click to expand/collapse folder and show conversations
-                header.style.cursor = 'pointer';
-                const convContainer = document.createElement('div');
-                convContainer.className = 'folder-conversations';
-                convContainer.style.display = 'none';
-                section.appendChild(convContainer);
-
-                header.addEventListener('click', async () => {
-                    if (convContainer.style.display === 'none') {
-                        convContainer.textContent = 'Loading...';
-                        convContainer.style.display = '';
-                        try {
-                            const resp = await fetch(`/api/folders/${f.id}/conversations`);
-                            if (resp.ok) {
-                                const convs = await resp.json();
-                                convContainer.textContent = '';
-                                if (convs.length === 0) {
-                                    const empty = document.createElement('div');
-                                    empty.className = 'empty-state';
-                                    empty.textContent = 'No conversations in this folder.';
-                                    convContainer.appendChild(empty);
-                                } else {
-                                    convs.forEach(c => {
-                                        const item = document.createElement('div');
-                                        item.className = 'conversation-item folder-conv-item';
-                                        item.dataset.id = c.id;
-                                        item.style.cursor = 'pointer';
-                                        const title = document.createElement('span');
-                                        title.textContent = c.title;
-                                        item.appendChild(title);
-                                        item.addEventListener('click', (e) => {
-                                            e.stopPropagation();
-                                            this.loadConversation(c.id);
-                                        });
-                                        convContainer.appendChild(item);
-                                    });
-                                }
-                            }
-                        } catch(e) {
-                            convContainer.textContent = 'Failed to load conversations.';
-                        }
-                    } else {
-                        convContainer.style.display = 'none';
-                    }
-                });
-
-                foldersContainer.appendChild(section);
+                row.addEventListener('click', () => this._openFolder(f));
+                container.appendChild(row);
             });
         }
-        foldersContainer.style.display = '';
+    }
+
+    async _openFolder(folder) {
+        const container = document.getElementById('foldersView');
+        if (!container) return;
+        container.textContent = '';
+
+        // Back button header
+        const backHeader = document.createElement('div');
+        backHeader.className = 'folder-back-header';
+
+        const backBtn = document.createElement('button');
+        backBtn.className = 'folder-back-btn';
+        const backSvg = document.createElementNS('http://www.w3.org/2000/svg', 'svg');
+        backSvg.setAttribute('viewBox', '0 0 24 24');
+        backSvg.setAttribute('fill', 'none');
+        backSvg.setAttribute('stroke', 'currentColor');
+        backSvg.setAttribute('stroke-width', '2');
+        backSvg.setAttribute('width', '16');
+        backSvg.setAttribute('height', '16');
+        const backPath = document.createElementNS('http://www.w3.org/2000/svg', 'path');
+        backPath.setAttribute('d', 'M19 12H5M12 19l-7-7 7-7');
+        backSvg.appendChild(backPath);
+        backBtn.appendChild(backSvg);
+        backBtn.appendChild(document.createTextNode(' Folders'));
+        backBtn.addEventListener('click', () => this._buildFolderListView(container));
+        backHeader.appendChild(backBtn);
+
+        // Delete folder button
+        const deleteBtn = document.createElement('button');
+        deleteBtn.className = 'folder-delete-btn';
+        deleteBtn.title = 'Delete folder';
+        const delSvg = document.createElementNS('http://www.w3.org/2000/svg', 'svg');
+        delSvg.setAttribute('viewBox', '0 0 24 24');
+        delSvg.setAttribute('fill', 'none');
+        delSvg.setAttribute('stroke', 'currentColor');
+        delSvg.setAttribute('stroke-width', '2');
+        delSvg.setAttribute('width', '14');
+        delSvg.setAttribute('height', '14');
+        const delPath = document.createElementNS('http://www.w3.org/2000/svg', 'path');
+        delPath.setAttribute('d', 'M3 6h18M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2');
+        delSvg.appendChild(delPath);
+        deleteBtn.appendChild(delSvg);
+        deleteBtn.addEventListener('click', async () => {
+            if (!confirm(`Delete folder "${folder.name}"? Conversations will be unfoldered, not deleted.`)) return;
+            try {
+                const resp = await fetch(`/api/folders/${folder.id}`, { method: 'DELETE' });
+                if (resp.ok) {
+                    await this.loadFolders();
+                    this._buildFolderListView(container);
+                    this.showToast('Folder deleted');
+                }
+            } catch(e) { this.showToast('Failed to delete folder'); }
+        });
+        backHeader.appendChild(deleteBtn);
+
+        container.appendChild(backHeader);
+
+        // Folder title
+        const titleEl = document.createElement('div');
+        titleEl.className = 'folder-title';
+        const folderSvg = document.createElementNS('http://www.w3.org/2000/svg', 'svg');
+        folderSvg.setAttribute('viewBox', '0 0 24 24');
+        folderSvg.setAttribute('fill', 'none');
+        folderSvg.setAttribute('stroke', 'currentColor');
+        folderSvg.setAttribute('stroke-width', '2');
+        folderSvg.setAttribute('width', '18');
+        folderSvg.setAttribute('height', '18');
+        const fPath = document.createElementNS('http://www.w3.org/2000/svg', 'path');
+        fPath.setAttribute('d', 'M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z');
+        folderSvg.appendChild(fPath);
+        titleEl.appendChild(folderSvg);
+        const titleText = document.createElement('span');
+        titleText.textContent = folder.name;
+        titleEl.appendChild(titleText);
+        container.appendChild(titleEl);
+
+        // Loading indicator
+        const loading = document.createElement('div');
+        loading.className = 'empty-state';
+        loading.textContent = 'Loading conversations...';
+        container.appendChild(loading);
+
+        // Fetch conversations
+        try {
+            const resp = await fetch(`/api/folders/${folder.id}/conversations`);
+            if (resp.ok) {
+                const convs = await resp.json();
+                container.removeChild(loading);
+                if (convs.length === 0) {
+                    const empty = document.createElement('div');
+                    empty.className = 'empty-state';
+                    empty.textContent = 'No conversations in this folder.';
+                    container.appendChild(empty);
+                } else {
+                    convs.forEach(c => {
+                        const item = document.createElement('div');
+                        item.className = 'conversation-item folder-conv-item';
+                        item.dataset.id = c.id;
+
+                        const titleSpan = document.createElement('div');
+                        titleSpan.className = 'conv-title';
+                        titleSpan.textContent = c.title || 'Untitled';
+                        item.appendChild(titleSpan);
+
+                        const meta = document.createElement('div');
+                        meta.className = 'conv-meta';
+                        meta.textContent = `${c.messageCount} message${c.messageCount !== 1 ? 's' : ''}`;
+                        item.appendChild(meta);
+
+                        item.addEventListener('click', () => this.loadConversation(c.id));
+                        container.appendChild(item);
+                    });
+                }
+            }
+        } catch(e) {
+            container.removeChild(loading);
+            const err = document.createElement('div');
+            err.className = 'empty-state';
+            err.textContent = 'Failed to load conversations.';
+            container.appendChild(err);
+        }
     }
 
     async createFolder() {

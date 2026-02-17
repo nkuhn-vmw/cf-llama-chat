@@ -2124,6 +2124,95 @@ pre.editing .edit-code-btn {
 .sidebar-tab.active { color: var(--text-primary); background-color: var(--bg-tertiary); font-weight: 500; }
 
 /* Folder View */
+.folder-row {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    padding: 10px 14px;
+    color: var(--text-secondary);
+    font-size: 0.85rem;
+    font-weight: 500;
+    cursor: pointer;
+    border-radius: 6px;
+    transition: background-color 0.15s;
+}
+.folder-row:hover { background-color: var(--bg-hover); }
+.folder-row .folder-name { flex: 1; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.folder-row .folder-chevron { flex-shrink: 0; opacity: 0.4; }
+.folder-row:hover .folder-chevron { opacity: 0.8; }
+.folder-count {
+    font-size: 0.7rem;
+    color: var(--text-muted);
+    background: var(--bg-tertiary);
+    padding: 2px 7px;
+    border-radius: 10px;
+    flex-shrink: 0;
+}
+
+/* Folder drill-down view */
+.folder-back-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 6px 8px;
+    margin-bottom: 4px;
+}
+.folder-back-btn {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    background: none;
+    border: none;
+    color: var(--accent-color);
+    font-size: 0.8rem;
+    font-weight: 500;
+    cursor: pointer;
+    padding: 4px 8px;
+    border-radius: 4px;
+}
+.folder-back-btn:hover { background-color: var(--bg-hover); }
+.folder-delete-btn {
+    display: flex;
+    align-items: center;
+    background: none;
+    border: none;
+    color: var(--text-muted);
+    cursor: pointer;
+    padding: 4px 6px;
+    border-radius: 4px;
+}
+.folder-delete-btn:hover { color: #e74c3c; background-color: var(--bg-hover); }
+.folder-title {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    padding: 8px 14px;
+    font-size: 0.9rem;
+    font-weight: 600;
+    color: var(--text-primary);
+    border-bottom: 1px solid var(--border-color);
+    margin-bottom: 4px;
+}
+.folder-conv-item {
+    padding: 10px 14px;
+    cursor: pointer;
+    border-radius: 6px;
+}
+.folder-conv-item:hover { background-color: var(--bg-hover); }
+.folder-conv-item .conv-title {
+    font-size: 0.85rem;
+    color: var(--text-primary);
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+.folder-conv-item .conv-meta {
+    font-size: 0.7rem;
+    color: var(--text-muted);
+    margin-top: 2px;
+}
+
+/* Legacy folder-header (kept for compatibility) */
 .folder-header {
     display: flex;
     align-items: center;
@@ -2135,14 +2224,6 @@ pre.editing .edit-code-btn {
     cursor: pointer;
 }
 .folder-header:hover { background-color: var(--bg-hover); border-radius: 6px; }
-.folder-count {
-    margin-left: auto;
-    font-size: 0.75rem;
-    color: var(--text-muted);
-    background: var(--bg-tertiary);
-    padding: 2px 6px;
-    border-radius: 10px;
-}
 
 /* Empty state */
 .empty-state {
