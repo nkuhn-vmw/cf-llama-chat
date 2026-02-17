@@ -48,6 +48,10 @@
         </dependency>
         <dependency>
             <groupId>org.springframework.boot</groupId>
+            <artifactId>spring-boot-starter-aop</artifactId>
+        </dependency>
+        <dependency>
+            <groupId>org.springframework.boot</groupId>
             <artifactId>spring-boot-starter-security</artifactId>
         </dependency>
         <dependency>
@@ -160,11 +164,27 @@
             <version>0.21.0</version>
         </dependency>
 
-        <!-- AWS S3 SDK for document storage -->
+        <!-- AWS S3 SDK for document storage and S3 StorageService -->
         <dependency>
             <groupId>software.amazon.awssdk</groupId>
             <artifactId>s3</artifactId>
             <version>2.25.16</version>
+        </dependency>
+
+        <!-- Azure Blob Storage SDK (optional, for azure StorageService) -->
+        <dependency>
+            <groupId>com.azure</groupId>
+            <artifactId>azure-storage-blob</artifactId>
+            <version>12.25.1</version>
+            <optional>true</optional>
+        </dependency>
+
+        <!-- Google Cloud Storage SDK (optional, for gcs StorageService) -->
+        <dependency>
+            <groupId>com.google.cloud</groupId>
+            <artifactId>google-cloud-storage</artifactId>
+            <version>2.36.1</version>
+            <optional>true</optional>
         </dependency>
 
         <!-- Web Content Fetching -->
@@ -210,6 +230,23 @@
         <dependency>
             <groupId>org.springframework.session</groupId>
             <artifactId>spring-session-data-redis</artifactId>
+            <optional>true</optional>
+        </dependency>
+
+        <!-- OpenTelemetry / Distributed Tracing (optional) -->
+        <dependency>
+            <groupId>io.micrometer</groupId>
+            <artifactId>micrometer-tracing-bridge-otel</artifactId>
+            <optional>true</optional>
+        </dependency>
+        <dependency>
+            <groupId>io.opentelemetry</groupId>
+            <artifactId>opentelemetry-exporter-otlp</artifactId>
+            <optional>true</optional>
+        </dependency>
+        <dependency>
+            <groupId>io.micrometer</groupId>
+            <artifactId>micrometer-registry-otlp</artifactId>
             <optional>true</optional>
         </dependency>
 

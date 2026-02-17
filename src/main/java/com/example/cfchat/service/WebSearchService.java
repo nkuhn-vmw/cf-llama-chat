@@ -1,5 +1,6 @@
 package com.example.cfchat.service;
 
+import io.micrometer.observation.annotation.Observed;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.http.HttpEntity;
@@ -39,6 +40,9 @@ public class WebSearchService {
         return enabled;
     }
 
+    @Observed(name = "cfllama.web.search",
+            contextualName = "web-search",
+            lowCardinalityKeyValues = {"operation", "web-search"})
     public List<SearchResult> search(String query, int maxResults) {
         if (!enabled) {
             return List.of();

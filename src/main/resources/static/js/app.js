@@ -12,6 +12,7 @@ class ChatApp {
         this.abortController = null;
         this.useDocumentContext = false;
         this.documentsAvailable = false;
+        this.ragRetrievalMode = localStorage.getItem('ragRetrievalMode') || 'snippet';
         this.useTools = true;
         this.toolsAvailable = false;
         this.tools = [];
@@ -64,6 +65,12 @@ class ChatApp {
         this.noDocuments = document.getElementById('noDocuments');
         this.useDocumentsToggle = document.getElementById('useDocumentsToggle');
         this.docToggleLabel = document.getElementById('docToggleLabel');
+
+        // RAG retrieval mode toggle elements
+        this.ragRetrievalModeSection = document.getElementById('ragRetrievalModeSection');
+        this.ragModeToggle = document.getElementById('ragModeToggle');
+        this.ragModeSnippetBtn = document.getElementById('ragModeSnippet');
+        this.ragModeFullBtn = document.getElementById('ragModeFull');
 
         // Temporary chat toggle
         this.tempChatToggle = document.getElementById('tempChatToggle');
@@ -710,17 +717,19 @@ class ChatApp {
             // Read toggle state directly from DOM for reliability
             const toolsEnabled = this.useToolsToggle ? this.useToolsToggle.checked : this.useTools;
 
+            const useDocContext = this.useDocumentContext && this.documentsAvailable;
             const request = {
                 conversationId: this.temporaryChat ? null : this.conversationId,
                 message: message,
                 provider: provider,
                 model: model,
-                useDocumentContext: this.useDocumentContext && this.documentsAvailable,
+                useDocumentContext: useDocContext,
                 useTools: toolsEnabled && this.toolsAvailable,
-                temporary: this.temporaryChat
+                temporary: this.temporaryChat,
+                ragRetrievalMode: useDocContext ? this.ragRetrievalMode : null
             };
 
-            console.debug('Chat request - useTools:', request.useTools, '(toggle:', toolsEnabled, ', available:', this.toolsAvailable, '), temporary:', request.temporary);
+            console.debug('Chat request - useTools:', request.useTools, '(toggle:', toolsEnabled, ', available:', this.toolsAvailable, '), temporary:', request.temporary, ', ragMode:', request.ragRetrievalMode);
 
             if (this.isStreaming) {
                 await this.sendStreamingMessage(request, typingIndicator);
@@ -1439,10 +1448,31 @@ class ChatApp {
                 if (data.available) {
                     this.initDocumentEventListeners();
                     await this.loadDocuments();
+                    // Load saved RAG retrieval mode preference from server
+                    this.loadRagRetrievalModePreference();
                 }
             }
         } catch (error) {
             console.warn('Document service not available:', error);
+        }
+    }
+
+    /**
+     * Load the RAG retrieval mode preference from the server and apply it.
+     */
+    async loadRagRetrievalModePreference() {
+        try {
+            const response = await fetch('/api/user/preferences');
+            if (response.ok) {
+                const prefs = await response.json();
+                if (prefs && prefs.ragRetrievalMode) {
+                    this.ragRetrievalMode = prefs.ragRetrievalMode;
+                    localStorage.setItem('ragRetrievalMode', prefs.ragRetrievalMode);
+                    this.applyRagModeUI(prefs.ragRetrievalMode);
+                }
+            }
+        } catch (error) {
+            console.warn('Failed to load RAG retrieval mode preference:', error);
         }
     }
 
@@ -1499,6 +1529,48 @@ class ChatApp {
             });
         }
 
+        // RAG retrieval mode toggle buttons
+        if (this.ragModeToggle) {
+            this.ragModeToggle.querySelectorAll('.rag-mode-btn').forEach(btn => {
+                btn.addEventListener('click', () => {
+                    const mode = btn.dataset.mode;
+                    this.setRagRetrievalMode(mode);
+                });
+            });
+            // Apply saved mode on init
+            this.applyRagModeUI(this.ragRetrievalMode);
+        }
+
+    }
+
+    /**
+     * Set the RAG retrieval mode and persist to server and localStorage.
+     * @param {string} mode - "snippet" or "full"
+     */
+    setRagRetrievalMode(mode) {
+        this.ragRetrievalMode = mode;
+        localStorage.setItem('ragRetrievalMode', mode);
+        this.applyRagModeUI(mode);
+
+        // Persist to server
+        fetch('/api/user/preferences/rag-retrieval-mode', {
+            method: 'PUT',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ ragRetrievalMode: mode })
+        }).catch(err => console.warn('Failed to save RAG mode preference:', err));
+
+        console.debug('RAG retrieval mode set to:', mode);
+    }
+
+    /**
+     * Update the RAG mode toggle UI to reflect the active mode.
+     * @param {string} mode - "snippet" or "full"
+     */
+    applyRagModeUI(mode) {
+        if (!this.ragModeToggle) return;
+        this.ragModeToggle.querySelectorAll('.rag-mode-btn').forEach(btn => {
+            btn.classList.toggle('active', btn.dataset.mode === mode);
+        });
     }
 
     toggleDocumentsPanel() {

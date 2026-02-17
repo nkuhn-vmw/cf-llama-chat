@@ -167,6 +167,40 @@ public class UserPreferencesController {
         return ResponseEntity.ok(PRESET_BACKGROUNDS);
     }
 
+    /**
+     * Allowed RAG retrieval modes.
+     */
+    private static final List<String> RAG_RETRIEVAL_MODES = List.of("snippet", "full");
+
+    /**
+     * Set the user's RAG retrieval mode preference.
+     * "snippet" returns individual matched text chunks (default).
+     * "full" returns the entire parent document when a chunk matches.
+     */
+    @PutMapping("/rag-retrieval-mode")
+    public ResponseEntity<Map<String, Object>> setRagRetrievalMode(@RequestBody Map<String, String> body) {
+        Optional<User> currentUser = userService.getCurrentUser();
+        if (currentUser.isEmpty()) {
+            return ResponseEntity.status(401).build();
+        }
+
+        String mode = body.get("ragRetrievalMode");
+        if (mode == null || !RAG_RETRIEVAL_MODES.contains(mode)) {
+            return ResponseEntity.badRequest().body(Map.of(
+                    "error", "Invalid RAG retrieval mode. Must be one of: " + RAG_RETRIEVAL_MODES,
+                    "validModes", RAG_RETRIEVAL_MODES
+            ));
+        }
+
+        User user = currentUser.get();
+        Map<String, Object> prefs = parsePreferences(user.getPreferences());
+        prefs.put("ragRetrievalMode", mode);
+        savePreferences(user, prefs);
+
+        log.debug("User {} set RAG retrieval mode to {}", user.getUsername(), mode);
+        return ResponseEntity.ok(Map.of("success", true, "ragRetrievalMode", mode));
+    }
+
     // --- Helpers ---
 
     private Map<String, Object> parsePreferences(String json) {

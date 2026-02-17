@@ -9,6 +9,7 @@ import com.example.cfchat.model.UserDocument;
 import com.example.cfchat.model.UserDocument.DocumentStatus;
 import com.example.cfchat.repository.UserDocumentRepository;
 import com.example.cfchat.repository.UserRepository;
+import io.micrometer.observation.annotation.Observed;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.ai.document.Document;
 import org.springframework.ai.reader.pdf.PagePdfDocumentReader;
@@ -145,6 +146,9 @@ public class DocumentEmbeddingService {
      * Note: Not using @Transactional here so that document status can be updated
      * to FAILED even if the embedding operation fails.
      */
+    @Observed(name = "cfllama.document.upload",
+            contextualName = "document-upload",
+            lowCardinalityKeyValues = {"operation", "upload"})
     public DocumentUploadResponse uploadDocument(UUID userId, MultipartFile file) throws IOException {
         long startTime = System.currentTimeMillis();
 
@@ -332,6 +336,9 @@ public class DocumentEmbeddingService {
     /**
      * Search for relevant document chunks for a user's query.
      */
+    @Observed(name = "cfllama.rag.search",
+            contextualName = "rag-search",
+            lowCardinalityKeyValues = {"operation", "rag-search"})
     public List<Document> searchUserDocuments(UUID userId, String query, int topK) {
         if (vectorStore == null) {
             log.warn("VectorStore not available - cannot search documents");
@@ -356,6 +363,65 @@ public class DocumentEmbeddingService {
 
         log.debug("Found {} relevant chunks for user {}", userResults.size(), userId);
         return userResults;
+    }
+
+    /**
+     * Fetch all chunks belonging to the specified document IDs from the vector store.
+     * Used for full-document retrieval mode: when a chunk matches a query, we retrieve
+     * all sibling chunks for the same parent document to provide complete context.
+     *
+     * @param userId      the user whose documents to search
+     * @param documentIds set of document_id values to retrieve chunks for
+     * @return all chunks belonging to the given documents, sorted by document_id and chunk_index
+     */
+    public List<Document> getAllChunksForDocuments(UUID userId, java.util.Set<String> documentIds) {
+        if (vectorStore == null || documentIds == null || documentIds.isEmpty()) {
+            return List.of();
+        }
+
+        try {
+            // Query the vector store table directly via JDBC to get all chunks for the given documents
+            // This avoids the similarity-search top-K limit
+            String placeholders = documentIds.stream().map(id -> "?").collect(Collectors.joining(","));
+            String sql = String.format("""
+                SELECT id, content, metadata
+                FROM document_embeddings
+                WHERE metadata::jsonb ->> 'user_id' = ?
+                  AND metadata::jsonb ->> 'document_id' IN (%s)
+                ORDER BY metadata::jsonb ->> 'document_id',
+                         (metadata::jsonb ->> 'chunk_index')::int
+                """, placeholders);
+
+            Object[] params = new Object[1 + documentIds.size()];
+            params[0] = userId.toString();
+            int i = 1;
+            for (String docId : documentIds) {
+                params[i++] = docId;
+            }
+
+            List<Document> allChunks = jdbcTemplate.query(sql, params, (rs, rowNum) -> {
+                String content = rs.getString("content");
+                String metadataJson = rs.getString("metadata");
+                Document doc = new Document(content);
+                try {
+                    @SuppressWarnings("unchecked")
+                    Map<String, Object> meta = new com.fasterxml.jackson.databind.ObjectMapper()
+                            .readValue(metadataJson, Map.class);
+                    doc.getMetadata().putAll(meta);
+                } catch (Exception e) {
+                    log.warn("Failed to parse metadata for embedding row: {}", e.getMessage());
+                }
+                return doc;
+            });
+
+            log.debug("Retrieved {} total chunks for {} documents (user {})",
+                    allChunks.size(), documentIds.size(), userId);
+            return allChunks;
+
+        } catch (Exception e) {
+            log.warn("Failed to fetch all chunks for documents: {}", e.getMessage());
+            return List.of();
+        }
     }
 
     /**

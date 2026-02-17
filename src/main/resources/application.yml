@@ -90,6 +90,11 @@ management:
     sampling:
       probability: ${OTEL_SAMPLING:1.0}
 
+# OpenTelemetry configuration (active only when OTEL_ENABLED=true)
+otel:
+  service-name: ${OTEL_SERVICE_NAME:cf-llama-chat}
+  resource-attributes: ${OTEL_RESOURCE_ATTRIBUTES:}
+
 app:
   model-access-control:
     enabled: ${MODEL_ACCESS_CONTROL_ENABLED:false}
@@ -176,8 +181,33 @@ translation:
   libretranslate:
     url: ${LIBRETRANSLATE_URL:http://localhost:5000}
 
+# Agentic Search configuration
+agentic-search:
+  enabled: ${AGENTIC_SEARCH_ENABLED:false}
+  max-iterations: ${AGENTIC_SEARCH_MAX_ITERATIONS:3}
+  max-sub-queries: ${AGENTIC_SEARCH_MAX_SUB_QUERIES:3}
+  top-k: ${AGENTIC_SEARCH_TOP_K:5}
+  max-snippet-length: ${AGENTIC_SEARCH_MAX_SNIPPET:500}
+
 # Storage configuration
 storage:
   provider: ${STORAGE_PROVIDER:local}
   local:
     path: ${STORAGE_LOCAL_PATH:/tmp/cf-llama-uploads}
+  s3:
+    bucket: ${S3_BUCKET:}
+    region: ${AWS_REGION:us-east-1}
+    access-key: ${AWS_ACCESS_KEY_ID:}
+    secret-key: ${AWS_SECRET_ACCESS_KEY:}
+    endpoint: ${S3_ENDPOINT:}
+    path-style-access: ${S3_PATH_STYLE_ACCESS:false}
+    prefix: ${S3_PREFIX:}
+  gcs:
+    bucket: ${GCS_BUCKET:}
+    project-id: ${GCP_PROJECT:}
+    credentials-path: ${GOOGLE_APPLICATION_CREDENTIALS:}
+    prefix: ${GCS_PREFIX:}
+  azure:
+    container: ${AZURE_CONTAINER:}
+    connection-string: ${AZURE_STORAGE_CONNECTION:}
+    prefix: ${AZURE_PREFIX:}

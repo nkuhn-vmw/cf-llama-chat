@@ -384,6 +384,27 @@
                     <span id="docCount">0 documents</span>
                     <span id="chunkCount">0 chunks</span>
                 </div>
+                <div class="rag-retrieval-mode" id="ragRetrievalModeSection">
+                    <label class="rag-mode-label">Retrieval Mode</label>
+                    <div class="rag-mode-toggle" id="ragModeToggle">
+                        <button class="rag-mode-btn active" data-mode="snippet" id="ragModeSnippet" title="Return relevant text chunks only">
+                            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="14" height="14">
+                                <rect x="3" y="3" width="18" height="4" rx="1"></rect>
+                                <rect x="3" y="10" width="12" height="4" rx="1"></rect>
+                            </svg>
+                            Snippets
+                        </button>
+                        <button class="rag-mode-btn" data-mode="full" id="ragModeFull" title="Return full parent documents when a chunk matches">
+                            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="14" height="14">
+                                <rect x="3" y="3" width="18" height="18" rx="2"></rect>
+                                <line x1="7" y1="8" x2="17" y2="8"></line>
+                                <line x1="7" y1="12" x2="17" y2="12"></line>
+                                <line x1="7" y1="16" x2="13" y2="16"></line>
+                            </svg>
+                            Full Doc
+                        </button>
+                    </div>
+                </div>
                 <div class="documents-list" id="documentsList">
                     <p class="no-documents" id="noDocuments">No documents uploaded yet</p>
                 </div>

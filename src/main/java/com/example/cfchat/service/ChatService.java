@@ -3,6 +3,7 @@ package com.example.cfchat.service;
 import com.example.cfchat.auth.UserService;
 import com.example.cfchat.config.ChatConfig;
 import com.example.cfchat.dto.ChatRequest;
+import io.micrometer.observation.annotation.Observed;
 import com.example.cfchat.dto.ChatResponse;
 import com.example.cfchat.mcp.McpToolCallbackCacheService;
 import com.example.cfchat.model.Conversation;
@@ -28,6 +29,8 @@ import org.springframework.stereotype.Service;
 import reactor.core.publisher.Flux;
 
 import com.example.cfchat.config.GenAiConfig;
+import com.example.cfchat.dto.AgenticSearchRequest;
+import com.example.cfchat.dto.AgenticSearchResponse;
 import com.example.cfchat.service.ExternalBindingService;
 
 import java.util.ArrayList;
@@ -60,6 +63,7 @@ public class ChatService {
     private final YouTubeTranscriptService youTubeTranscriptService;
     private final RagPromptBuilder ragPromptBuilder;
     private final WebContentService webContentService;
+    private final AgenticSearchService agenticSearchService;
 
     private static final Pattern YT_RAG_PATTERN = Pattern.compile("#\\s*(https?://(?:www\\.)?(?:youtube\\.com/watch\\?v=|youtu\\.be/)[\\w-]{11}\\S*)");
     private static final Pattern WEB_RAG_PATTERN = Pattern.compile("#\\s*(https?://\\S+)");
@@ -90,7 +94,8 @@ public class ChatService {
             @Autowired(required = false) ExternalBindingService externalBindingService,
             @Autowired(required = false) YouTubeTranscriptService youTubeTranscriptService,
             @Autowired(required = false) WebContentService webContentService,
-            RagPromptBuilder ragPromptBuilder) {
+            RagPromptBuilder ragPromptBuilder,
+            @Autowired(required = false) AgenticSearchService agenticSearchService) {
         this.primaryChatClient = primaryChatClient;
         // Use OpenAI model as primary for streaming
         this.primaryChatModel = openAiChatModel;
@@ -109,15 +114,20 @@ public class ChatService {
         this.youTubeTranscriptService = youTubeTranscriptService;
         this.ragPromptBuilder = ragPromptBuilder;
         this.webContentService = webContentService;
+        this.agenticSearchService = agenticSearchService;
 
-        log.info("ChatService initialized - primaryChatClient: {}, ollamaChatClient: {}, primaryChatModel: {}, mcpTools: {}, documentEmbedding: {}, externalBindings: {}",
+        log.info("ChatService initialized - primaryChatClient: {}, ollamaChatClient: {}, primaryChatModel: {}, mcpTools: {}, documentEmbedding: {}, externalBindings: {}, agenticSearch: {}",
                 primaryChatClient != null, ollamaChatClient != null,
                 openAiChatModel != null ? openAiChatModel.getClass().getSimpleName() : "null",
                 mcpToolCallbackCacheService != null ? mcpToolCallbackCacheService.getMcpServerServices().size() : 0,
                 documentEmbeddingService != null && documentEmbeddingService.isAvailable(),
-                externalBindingService != null);
+                externalBindingService != null,
+                agenticSearchService != null);
     }
 
+    @Observed(name = "cfllama.chat",
+            contextualName = "chat-request",
+            lowCardinalityKeyValues = {"operation", "chat"})
     public ChatResponse chat(ChatRequest request) {
         String provider = request.getProvider() != null ? request.getProvider() : chatConfig.getDefaultProvider();
         String model = request.getModel();
@@ -164,9 +174,16 @@ public class ChatService {
             conversationService.addMessage(conversationId, Message.MessageRole.USER, request.getMessage(), null);
         }
 
+        // Delegate to agentic search if requested and available
+        if (request.isUseAgenticSearch() && agenticSearchService != null && agenticSearchService.isEnabled()) {
+            log.info("Delegating to agentic search for conversation: {}", conversationId);
+            return handleAgenticSearch(request, userId, conversationId, model, provider, isTemporary);
+        }
+
         // Build prompt with conversation history (with optional skill and document context)
         List<org.springframework.ai.chat.messages.Message> messages = buildMessageHistory(
-            conversation, request.getMessage(), request.getSkillId(), userId, request.isUseDocumentContext());
+            conversation, request.getMessage(), request.getSkillId(), userId,
+            request.isUseDocumentContext(), request.getRagRetrievalMode());
 
         // Get AI response - pass model name for GenAI multi-model support
         ChatClient chatClient = getChatClient(provider, model);
@@ -237,6 +254,68 @@ public class ChatService {
                 .build();
     }
 
+    /**
+     * Handle a chat request using agentic search.
+     * Delegates to AgenticSearchService for multi-step query decomposition and synthesis,
+     * then wraps the result as a ChatResponse.
+     */
+    private ChatResponse handleAgenticSearch(ChatRequest request, UUID userId,
+                                              UUID conversationId, String model,
+                                              String provider, boolean isTemporary) {
+        long startTime = System.currentTimeMillis();
+
+        AgenticSearchRequest searchRequest = AgenticSearchRequest.builder()
+                .query(request.getMessage())
+                .model(model)
+                .provider(provider)
+                .includeWebSearch(false)
+                .conversationId(conversationId)
+                .build();
+
+        AgenticSearchResponse searchResponse = agenticSearchService.search(searchRequest, userId);
+
+        String response = searchResponse.getAnswer() != null
+                ? searchResponse.getAnswer()
+                : searchResponse.getError();
+
+        long responseTime = System.currentTimeMillis() - startTime;
+
+        // Save assistant message (skip for temporary chats)
+        UUID messageId = null;
+        if (!isTemporary) {
+            Message savedMessage = conversationService.addMessage(
+                    conversationId, Message.MessageRole.ASSISTANT, response, model);
+            messageId = savedMessage.getId();
+        }
+
+        // Record metrics
+        int promptTokens = estimateTokens(request.getMessage());
+        int completionTokens = estimateTokens(response);
+        Long timeToFirstToken = responseTime;
+        Double tokensPerSecond = responseTime > 0
+                ? (completionTokens / (responseTime / 1000.0)) : 0.0;
+
+        if (!isTemporary) {
+            metricsService.recordUsage(userId, conversationId, model, provider,
+                    promptTokens, completionTokens, responseTime, timeToFirstToken, tokensPerSecond);
+        }
+
+        return ChatResponse.builder()
+                .conversationId(isTemporary ? null : conversationId)
+                .messageId(messageId)
+                .content(response)
+                .htmlContent(searchResponse.getHtmlAnswer() != null
+                        ? searchResponse.getHtmlAnswer()
+                        : markdownService.toHtml(response))
+                .model(model)
+                .complete(true)
+                .temporary(isTemporary)
+                .timeToFirstTokenMs(timeToFirstToken)
+                .tokensPerSecond(tokensPerSecond)
+                .totalResponseTimeMs(responseTime)
+                .build();
+    }
+
     private int estimateTokens(String text) {
         if (text == null || text.isEmpty()) {
             return 0;
@@ -245,6 +324,9 @@ public class ChatService {
         return (int) Math.ceil(text.length() / 4.0);
     }
 
+    @Observed(name = "cfllama.chat.stream",
+            contextualName = "chat-stream-request",
+            lowCardinalityKeyValues = {"operation", "chat-stream"})
     public Flux<ChatResponse> chatStream(ChatRequest request) {
         String provider = request.getProvider() != null ? request.getProvider() : chatConfig.getDefaultProvider();
         String model = request.getModel();
@@ -299,7 +381,8 @@ public class ChatService {
 
         // Build prompt with conversation history (with optional skill and document context)
         List<org.springframework.ai.chat.messages.Message> messages = buildMessageHistory(
-            conversation, request.getMessage(), request.getSkillId(), userId, request.isUseDocumentContext());
+            conversation, request.getMessage(), request.getSkillId(), userId,
+            request.isUseDocumentContext(), request.getRagRetrievalMode());
         Prompt prompt = new Prompt(messages);
 
         // Stream AI response
@@ -632,16 +715,22 @@ public class ChatService {
 
     private List<org.springframework.ai.chat.messages.Message> buildMessageHistory(
             Conversation conversation, String currentMessage) {
-        return buildMessageHistory(conversation, currentMessage, null, null, false);
+        return buildMessageHistory(conversation, currentMessage, null, null, false, null);
     }
 
     private List<org.springframework.ai.chat.messages.Message> buildMessageHistory(
             Conversation conversation, String currentMessage, UUID skillId) {
-        return buildMessageHistory(conversation, currentMessage, skillId, null, false);
+        return buildMessageHistory(conversation, currentMessage, skillId, null, false, null);
     }
 
     private List<org.springframework.ai.chat.messages.Message> buildMessageHistory(
             Conversation conversation, String currentMessage, UUID skillId, UUID userId, boolean useDocumentContext) {
+        return buildMessageHistory(conversation, currentMessage, skillId, userId, useDocumentContext, null);
+    }
+
+    private List<org.springframework.ai.chat.messages.Message> buildMessageHistory(
+            Conversation conversation, String currentMessage, UUID skillId, UUID userId,
+            boolean useDocumentContext, String ragRetrievalMode) {
         List<org.springframework.ai.chat.messages.Message> messages = new ArrayList<>();
 
         // Build system prompt (base + optional skill augmentation + optional RAG instructions)
@@ -663,7 +752,7 @@ public class ChatService {
         // Add document context if user has documents and RAG is enabled
         String documentContext = null;
         if (useDocumentContext && userId != null && documentEmbeddingService != null && documentEmbeddingService.isAvailable()) {
-            documentContext = buildDocumentContext(userId, currentMessage);
+            documentContext = buildDocumentContext(userId, currentMessage, ragRetrievalMode);
             if (documentContext != null && !documentContext.isEmpty()) {
                 systemPromptBuilder.append("\n\n");
                 systemPromptBuilder.append("You have access to the user's uploaded documents. ");
@@ -766,9 +855,13 @@ public class ChatService {
 
     /**
      * Build document context by searching user's documents for relevant content.
-     * Formats context with source attribution from metadata for the LLM.
+     * Supports two retrieval modes:
+     *   - "snippet" (default): returns individual matched chunks
+     *   - "full": expands matched chunks to include all sibling chunks from the same parent document
+     *
+     * @param ragRetrievalMode "snippet", "full", or null for server default
      */
-    private String buildDocumentContext(UUID userId, String query) {
+    private String buildDocumentContext(UUID userId, String query, String ragRetrievalMode) {
         if (documentEmbeddingService == null || !documentEmbeddingService.isAvailable()) {
             return null;
         }
@@ -781,23 +874,71 @@ public class ChatService {
                 return null;
             }
 
-            StringBuilder contextBuilder = new StringBuilder();
-            for (int i = 0; i < relevantDocs.size(); i++) {
-                Document doc = relevantDocs.get(i);
-                String filename = (String) doc.getMetadata().getOrDefault("filename", "document");
-                Object chunkIndex = doc.getMetadata().get("chunk_index");
+            // Determine the effective retrieval mode
+            String mode = (ragRetrievalMode != null) ? ragRetrievalMode : ragPromptBuilder.getDefaultRetrievalMode();
 
-                // Format context with clear section markers (internal, not for display)
-                contextBuilder.append("--- From: ").append(filename);
-                if (chunkIndex != null) {
-                    contextBuilder.append(" (section ").append(((Number) chunkIndex).intValue() + 1).append(")");
+            // For full-document mode, expand matched chunks to include all sibling chunks
+            List<Document> docsForContext = relevantDocs;
+            if ("full".equalsIgnoreCase(mode)) {
+                java.util.Set<String> documentIds = relevantDocs.stream()
+                        .map(doc -> (String) doc.getMetadata().getOrDefault("document_id", ""))
+                        .filter(id -> !id.isEmpty())
+                        .collect(java.util.stream.Collectors.toSet());
+
+                if (!documentIds.isEmpty()) {
+                    List<Document> allChunks = documentEmbeddingService.getAllChunksForDocuments(userId, documentIds);
+                    if (!allChunks.isEmpty()) {
+                        docsForContext = allChunks;
+                        log.debug("Full-doc mode: expanded {} matched chunks to {} total chunks across {} documents",
+                                relevantDocs.size(), allChunks.size(), documentIds.size());
+                    }
                 }
-                contextBuilder.append(" ---\n");
-                contextBuilder.append(doc.getText());
-                contextBuilder.append("\n\n");
             }
 
-            log.debug("Built document context with {} chunks for user {}", relevantDocs.size(), userId);
+            // Build the context string
+            StringBuilder contextBuilder = new StringBuilder();
+            if ("full".equalsIgnoreCase(mode)) {
+                // Group by document_id for full-doc mode
+                java.util.Map<String, List<Document>> grouped = new java.util.LinkedHashMap<>();
+                for (Document doc : docsForContext) {
+                    String docId = (String) doc.getMetadata().getOrDefault("document_id", "unknown");
+                    grouped.computeIfAbsent(docId, k -> new java.util.ArrayList<>()).add(doc);
+                }
+
+                for (java.util.Map.Entry<String, List<Document>> entry : grouped.entrySet()) {
+                    List<Document> chunks = entry.getValue();
+                    // Sort by chunk_index for coherent reading order
+                    chunks.sort(java.util.Comparator.comparingInt(d -> {
+                        Object idx = d.getMetadata().get("chunk_index");
+                        return (idx instanceof Number) ? ((Number) idx).intValue() : 0;
+                    }));
+
+                    String filename = (String) chunks.get(0).getMetadata().getOrDefault("filename", "document");
+                    contextBuilder.append("--- Full document: ").append(filename).append(" ---\n");
+                    for (Document chunk : chunks) {
+                        contextBuilder.append(chunk.getText()).append("\n");
+                    }
+                    contextBuilder.append("\n");
+                }
+            } else {
+                // Snippet mode: original behavior
+                for (int i = 0; i < docsForContext.size(); i++) {
+                    Document doc = docsForContext.get(i);
+                    String filename = (String) doc.getMetadata().getOrDefault("filename", "document");
+                    Object chunkIndex = doc.getMetadata().get("chunk_index");
+
+                    contextBuilder.append("--- From: ").append(filename);
+                    if (chunkIndex != null) {
+                        contextBuilder.append(" (section ").append(((Number) chunkIndex).intValue() + 1).append(")");
+                    }
+                    contextBuilder.append(" ---\n");
+                    contextBuilder.append(doc.getText());
+                    contextBuilder.append("\n\n");
+                }
+            }
+
+            log.debug("Built document context ({} mode) with {} chunks for user {}",
+                    mode, docsForContext.size(), userId);
             return contextBuilder.toString().trim();
 
         } catch (Exception e) {

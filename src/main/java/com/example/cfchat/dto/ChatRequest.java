@@ -48,4 +48,20 @@ public class ChatRequest {
      */
     @Builder.Default
     private boolean temporary = false;
+
+    /**
+     * RAG retrieval mode: "snippet" (default) returns individual matching chunks,
+     * "full" returns all chunks from matched parent documents grouped together.
+     * When null, falls back to the server-configured default (rag.retrieval-mode).
+     */
+    private String ragRetrievalMode;
+
+    /**
+     * Whether to use agentic search for this request.
+     * When true, the query is decomposed into sub-queries, searched iteratively,
+     * and results are synthesized into a comprehensive answer.
+     * Requires agentic-search.enabled=true in configuration.
+     */
+    @Builder.Default
+    private boolean useAgenticSearch = false;
 }

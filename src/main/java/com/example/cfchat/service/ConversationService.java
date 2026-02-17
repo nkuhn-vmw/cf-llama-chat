@@ -5,6 +5,7 @@ import com.example.cfchat.model.Conversation;
 import com.example.cfchat.model.Message;
 import com.example.cfchat.repository.ConversationRepository;
 import com.example.cfchat.repository.MessageRepository;
+import io.micrometer.observation.annotation.Observed;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.data.domain.Page;
@@ -25,6 +26,9 @@ public class ConversationService {
     private final ConversationRepository conversationRepository;
     private final MessageRepository messageRepository;
 
+    @Observed(name = "cfllama.conversation.create",
+            contextualName = "create-conversation",
+            lowCardinalityKeyValues = {"operation", "create-conversation"})
     @Transactional
     public Conversation createConversation(String title, String provider, String model, UUID userId) {
         Conversation conversation = Conversation.builder()
