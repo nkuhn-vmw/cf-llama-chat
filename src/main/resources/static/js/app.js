@@ -134,12 +134,8 @@ class ChatApp {
         this.conversationsList.addEventListener('click', (e) => {
             const item = e.target.closest('.conversation-item');
             const deleteBtn = e.target.closest('.delete-btn');
-            const unarchiveBtn = e.target.closest('.unarchive-btn');
 
-            if (unarchiveBtn) {
-                e.stopPropagation();
-                this.unarchiveConversation(unarchiveBtn.dataset.id);
-            } else if (deleteBtn) {
+            if (deleteBtn) {
                 e.stopPropagation();
                 const id = deleteBtn.dataset.id;
                 this.deleteConversation(id);
@@ -152,7 +148,7 @@ class ChatApp {
         // Right-click context menu on conversations
         this.conversationsList.addEventListener('contextmenu', (e) => {
             const item = e.target.closest('.conversation-item');
-            if (item && !item.classList.contains('archived-item')) {
+            if (item) {
                 e.preventDefault();
                 this.showConvContextMenu(e.clientX, e.clientY, item.dataset.id);
             }
@@ -2227,7 +2223,6 @@ class ChatApp {
                 document.querySelectorAll('.conversation-item').forEach(el => el.style.display = '');
                 document.querySelectorAll('.folder-section').forEach(el => el.style.display = 'none');
                 { const fv = document.getElementById('foldersView'); if (fv) fv.style.display = 'none'; }
-                { const ai = document.getElementById('archivedItems'); if (ai) ai.style.display = 'none'; }
                 break;
             case 'pinned':
                 try {
@@ -2240,40 +2235,11 @@ class ChatApp {
                         });
                         document.querySelectorAll('.folder-section').forEach(el => el.style.display = 'none');
                         { const fv = document.getElementById('foldersView'); if (fv) fv.style.display = 'none'; }
-                        { const ai = document.getElementById('archivedItems'); if (ai) ai.style.display = 'none'; }
                     }
                 } catch(e) {}
                 break;
             case 'folders':
                 this.showFolderView();
-                break;
-            case 'archived':
-                try {
-                    const resp = await fetch('/api/conversations/archived?size=50');
-                    if (resp.ok) {
-                        const data = await resp.json();
-                        // Hide all current, show archived
-                        document.querySelectorAll('.conversation-item').forEach(el => el.style.display = 'none');
-                        document.querySelectorAll('.folder-section').forEach(el => el.style.display = 'none');
-                        // Add archived items temporarily
-                        let archivedContainer = document.getElementById('archivedItems');
-                        if (!archivedContainer) {
-                            archivedContainer = document.createElement('div');
-                            archivedContainer.id = 'archivedItems';
-                            list.appendChild(archivedContainer);
-                        }
-                        archivedContainer.innerHTML = data.content.map(c => `
-                            <div class="conversation-item archived-item" data-id="${c.id}">
-                                <div class="conversation-title">${this.escapeHtml(c.title || 'Untitled')}</div>
-                                <div class="conversation-meta">
-                                    <span>Archived</span>
-                                    <button class="unarchive-btn" data-id="${c.id}" title="Unarchive">Restore</button>
-                                </div>
-                            </div>
-                        `).join('');
-                        archivedContainer.style.display = '';
-                    }
-                } catch(e) {}
                 break;
         }
     }
@@ -2324,14 +2290,14 @@ class ChatApp {
         plusSvg.appendChild(l1);
         plusSvg.appendChild(l2);
         newBtn.appendChild(plusSvg);
-        newBtn.appendChild(document.createTextNode(' New Folder'));
+        newBtn.appendChild(document.createTextNode(' New Project'));
         newBtn.addEventListener('click', () => this.createFolder());
         container.appendChild(newBtn);
 
         if (this.folders.length === 0) {
             const empty = document.createElement('div');
             empty.className = 'empty-state';
-            empty.textContent = 'No folders yet. Create one to organize your chats.';
+            empty.textContent = 'No projects yet. Create one to organize your chats.';
             container.appendChild(empty);
         } else {
             this.folders.forEach(f => {
@@ -2403,14 +2369,14 @@ class ChatApp {
         backPath.setAttribute('d', 'M19 12H5M12 19l-7-7 7-7');
         backSvg.appendChild(backPath);
         backBtn.appendChild(backSvg);
-        backBtn.appendChild(document.createTextNode(' Folders'));
+        backBtn.appendChild(document.createTextNode(' Projects'));
         backBtn.addEventListener('click', () => this._buildFolderListView(container));
         backHeader.appendChild(backBtn);
 
         // Delete folder button
         const deleteBtn = document.createElement('button');
         deleteBtn.className = 'folder-delete-btn';
-        deleteBtn.title = 'Delete folder';
+        deleteBtn.title = 'Delete project';
         const delSvg = document.createElementNS('http://www.w3.org/2000/svg', 'svg');
         delSvg.setAttribute('viewBox', '0 0 24 24');
         delSvg.setAttribute('fill', 'none');
@@ -2423,15 +2389,15 @@ class ChatApp {
         delSvg.appendChild(delPath);
         deleteBtn.appendChild(delSvg);
         deleteBtn.addEventListener('click', async () => {
-            if (!confirm(`Delete folder "${folder.name}"? Conversations will be unfoldered, not deleted.`)) return;
+            if (!confirm(`Delete project "${folder.name}"? Conversations will be removed from the project, not deleted.`)) return;
             try {
                 const resp = await fetch(`/api/folders/${folder.id}`, { method: 'DELETE' });
                 if (resp.ok) {
                     await this.loadFolders();
                     this._buildFolderListView(container);
-                    this.showToast('Folder deleted');
+                    this.showToast('Project deleted');
                 }
-            } catch(e) { this.showToast('Failed to delete folder'); }
+            } catch(e) { this.showToast('Failed to delete project'); }
         });
         backHeader.appendChild(deleteBtn);
 
@@ -2471,7 +2437,7 @@ class ChatApp {
                 if (convs.length === 0) {
                     const empty = document.createElement('div');
                     empty.className = 'empty-state';
-                    empty.textContent = 'No conversations in this folder.';
+                    empty.textContent = 'No conversations in this project.';
                     container.appendChild(empty);
                 } else {
                     convs.forEach(c => {
@@ -2504,7 +2470,7 @@ class ChatApp {
     }
 
     async createFolder() {
-        const name = prompt('Folder name:');
+        const name = prompt('Project name:');
         if (!name || !name.trim()) return;
         try {
             const resp = await fetch('/api/folders', {
@@ -2515,11 +2481,11 @@ class ChatApp {
             if (resp.ok) {
                 await this.loadFolders();
                 this.showFolderView();
-                this.showToast('Folder created');
+                this.showToast('Project created');
             }
         } catch(e) {
-            console.error('Failed to create folder:', e);
-            this.showToast('Failed to create folder');
+            console.error('Failed to create project:', e);
+            this.showToast('Failed to create project');
         }
     }
 
@@ -2534,7 +2500,7 @@ class ChatApp {
         const item = document.querySelector(`.conversation-item[data-id="${convId}"]`);
         const isPinned = item && item.dataset.pinned === 'true';
         const pinLabel = document.getElementById('ctxPinLabel');
-        if (pinLabel) pinLabel.textContent = isPinned ? 'Unpin' : 'Pin';
+        if (pinLabel) pinLabel.textContent = isPinned ? 'Unfavorite' : 'Favorite';
 
         // Position
         menu.style.display = 'block';
@@ -2557,10 +2523,6 @@ class ChatApp {
         menu.querySelector('[data-action="rename"]').addEventListener('click', () => {
             menu.style.display = 'none';
             this.renameConversation(convId);
-        });
-        menu.querySelector('[data-action="archive"]').addEventListener('click', () => {
-            menu.style.display = 'none';
-            this.archiveConversation(convId);
         });
         menu.querySelector('[data-action="folder"]').addEventListener('click', (e) => {
             e.stopPropagation();
@@ -2597,22 +2559,22 @@ class ChatApp {
                         if (!indicator) {
                             indicator = document.createElement('span');
                             indicator.className = 'pin-indicator';
-                            indicator.textContent = '\u{1F4CC}';
+                            indicator.textContent = '\u{2764}';
                             item.querySelector('.conversation-title').appendChild(indicator);
                         }
                     } else {
                         if (indicator) indicator.remove();
                     }
                 }
-                this.showToast(isPinned ? 'Unpinned' : 'Pinned');
+                this.showToast(isPinned ? 'Removed from favorites' : 'Added to favorites');
             }
-        } catch(e) { this.showToast('Failed to update pin'); }
+        } catch(e) { this.showToast('Failed to update favorite'); }
     }
 
     async renameConversation(convId) {
         const item = document.querySelector(`.conversation-item[data-id="${convId}"]`);
         const titleEl = item ? item.querySelector('.conversation-title') : null;
-        const currentTitle = titleEl ? titleEl.textContent.replace('\u{1F4CC}', '').trim() : '';
+        const currentTitle = titleEl ? titleEl.textContent.replace('\u{2764}', '').trim() : '';
         const newTitle = prompt('Rename conversation:', currentTitle);
         if (!newTitle || newTitle.trim() === currentTitle) return;
         try {
@@ -2626,38 +2588,12 @@ class ChatApp {
                 if (item && item.dataset.pinned === 'true') {
                     const indicator = document.createElement('span');
                     indicator.className = 'pin-indicator';
-                    indicator.textContent = '\u{1F4CC}';
+                    indicator.textContent = '\u{2764}';
                     titleEl.appendChild(indicator);
                 }
                 this.showToast('Renamed');
             }
         } catch(e) { this.showToast('Failed to rename'); }
-    }
-
-    async archiveConversation(convId) {
-        try {
-            const resp = await fetch(`/api/conversations/${convId}/archive`, { method: 'POST' });
-            if (resp.ok) {
-                const item = document.querySelector(`.conversation-item[data-id="${convId}"]`);
-                if (item) item.remove();
-                if (this.conversationId === convId) {
-                    this.startNewChat();
-                }
-                this.showToast('Archived');
-            }
-        } catch(e) { this.showToast('Failed to archive'); }
-    }
-
-    async unarchiveConversation(convId) {
-        try {
-            const resp = await fetch(`/api/conversations/${convId}/unarchive`, { method: 'POST' });
-            if (resp.ok) {
-                const item = document.querySelector(`.archived-item[data-id="${convId}"]`);
-                if (item) item.remove();
-                this.showToast('Restored');
-                window.location.reload();
-            }
-        } catch(e) { this.showToast('Failed to restore'); }
     }
 
     async showFolderPicker(x, y, convId) {
@@ -2673,7 +2609,7 @@ class ChatApp {
 
         const noFolder = document.createElement('button');
         noFolder.className = 'folder-picker-item remove-folder';
-        noFolder.textContent = 'No folder';
+        noFolder.textContent = 'No project';
         noFolder.addEventListener('click', () => {
             this.moveToFolder(convId, null);
             picker.remove();
@@ -2683,7 +2619,7 @@ class ChatApp {
         if (this.folders.length === 0) {
             const empty = document.createElement('div');
             empty.style.cssText = 'padding: 8px 12px; color: var(--text-muted); font-size: 0.85rem;';
-            empty.textContent = 'No folders. Create one in the Folders tab.';
+            empty.textContent = 'No projects. Create one in the Projects tab.';
             picker.appendChild(empty);
         } else {
             this.folders.forEach(f => {
@@ -2714,7 +2650,7 @@ class ChatApp {
                 body: JSON.stringify({ folderId: folderId })
             });
             if (resp.ok) {
-                this.showToast(folderId ? 'Moved to folder' : 'Removed from folder');
+                this.showToast(folderId ? 'Moved to project' : 'Removed from project');
                 await this.loadFolders();
             }
         } catch(e) { this.showToast('Failed to move'); }
