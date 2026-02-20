@@ -127,6 +127,10 @@
                 <div class="stat-value" th:text="${genAiModelCount}">0</div>
                 <div class="stat-label">GenAI Services</div>
             </div>
+            <div class="stat-card">
+                <div class="stat-value" id="activeUsersCount">--</div>
+                <div class="stat-label">Active Users</div>
+            </div>
         </div>
 
         <nav class="admin-nav">
@@ -246,6 +250,64 @@
                     View database performance
                 </div>
             </a>
+
+            <a href="/admin/settings" class="admin-nav-card">
+                <div class="card-icon">
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                        <path d="M12.22 2h-.44a2 2 0 0 0-2 2v.18a2 2 0 0 1-1 1.73l-.43.25a2 2 0 0 1-2 0l-.15-.08a2 2 0 0 0-2.73.73l-.22.38a2 2 0 0 0 .73 2.73l.15.1a2 2 0 0 1 1 1.72v.51a2 2 0 0 1-1 1.74l-.15.09a2 2 0 0 0-.73 2.73l.22.38a2 2 0 0 0 2.73.73l.15-.08a2 2 0 0 1 2 0l.43.25a2 2 0 0 1 1 1.73V20a2 2 0 0 0 2 2h.44a2 2 0 0 0 2-2v-.18a2 2 0 0 1 1-1.73l.43-.25a2 2 0 0 1 2 0l.15.08a2 2 0 0 0 2.73-.73l.22-.39a2 2 0 0 0-.73-2.73l-.15-.08a2 2 0 0 1-1-1.74v-.5a2 2 0 0 1 1-1.74l.15-.09a2 2 0 0 0 .73-2.73l-.22-.38a2 2 0 0 0-2.73-.73l-.15.08a2 2 0 0 1-2 0l-.43-.25a2 2 0 0 1-1-1.73V4a2 2 0 0 0-2-2z"></path>
+                        <circle cx="12" cy="12" r="3"></circle>
+                    </svg>
+                </div>
+                <h3>System Settings</h3>
+                <p>Configure rate limiting, content moderation, feature flags, and system-wide preferences.</p>
+                <div class="card-stat">
+                    Manage system configuration
+                </div>
+            </a>
+
+            <a href="/admin/groups" class="admin-nav-card">
+                <div class="card-icon">
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                        <path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"></path>
+                        <circle cx="9" cy="7" r="4"></circle>
+                        <path d="M23 21v-2a4 4 0 0 0-3-3.87"></path>
+                        <path d="M16 3.13a4 4 0 0 1 0 7.75"></path>
+                    </svg>
+                </div>
+                <h3>User Groups</h3>
+                <p>Create and manage user groups, assign permissions, and organize users into logical groupings.</p>
+                <div class="card-stat">
+                    Manage group memberships
+                </div>
+            </a>
+
+            <a href="/admin/banners" class="admin-nav-card">
+                <div class="card-icon">
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                        <path d="M18 8A6 6 0 0 0 6 8c0 7-3 9-3 9h18s-3-2-3-9"></path>
+                        <path d="M13.73 21a2 2 0 0 1-3.46 0"></path>
+                    </svg>
+                </div>
+                <h3>Notification Banners</h3>
+                <p>Create and manage notification banners displayed to all users across the application.</p>
+                <div class="card-stat">
+                    Manage active announcements
+                </div>
+            </a>
+
+            <a href="/admin/webhooks" class="admin-nav-card">
+                <div class="card-icon">
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                        <path d="M10 13a5 5 0 0 0 7.54.54l3-3a5 5 0 0 0-7.07-7.07l-1.72 1.71"></path>
+                        <path d="M14 11a5 5 0 0 0-7.54-.54l-3 3a5 5 0 0 0 7.07 7.07l1.71-1.71"></path>
+                    </svg>
+                </div>
+                <h3>Webhooks</h3>
+                <p>Configure webhook endpoints to receive event notifications for chat messages, user activity, and more.</p>
+                <div class="card-stat">
+                    Manage event integrations
+                </div>
+            </a>
         </nav>
 
         <div class="environment-badge" th:classappend="${isCloudProfile} ? 'cloud' : ''">
@@ -263,5 +325,18 @@
 
     <script th:src="@{/js/admin-theme.js}"></script>
     <script th:src="@{/js/admin-toast.js}"></script>
+    <script>
+        fetch('/api/admin/active-users')
+            .then(function(res) {
+                if (!res.ok) throw new Error('Failed to load active users');
+                return res.json();
+            })
+            .then(function(data) {
+                document.getElementById('activeUsersCount').textContent = data.count != null ? data.count : data;
+            })
+            .catch(function() {
+                document.getElementById('activeUsersCount').textContent = '--';
+            });
+    </script>
 </body>
 </html>

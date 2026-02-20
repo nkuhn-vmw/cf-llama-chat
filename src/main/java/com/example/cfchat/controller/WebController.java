@@ -122,6 +122,88 @@ public class WebController {
         return "index";
     }
 
+    @GetMapping("/workspace")
+    public String workspace(Model model) {
+        Optional<User> currentUser = userService.getCurrentUser();
+        if (currentUser.isEmpty()) {
+            return "redirect:/login.html";
+        }
+        model.addAttribute("currentUser", currentUser.get());
+        return "workspace";
+    }
+
+    @GetMapping("/workspace/channels")
+    public String workspaceChannels(Model model) {
+        Optional<User> currentUser = userService.getCurrentUser();
+        if (currentUser.isEmpty()) {
+            return "redirect:/login.html";
+        }
+        model.addAttribute("currentUser", currentUser.get());
+        return "workspace/channels";
+    }
+
+    @GetMapping("/workspace/notes")
+    public String workspaceNotes(Model model) {
+        Optional<User> currentUser = userService.getCurrentUser();
+        if (currentUser.isEmpty()) {
+            return "redirect:/login.html";
+        }
+        model.addAttribute("currentUser", currentUser.get());
+        return "workspace/notes";
+    }
+
+    @GetMapping("/workspace/memory")
+    public String workspaceMemory(Model model) {
+        Optional<User> currentUser = userService.getCurrentUser();
+        if (currentUser.isEmpty()) {
+            return "redirect:/login.html";
+        }
+        model.addAttribute("currentUser", currentUser.get());
+        return "workspace/memory";
+    }
+
+    @GetMapping("/workspace/prompts")
+    public String workspacePrompts(Model model) {
+        Optional<User> currentUser = userService.getCurrentUser();
+        if (currentUser.isEmpty()) {
+            return "redirect:/login.html";
+        }
+        model.addAttribute("currentUser", currentUser.get());
+        return "workspace/prompts";
+    }
+
+    @GetMapping("/workspace/tools")
+    public String workspaceTools(Model model) {
+        Optional<User> currentUser = userService.getCurrentUser();
+        if (currentUser.isEmpty()) {
+            return "redirect:/login.html";
+        }
+        model.addAttribute("currentUser", currentUser.get());
+        return "workspace/tools";
+    }
+
+    @GetMapping("/workspace/documents")
+    public String workspaceDocuments(Model model) {
+        Optional<User> currentUser = userService.getCurrentUser();
+        if (currentUser.isEmpty()) {
+            return "redirect:/login.html";
+        }
+        model.addAttribute("currentUser", currentUser.get());
+        return "workspace/documents";
+    }
+
+    @GetMapping("/settings")
+    public String settings(Model model) {
+        Optional<User> currentUser = userService.getCurrentUser();
+        if (currentUser.isEmpty()) {
+            return "redirect:/login.html";
+        }
+
+        model.addAttribute("currentUser", currentUser.get());
+        model.addAttribute("models", chatService.getAvailableModels());
+        return "settings";
+    }
+
     @GetMapping("/chat/{id}")
     public String chat(@PathVariable UUID id, Model model) {
         Optional<User> currentUser = userService.getCurrentUser();

@@ -49,6 +49,13 @@ public class User {
     @Column(name = "last_login_at")
     private LocalDateTime lastLoginAt;
 
+    @Column(name = "external_id")
+    private String externalId;
+
+    @Column(name = "enabled")
+    @Builder.Default
+    private Boolean enabled = true;
+
     @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "organization_id")
     private Organization organization;
@@ -57,6 +64,9 @@ public class User {
     @Column(name = "organization_role")
     @Builder.Default
     private OrganizationRole organizationRole = OrganizationRole.MEMBER;
+
+    @Column(name = "preferences", columnDefinition = "TEXT")
+    private String preferences;  // JSON string for user preferences (theme, background, language, etc.)
 
     @PrePersist
     protected void onCreate() {
@@ -71,7 +81,9 @@ public class User {
 
     public enum AuthProvider {
         LOCAL,
-        SSO
+        SSO,
+        LDAP,
+        SCIM
     }
 
     public enum OrganizationRole {

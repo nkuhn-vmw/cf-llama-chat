@@ -37,6 +37,9 @@ class AuthControllerTest {
     @MockBean
     private SecurityConfig securityConfig;
 
+    @MockBean
+    private com.example.cfchat.service.RateLimitService rateLimitService;
+
     @Test
     void getAuthProvider_returnsProviderInfo() throws Exception {
         when(securityConfig.isSsoConfigured()).thenReturn(false);

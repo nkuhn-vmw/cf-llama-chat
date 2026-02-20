@@ -1,0 +1,821 @@
+<!DOCTYPE html>
+<html lang="en" xmlns:th="http://www.thymeleaf.org">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Settings - CF Llama Chat</title>
+    <link rel="stylesheet" th:href="@{/css/style.css}">
+    <link rel="stylesheet" th:href="@{/css/admin.css}">
+    <style>
+        /* Settings Page Styles */
+        .settings-container {
+            max-width: 800px;
+            margin: 0 auto;
+            padding: 24px;
+        }
+
+        .settings-section {
+            background-color: var(--bg-secondary);
+            border: 1px solid var(--border-color);
+            border-radius: 12px;
+            padding: 24px;
+            margin-bottom: 24px;
+        }
+
+        .settings-section h2 {
+            font-size: 1.2rem;
+            font-weight: 600;
+            margin-bottom: 4px;
+            color: var(--text-primary);
+        }
+
+        .settings-section .section-description {
+            font-size: 0.85rem;
+            color: var(--text-muted);
+            margin-bottom: 20px;
+        }
+
+        .setting-row {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding: 16px 0;
+            border-bottom: 1px solid var(--border-color);
+        }
+
+        .setting-row:last-child {
+            border-bottom: none;
+            padding-bottom: 0;
+        }
+
+        .setting-row:first-of-type {
+            padding-top: 0;
+        }
+
+        .setting-info {
+            flex: 1;
+            margin-right: 24px;
+        }
+
+        .setting-label {
+            font-size: 0.95rem;
+            font-weight: 500;
+            color: var(--text-primary);
+            margin-bottom: 2px;
+        }
+
+        .setting-description {
+            font-size: 0.8rem;
+            color: var(--text-muted);
+        }
+
+        .setting-control {
+            flex-shrink: 0;
+        }
+
+        /* Segmented Control */
+        .segmented-control {
+            display: flex;
+            background-color: var(--bg-tertiary);
+            border-radius: 8px;
+            padding: 3px;
+            gap: 2px;
+        }
+
+        .segmented-control label {
+            padding: 6px 14px;
+            border-radius: 6px;
+            font-size: 0.85rem;
+            cursor: pointer;
+            color: var(--text-secondary);
+            transition: all 0.2s;
+            text-align: center;
+            user-select: none;
+        }
+
+        .segmented-control label:hover {
+            color: var(--text-primary);
+        }
+
+        .segmented-control input[type="radio"] {
+            display: none;
+        }
+
+        .segmented-control input[type="radio"]:checked + label,
+        .segmented-control label.active {
+            background-color: var(--accent-color);
+            color: #ffffff;
+        }
+
+        /* Toggle Switch */
+        .settings-toggle {
+            position: relative;
+            width: 44px;
+            height: 24px;
+            flex-shrink: 0;
+        }
+
+        .settings-toggle input {
+            opacity: 0;
+            width: 0;
+            height: 0;
+        }
+
+        .settings-toggle .slider {
+            position: absolute;
+            cursor: pointer;
+            top: 0;
+            left: 0;
+            right: 0;
+            bottom: 0;
+            background-color: var(--bg-tertiary);
+            border-radius: 24px;
+            transition: 0.3s;
+        }
+
+        .settings-toggle .slider:before {
+            position: absolute;
+            content: "";
+            height: 18px;
+            width: 18px;
+            left: 3px;
+            bottom: 3px;
+            background-color: white;
+            border-radius: 50%;
+            transition: 0.3s;
+        }
+
+        .settings-toggle input:checked + .slider {
+            background-color: var(--accent-color);
+        }
+
+        .settings-toggle input:checked + .slider:before {
+            transform: translateX(20px);
+        }
+
+        /* Select / Dropdown */
+        .settings-select {
+            padding: 8px 12px;
+            background-color: var(--bg-tertiary);
+            border: 1px solid var(--border-color);
+            border-radius: 8px;
+            color: var(--text-primary);
+            font-size: 0.9rem;
+            min-width: 180px;
+            cursor: pointer;
+            appearance: auto;
+        }
+
+        .settings-select:focus {
+            outline: none;
+            border-color: var(--accent-color);
+        }
+
+        /* Range Slider */
+        .range-control {
+            display: flex;
+            align-items: center;
+            gap: 12px;
+        }
+
+        .range-control input[type="range"] {
+            width: 120px;
+            accent-color: var(--accent-color);
+            cursor: pointer;
+        }
+
+        .range-label {
+            font-size: 0.8rem;
+            color: var(--text-secondary);
+            min-width: 56px;
+            text-align: center;
+        }
+
+        /* Textarea */
+        .settings-textarea {
+            width: 100%;
+            min-height: 100px;
+            padding: 10px 12px;
+            background-color: var(--bg-tertiary);
+            border: 1px solid var(--border-color);
+            border-radius: 8px;
+            color: var(--text-primary);
+            font-size: 0.9rem;
+            font-family: inherit;
+            resize: vertical;
+            margin-top: 8px;
+        }
+
+        .settings-textarea:focus {
+            outline: none;
+            border-color: var(--accent-color);
+        }
+
+        .textarea-row .setting-info {
+            margin-right: 0;
+        }
+
+        .textarea-row {
+            flex-direction: column;
+            align-items: stretch;
+        }
+
+        .char-count {
+            font-size: 0.75rem;
+            color: var(--text-muted);
+            text-align: right;
+            margin-top: 4px;
+        }
+
+        .char-count.near-limit {
+            color: #fbbf24;
+        }
+
+        .char-count.at-limit {
+            color: var(--error-color);
+        }
+
+        /* Danger Zone */
+        .danger-section {
+            border-color: rgba(239, 68, 68, 0.3);
+        }
+
+        .danger-section h2 {
+            color: var(--error-color);
+        }
+
+        .danger-btn {
+            padding: 8px 16px;
+            background: none;
+            border: 1px solid var(--error-color);
+            border-radius: 8px;
+            color: var(--error-color);
+            font-size: 0.85rem;
+            font-weight: 500;
+            cursor: pointer;
+            transition: all 0.2s;
+        }
+
+        .danger-btn:hover {
+            background-color: rgba(239, 68, 68, 0.1);
+        }
+
+        .danger-btn.filled {
+            background-color: var(--error-color);
+            color: white;
+        }
+
+        .danger-btn.filled:hover {
+            background-color: #dc2626;
+        }
+
+        /* Export Button */
+        .export-btn {
+            padding: 8px 16px;
+            background: none;
+            border: 1px solid var(--accent-color);
+            border-radius: 8px;
+            color: var(--accent-color);
+            font-size: 0.85rem;
+            font-weight: 500;
+            cursor: pointer;
+            transition: all 0.2s;
+            display: inline-flex;
+            align-items: center;
+            gap: 6px;
+        }
+
+        .export-btn:hover {
+            background-color: rgba(16, 163, 127, 0.1);
+        }
+
+        .export-btn svg,
+        .danger-btn svg {
+            width: 16px;
+            height: 16px;
+        }
+
+        /* Confirmation Modal */
+        .settings-modal-overlay {
+            display: none;
+            position: fixed;
+            top: 0;
+            left: 0;
+            right: 0;
+            bottom: 0;
+            background-color: rgba(0, 0, 0, 0.6);
+            z-index: 1000;
+            align-items: center;
+            justify-content: center;
+        }
+
+        .settings-modal-overlay.open {
+            display: flex;
+        }
+
+        .settings-modal {
+            background-color: var(--bg-secondary);
+            border: 1px solid var(--border-color);
+            border-radius: 16px;
+            padding: 28px;
+            max-width: 440px;
+            width: 90%;
+        }
+
+        .settings-modal h3 {
+            font-size: 1.15rem;
+            margin-bottom: 12px;
+            color: var(--text-primary);
+        }
+
+        .settings-modal p {
+            font-size: 0.9rem;
+            color: var(--text-secondary);
+            line-height: 1.5;
+            margin-bottom: 20px;
+        }
+
+        .settings-modal .modal-input-group {
+            margin-bottom: 20px;
+        }
+
+        .settings-modal .modal-input-group label {
+            display: block;
+            font-size: 0.85rem;
+            color: var(--text-secondary);
+            margin-bottom: 6px;
+        }
+
+        .settings-modal .modal-input-group input {
+            width: 100%;
+            padding: 10px 12px;
+            background-color: var(--bg-tertiary);
+            border: 1px solid var(--border-color);
+            border-radius: 8px;
+            color: var(--text-primary);
+            font-size: 0.9rem;
+        }
+
+        .settings-modal .modal-input-group input:focus {
+            outline: none;
+            border-color: var(--accent-color);
+        }
+
+        .settings-modal-actions {
+            display: flex;
+            gap: 12px;
+            justify-content: flex-end;
+        }
+
+        .settings-modal-actions button {
+            padding: 10px 20px;
+            border-radius: 8px;
+            border: none;
+            cursor: pointer;
+            font-size: 0.9rem;
+            font-weight: 500;
+        }
+
+        .settings-modal-actions .cancel-btn {
+            background-color: var(--bg-tertiary);
+            color: var(--text-primary);
+        }
+
+        .settings-modal-actions .cancel-btn:hover {
+            background-color: var(--bg-hover);
+        }
+
+        .settings-modal-actions .confirm-delete-btn {
+            background-color: var(--error-color);
+            color: white;
+        }
+
+        .settings-modal-actions .confirm-delete-btn:hover {
+            background-color: #dc2626;
+        }
+
+        .settings-modal-actions .confirm-delete-btn:disabled {
+            opacity: 0.5;
+            cursor: not-allowed;
+        }
+
+        /* Saving indicator */
+        .saving-indicator {
+            display: none;
+            align-items: center;
+            gap: 6px;
+            font-size: 0.8rem;
+            color: var(--text-muted);
+            margin-left: 12px;
+        }
+
+        .saving-indicator.visible {
+            display: inline-flex;
+        }
+
+        .saving-indicator .spinner {
+            width: 14px;
+            height: 14px;
+            border: 2px solid var(--border-color);
+            border-top-color: var(--accent-color);
+            border-radius: 50%;
+            animation: spin 0.6s linear infinite;
+        }
+
+        @keyframes spin {
+            to { transform: rotate(360deg); }
+        }
+
+        /* User info card */
+        .user-info-card {
+            display: flex;
+            align-items: center;
+            gap: 16px;
+            padding: 16px;
+            background-color: var(--bg-tertiary);
+            border-radius: 10px;
+            margin-bottom: 8px;
+        }
+
+        .user-info-card .user-avatar-lg {
+            width: 48px;
+            height: 48px;
+            border-radius: 50%;
+            background-color: var(--accent-color);
+            color: white;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 1.2rem;
+            font-weight: 600;
+            flex-shrink: 0;
+        }
+
+        .user-info-card .user-details h3 {
+            font-size: 1rem;
+            font-weight: 600;
+            margin-bottom: 2px;
+        }
+
+        .user-info-card .user-details p {
+            font-size: 0.8rem;
+            color: var(--text-muted);
+            margin: 0;
+        }
+
+        /* Responsive */
+        @media (max-width: 640px) {
+            .settings-container {
+                padding: 16px;
+            }
+
+            .setting-row {
+                flex-direction: column;
+                align-items: flex-start;
+                gap: 10px;
+            }
+
+            .setting-info {
+                margin-right: 0;
+            }
+
+            .segmented-control label {
+                padding: 6px 10px;
+                font-size: 0.8rem;
+            }
+
+            .settings-select {
+                min-width: 140px;
+                width: 100%;
+            }
+
+            .range-control input[type="range"] {
+                width: 100px;
+            }
+        }
+    </style>
+</head>
+<body>
+    <div class="settings-container">
+        <header class="admin-header">
+            <h1>Settings</h1>
+            <a href="/" class="back-link">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                    <line x1="19" y1="12" x2="5" y2="12"></line>
+                    <polyline points="12 19 5 12 12 5"></polyline>
+                </svg>
+                Back to Chat
+            </a>
+        </header>
+
+        <!-- Account Info -->
+        <div class="settings-section">
+            <div class="user-info-card">
+                <div class="user-avatar-lg" th:text="${currentUser.displayName != null ? currentUser.displayName.substring(0, 1).toUpperCase() : currentUser.username.substring(0, 1).toUpperCase()}">U</div>
+                <div class="user-details">
+                    <h3 th:text="${currentUser.displayName != null ? currentUser.displayName : currentUser.username}">User</h3>
+                    <p th:text="${currentUser.email != null ? currentUser.email : currentUser.username}">user@example.com</p>
+                </div>
+            </div>
+        </div>
+
+        <!-- Appearance -->
+        <div class="settings-section" id="appearanceSection">
+            <h2>Appearance</h2>
+            <p class="section-description">Customize the look and feel of the application.</p>
+
+            <div class="setting-row">
+                <div class="setting-info">
+                    <div class="setting-label">Theme</div>
+                    <div class="setting-description">Choose your preferred color scheme.</div>
+                </div>
+                <div class="setting-control">
+                    <div class="segmented-control" id="themeControl">
+                        <input type="radio" name="theme" id="themeDark" value="dark">
+                        <label for="themeDark">Dark</label>
+                        <input type="radio" name="theme" id="themeLight" value="light">
+                        <label for="themeLight">Light</label>
+                        <input type="radio" name="theme" id="themeOled" value="oled">
+                        <label for="themeOled">OLED</label>
+                    </div>
+                </div>
+            </div>
+
+            <div class="setting-row">
+                <div class="setting-info">
+                    <div class="setting-label">Background</div>
+                    <div class="setting-description">Set a background style for the chat area.</div>
+                </div>
+                <div class="setting-control">
+                    <div class="segmented-control" id="backgroundControl">
+                        <input type="radio" name="background" id="bgNone" value="none">
+                        <label for="bgNone">None</label>
+                        <input type="radio" name="background" id="bgGradient" value="gradient-dark">
+                        <label for="bgGradient">Gradient</label>
+                        <input type="radio" name="background" id="bgPattern" value="pattern-dots">
+                        <label for="bgPattern">Pattern</label>
+                    </div>
+                </div>
+            </div>
+
+            <div class="setting-row">
+                <div class="setting-info">
+                    <div class="setting-label">Font Size</div>
+                    <div class="setting-description">Adjust the text size across the interface.</div>
+                </div>
+                <div class="setting-control">
+                    <div class="range-control">
+                        <span class="range-label" style="font-size: 0.75rem;">A</span>
+                        <input type="range" id="fontSizeSlider" min="0" max="2" step="1" value="1">
+                        <span class="range-label" style="font-size: 1.1rem;">A</span>
+                        <span class="range-label" id="fontSizeLabel">Medium</span>
+                    </div>
+                </div>
+            </div>
+
+            <div class="setting-row">
+                <div class="setting-info">
+                    <div class="setting-label">Message Density</div>
+                    <div class="setting-description">Control the spacing between messages.</div>
+                </div>
+                <div class="setting-control">
+                    <div class="segmented-control" id="densityControl">
+                        <input type="radio" name="density" id="densityCompact" value="compact">
+                        <label for="densityCompact">Compact</label>
+                        <input type="radio" name="density" id="densityNormal" value="normal">
+                        <label for="densityNormal">Normal</label>
+                        <input type="radio" name="density" id="densityComfortable" value="comfortable">
+                        <label for="densityComfortable">Comfortable</label>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Chat Preferences -->
+        <div class="settings-section" id="chatSection">
+            <h2>Chat Preferences</h2>
+            <p class="section-description">Configure default behavior for new conversations.</p>
+
+            <div class="setting-row">
+                <div class="setting-info">
+                    <div class="setting-label">Default Model</div>
+                    <div class="setting-description">The model to use when starting a new conversation.</div>
+                </div>
+                <div class="setting-control">
+                    <select class="settings-select" id="defaultModel">
+                        <option value="">Auto (first available)</option>
+                        <optgroup th:each="provider : ${ {'openai', 'ollama', 'genai', 'external'} }"
+                                  th:if="${#lists.size(models.?[#this.provider == #vars.provider]) > 0}"
+                                  th:label="${provider}">
+                            <option th:each="m : ${models}"
+                                    th:if="${m.provider == provider}"
+                                    th:value="${m.provider + ':' + m.id}"
+                                    th:text="${m.name}">
+                            </option>
+                        </optgroup>
+                    </select>
+                </div>
+            </div>
+
+            <div class="setting-row">
+                <div class="setting-info">
+                    <div class="setting-label">Streaming Responses</div>
+                    <div class="setting-description">Show AI responses word by word as they are generated.</div>
+                </div>
+                <div class="setting-control">
+                    <label class="settings-toggle">
+                        <input type="checkbox" id="defaultStreaming" checked>
+                        <span class="slider"></span>
+                    </label>
+                </div>
+            </div>
+
+            <div class="setting-row">
+                <div class="setting-info">
+                    <div class="setting-label">Auto-title Conversations</div>
+                    <div class="setting-description">Automatically generate a title from the first message.</div>
+                </div>
+                <div class="setting-control">
+                    <label class="settings-toggle">
+                        <input type="checkbox" id="autoTitle" checked>
+                        <span class="slider"></span>
+                    </label>
+                </div>
+            </div>
+
+            <div class="setting-row textarea-row">
+                <div class="setting-info">
+                    <div class="setting-label">Custom System Instructions</div>
+                    <div class="setting-description">These instructions will be prepended to every conversation. Use this to customize how the AI responds to you.</div>
+                </div>
+                <textarea class="settings-textarea" id="systemInstructions"
+                          placeholder="e.g., Always respond in a concise, technical manner. Prefer code examples over lengthy explanations."
+                          maxlength="2000"></textarea>
+                <div class="char-count" id="charCount">0 / 2000</div>
+            </div>
+        </div>
+
+        <!-- Language & Region -->
+        <div class="settings-section" id="languageSection">
+            <h2>Language &amp; Region</h2>
+            <p class="section-description">Set your preferred language and date format.</p>
+
+            <div class="setting-row">
+                <div class="setting-info">
+                    <div class="setting-label">Language</div>
+                    <div class="setting-description">The language for the user interface.</div>
+                </div>
+                <div class="setting-control">
+                    <select class="settings-select" id="languageSelect">
+                        <option value="en">English</option>
+                        <option value="es">Spanish</option>
+                        <option value="fr">French</option>
+                        <option value="de">German</option>
+                        <option value="ja">Japanese</option>
+                        <option value="zh">Chinese</option>
+                        <option value="ar">Arabic</option>
+                    </select>
+                </div>
+            </div>
+
+            <div class="setting-row">
+                <div class="setting-info">
+                    <div class="setting-label">Date Format</div>
+                    <div class="setting-description">How dates are displayed throughout the application.</div>
+                </div>
+                <div class="setting-control">
+                    <select class="settings-select" id="dateFormat">
+                        <option value="MM/DD/YYYY">MM/DD/YYYY</option>
+                        <option value="DD/MM/YYYY">DD/MM/YYYY</option>
+                        <option value="YYYY-MM-DD">YYYY-MM-DD</option>
+                    </select>
+                </div>
+            </div>
+        </div>
+
+        <!-- Notifications -->
+        <div class="settings-section" id="notificationsSection">
+            <h2>Notifications</h2>
+            <p class="section-description">Manage how you receive alerts and notifications.</p>
+
+            <div class="setting-row">
+                <div class="setting-info">
+                    <div class="setting-label">Desktop Notifications</div>
+                    <div class="setting-description">Show browser notifications when a response completes in the background.</div>
+                </div>
+                <div class="setting-control">
+                    <label class="settings-toggle">
+                        <input type="checkbox" id="desktopNotifications">
+                        <span class="slider"></span>
+                    </label>
+                </div>
+            </div>
+
+            <div class="setting-row">
+                <div class="setting-info">
+                    <div class="setting-label">Sound Notifications</div>
+                    <div class="setting-description">Play a sound when a response finishes generating.</div>
+                </div>
+                <div class="setting-control">
+                    <label class="settings-toggle">
+                        <input type="checkbox" id="soundNotifications">
+                        <span class="slider"></span>
+                    </label>
+                </div>
+            </div>
+        </div>
+
+        <!-- Data & Privacy -->
+        <div class="settings-section" id="dataSection">
+            <h2>Data &amp; Privacy</h2>
+            <p class="section-description">Manage your data and conversation history.</p>
+
+            <div class="setting-row">
+                <div class="setting-info">
+                    <div class="setting-label">Export All Data</div>
+                    <div class="setting-description">Download all your conversations and data as a JSON file.</div>
+                </div>
+                <div class="setting-control">
+                    <button class="export-btn" id="exportDataBtn">
+                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                            <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path>
+                            <polyline points="7 10 12 15 17 10"></polyline>
+                            <line x1="12" y1="15" x2="12" y2="3"></line>
+                        </svg>
+                        Export Data
+                    </button>
+                </div>
+            </div>
+
+            <div class="setting-row">
+                <div class="setting-info">
+                    <div class="setting-label">Delete All Conversations</div>
+                    <div class="setting-description">Permanently remove all your conversation history. This action cannot be undone.</div>
+                </div>
+                <div class="setting-control">
+                    <button class="danger-btn" id="deleteConversationsBtn">
+                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                            <polyline points="3 6 5 6 21 6"></polyline>
+                            <path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"></path>
+                        </svg>
+                        Delete All Conversations
+                    </button>
+                </div>
+            </div>
+        </div>
+
+        <!-- Danger Zone -->
+        <div class="settings-section danger-section" id="dangerSection">
+            <h2>Danger Zone</h2>
+            <p class="section-description">Irreversible and destructive actions.</p>
+
+            <div class="setting-row">
+                <div class="setting-info">
+                    <div class="setting-label">Delete Account</div>
+                    <div class="setting-description">Permanently delete your account and all associated data. This cannot be undone.</div>
+                </div>
+                <div class="setting-control">
+                    <button class="danger-btn filled" id="deleteAccountBtn">Delete Account</button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Delete Conversations Confirmation Modal -->
+    <div class="settings-modal-overlay" id="deleteConversationsModal">
+        <div class="settings-modal">
+            <h3>Delete All Conversations?</h3>
+            <p>This will permanently delete all of your conversations and message history. This action cannot be undone.</p>
+            <div class="settings-modal-actions">
+                <button class="cancel-btn" data-dismiss="deleteConversationsModal">Cancel</button>
+                <button class="confirm-delete-btn" id="confirmDeleteConversations">Delete All</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Delete Account Confirmation Modal -->
+    <div class="settings-modal-overlay" id="deleteAccountModal">
+        <div class="settings-modal">
+            <h3>Delete Your Account?</h3>
+            <p>This will permanently delete your account, all conversations, uploaded documents, and preferences. This action is irreversible.</p>
+            <div class="modal-input-group" th:if="${currentUser.authProvider.name() == 'LOCAL'}">
+                <label for="deleteAccountPassword">Enter your password to confirm:</label>
+                <input type="password" id="deleteAccountPassword" placeholder="Your current password" autocomplete="current-password">
+            </div>
+            <div class="modal-input-group">
+                <label for="deleteAccountConfirm">Type <strong>DELETE</strong> to confirm:</label>
+                <input type="text" id="deleteAccountConfirm" placeholder="DELETE" autocomplete="off">
+            </div>
+            <div class="settings-modal-actions">
+                <button class="cancel-btn" data-dismiss="deleteAccountModal">Cancel</button>
+                <button class="confirm-delete-btn" id="confirmDeleteAccount" disabled>Delete My Account</button>
+            </div>
+        </div>
+    </div>
+
+    <script th:src="@{/js/admin-theme.js}"></script>
+    <script th:src="@{/js/csrf.js}"></script>
+    <script th:src="@{/js/admin-toast.js}"></script>
+    <script th:src="@{/js/settings.js}"></script>
+</body>
+</html>

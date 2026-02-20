@@ -14,7 +14,11 @@ import com.example.cfchat.repository.UserDocumentRepository;
 import com.example.cfchat.service.ChatService;
 import com.example.cfchat.service.ConversationService;
 import com.example.cfchat.service.DatabaseStatsService;
+import com.example.cfchat.service.ActiveUserTracker;
+import com.example.cfchat.service.SystemSettingService;
 import com.example.cfchat.service.UserAccessService;
+import com.example.cfchat.service.WebhookService;
+import com.example.cfchat.model.Webhook;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.annotation.Value;
@@ -41,6 +45,9 @@ public class AdminController {
     private final EmbeddingMetricRepository embeddingMetricRepository;
     private final UserAccessRepository userAccessRepository;
     private final UserDocumentRepository userDocumentRepository;
+    private final SystemSettingService systemSettingService;
+    private final WebhookService webhookService;
+    private final ActiveUserTracker activeUserTracker;
 
     @Value("${spring.profiles.active:default}")
     private String activeProfile;
@@ -57,7 +64,10 @@ public class AdminController {
             UsageMetricRepository usageMetricRepository,
             EmbeddingMetricRepository embeddingMetricRepository,
             UserAccessRepository userAccessRepository,
-            @Autowired(required = false) UserDocumentRepository userDocumentRepository) {
+            @Autowired(required = false) UserDocumentRepository userDocumentRepository,
+            SystemSettingService systemSettingService,
+            @Autowired(required = false) WebhookService webhookService,
+            @Autowired(required = false) ActiveUserTracker activeUserTracker) {
         this.userService = userService;
         this.conversationService = conversationService;
         this.conversationRepository = conversationRepository;
@@ -70,6 +80,9 @@ public class AdminController {
         this.embeddingMetricRepository = embeddingMetricRepository;
         this.userAccessRepository = userAccessRepository;
         this.userDocumentRepository = userDocumentRepository;
+        this.systemSettingService = systemSettingService;
+        this.webhookService = webhookService;
+        this.activeUserTracker = activeUserTracker;
     }
 
     @GetMapping("/admin")
@@ -573,5 +586,233 @@ public class AdminController {
         } else {
             return ResponseEntity.badRequest().body(Map.of("error", "Failed to reset password"));
         }
+    }
+
+    @GetMapping("/admin/groups")
+    public String groups(Model model) {
+        Optional<User> currentUser = userService.getCurrentUser();
+        if (currentUser.isEmpty() || currentUser.get().getRole() != User.UserRole.ADMIN) {
+            return "redirect:/";
+        }
+
+        return "admin/groups";
+    }
+
+    @GetMapping("/admin/banners")
+    public String banners(Model model) {
+        Optional<User> currentUser = userService.getCurrentUser();
+        if (currentUser.isEmpty() || currentUser.get().getRole() != User.UserRole.ADMIN) {
+            return "redirect:/";
+        }
+
+        return "admin/banners";
+    }
+
+    @GetMapping("/admin/settings")
+    public String adminSettingsPage(Model model) {
+        Optional<User> currentUser = userService.getCurrentUser();
+        if (currentUser.isEmpty() || currentUser.get().getRole() != User.UserRole.ADMIN) {
+            return "redirect:/";
+        }
+
+        // Count enabled features for stats
+        int enabledFeatures = 0;
+        String[] featureKeys = {
+            "feature.rag.enabled", "feature.tools.enabled", "feature.channels.enabled",
+            "feature.notes.enabled", "feature.memory.enabled",
+            "feature.temporary_chats.enabled"
+        };
+        for (String key : featureKeys) {
+            if (systemSettingService.getBooleanSetting(key, true)) {
+                enabledFeatures++;
+            }
+        }
+
+        model.addAttribute("enabledFeatures", enabledFeatures);
+        model.addAttribute("totalFeatures", featureKeys.length);
+        model.addAttribute("maintenanceMode", systemSettingService.getBooleanSetting("maintenance.enabled", false));
+        model.addAttribute("rateLimitingEnabled", systemSettingService.getBooleanSetting("rate_limiting.enabled", false));
+        model.addAttribute("moderationEnabled", systemSettingService.getBooleanSetting("moderation.enabled", false));
+        model.addAttribute("models", chatService.getAvailableModels());
+
+        return "admin/settings";
+    }
+
+    @GetMapping("/api/admin/settings")
+    @ResponseBody
+    public ResponseEntity<Map<String, Object>> getSettings() {
+        Optional<User> currentUser = userService.getCurrentUser();
+        if (currentUser.isEmpty() || currentUser.get().getRole() != User.UserRole.ADMIN) {
+            return ResponseEntity.status(403).build();
+        }
+
+        // Return all stored settings plus defaults for known keys
+        Map<String, String> allStored = systemSettingService.getAllSettings();
+        Map<String, Object> settings = new HashMap<>(allStored);
+
+        // Ensure all known keys have defaults
+        Map<String, String> defaults = new LinkedHashMap<>();
+        defaults.put("site.name", "CF Llama Chat");
+        defaults.put("site.welcome_message", "Welcome to CF Llama Chat");
+        defaults.put("registration.enabled", "true");
+        defaults.put("default.user_role", "USER");
+        defaults.put("rate_limiting.enabled", "false");
+        defaults.put("rate_limiting.requests_per_minute", "60");
+        defaults.put("max.message.length", "32000");
+        defaults.put("session.timeout", "30");
+        defaults.put("email.verification.required", "false");
+        defaults.put("default.model", "");
+        defaults.put("allowed.models", "");
+        defaults.put("max.tokens", "4096");
+        defaults.put("default.temperature", "0.7");
+        defaults.put("moderation.enabled", "false");
+        defaults.put("moderation.level", "medium");
+        defaults.put("feature.rag.enabled", "true");
+        defaults.put("feature.tools.enabled", "true");
+        defaults.put("feature.channels.enabled", "true");
+        defaults.put("feature.notes.enabled", "true");
+        defaults.put("feature.memory.enabled", "true");
+        defaults.put("feature.temporary_chats.enabled", "true");
+        defaults.put("maintenance.enabled", "false");
+        defaults.put("maintenance.message", "");
+        defaults.put("banner.text", "");
+        defaults.put("banner.type", "info");
+        defaults.put("prevent_chat_deletion", "false");
+
+        for (Map.Entry<String, String> entry : defaults.entrySet()) {
+            settings.putIfAbsent(entry.getKey(), entry.getValue());
+        }
+
+        return ResponseEntity.ok(settings);
+    }
+
+    @PostMapping("/api/admin/settings")
+    @ResponseBody
+    public ResponseEntity<Map<String, Object>> saveSetting(@RequestBody Map<String, String> body) {
+        Optional<User> currentUser = userService.getCurrentUser();
+        if (currentUser.isEmpty() || currentUser.get().getRole() != User.UserRole.ADMIN) {
+            return ResponseEntity.status(403).body(Map.of("error", "Forbidden"));
+        }
+
+        String key = body.get("key");
+        String value = body.get("value");
+
+        if (key == null || key.isBlank()) {
+            return ResponseEntity.badRequest().body(Map.of("error", "Setting key is required"));
+        }
+
+        // Validate key against known setting keys to prevent arbitrary writes
+        Set<String> validKeys = Set.of(
+            "site.name", "site.welcome_message", "registration.enabled", "default.user_role",
+            "rate_limiting.enabled", "rate_limiting.requests_per_minute", "max.message.length",
+            "session.timeout", "email.verification.required", "default.model", "allowed.models",
+            "max.tokens", "default.temperature", "moderation.enabled", "moderation.level",
+            "feature.rag.enabled", "feature.tools.enabled", "feature.channels.enabled",
+            "feature.notes.enabled", "feature.memory.enabled",
+            "feature.temporary_chats.enabled", "maintenance.enabled", "maintenance.message",
+            "banner.text", "banner.type", "prevent_chat_deletion"
+        );
+
+        if (!validKeys.contains(key)) {
+            return ResponseEntity.badRequest().body(Map.of("error", "Unknown setting key: " + key));
+        }
+
+        systemSettingService.setSetting(key, value != null ? value : "");
+        log.info("Admin {} updated setting {} = {}", currentUser.get().getUsername(), key, value);
+
+        return ResponseEntity.ok(Map.of("success", true, "key", key, "value", value != null ? value : ""));
+    }
+
+    @PostMapping("/api/admin/settings/prevent-deletion")
+    @ResponseBody
+    public ResponseEntity<?> setPreventDeletion(@RequestBody Map<String, Boolean> body) {
+        Optional<User> currentUser = userService.getCurrentUser();
+        if (currentUser.isEmpty() || currentUser.get().getRole() != User.UserRole.ADMIN) {
+            return ResponseEntity.status(403).body(Map.of("error", "Forbidden"));
+        }
+
+        Boolean enabled = body.get("enabled");
+        if (enabled == null) {
+            return ResponseEntity.badRequest().body(Map.of("error", "'enabled' field is required"));
+        }
+
+        systemSettingService.setSetting("prevent_chat_deletion", enabled.toString());
+        log.info("Admin {} set prevent_chat_deletion to {}", currentUser.get().getUsername(), enabled);
+        return ResponseEntity.ok(Map.of("success", true, "prevent_chat_deletion", enabled));
+    }
+
+    // Webhooks page and API
+    @GetMapping("/admin/webhooks")
+    public String webhooks(Model model) {
+        Optional<User> currentUser = userService.getCurrentUser();
+        if (currentUser.isEmpty() || currentUser.get().getRole() != User.UserRole.ADMIN) {
+            return "redirect:/";
+        }
+        return "admin/webhooks";
+    }
+
+    @GetMapping("/api/admin/webhooks")
+    @ResponseBody
+    public ResponseEntity<?> getWebhooks() {
+        Optional<User> currentUser = userService.getCurrentUser();
+        if (currentUser.isEmpty() || currentUser.get().getRole() != User.UserRole.ADMIN) {
+            return ResponseEntity.status(403).build();
+        }
+        if (webhookService == null) {
+            return ResponseEntity.ok(List.of());
+        }
+        return ResponseEntity.ok(webhookService.getAllWebhooks());
+    }
+
+    @PostMapping("/api/admin/webhooks")
+    @ResponseBody
+    public ResponseEntity<?> createWebhook(@RequestBody Map<String, Object> body) {
+        Optional<User> currentUser = userService.getCurrentUser();
+        if (currentUser.isEmpty() || currentUser.get().getRole() != User.UserRole.ADMIN) {
+            return ResponseEntity.status(403).body(Map.of("error", "Forbidden"));
+        }
+        if (webhookService == null) {
+            return ResponseEntity.badRequest().body(Map.of("error", "Webhook service not available"));
+        }
+        Webhook webhook = Webhook.builder()
+                .name((String) body.get("name"))
+                .url((String) body.get("url"))
+                .eventType((String) body.get("eventType"))
+                .platform((String) body.getOrDefault("platform", "generic"))
+                .secret((String) body.get("secret"))
+                .enabled(body.get("enabled") == null || Boolean.TRUE.equals(body.get("enabled")))
+                .build();
+        return ResponseEntity.ok(webhookService.create(webhook));
+    }
+
+    @DeleteMapping("/api/admin/webhooks/{id}")
+    @ResponseBody
+    public ResponseEntity<?> deleteWebhook(@PathVariable Long id) {
+        Optional<User> currentUser = userService.getCurrentUser();
+        if (currentUser.isEmpty() || currentUser.get().getRole() != User.UserRole.ADMIN) {
+            return ResponseEntity.status(403).body(Map.of("error", "Forbidden"));
+        }
+        if (webhookService == null) {
+            return ResponseEntity.badRequest().body(Map.of("error", "Webhook service not available"));
+        }
+        webhookService.delete(id);
+        return ResponseEntity.ok(Map.of("success", true));
+    }
+
+    // Active Users API
+    @GetMapping("/api/admin/active-users")
+    @ResponseBody
+    public ResponseEntity<?> getActiveUsers() {
+        Optional<User> currentUser = userService.getCurrentUser();
+        if (currentUser.isEmpty() || currentUser.get().getRole() != User.UserRole.ADMIN) {
+            return ResponseEntity.status(403).build();
+        }
+        if (activeUserTracker == null) {
+            return ResponseEntity.ok(Map.of("count", 0, "sessions", List.of()));
+        }
+        return ResponseEntity.ok(Map.of(
+                "count", activeUserTracker.getActiveCount(),
+                "sessions", activeUserTracker.getActiveSessions()
+        ));
     }
 }

@@ -53,6 +53,9 @@ class ChatControllerTest {
     @MockBean
     private McpService mcpService;
 
+    @MockBean
+    private com.example.cfchat.service.RateLimitService rateLimitService;
+
     @Test
     @WithMockUser(username = "testuser")
     void chat_validRequest_returnsResponse() throws Exception {

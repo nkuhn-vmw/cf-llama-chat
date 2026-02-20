@@ -48,6 +48,11 @@ spring:
       max-file-size: 100MB
       max-request-size: 100MB
 
+  data:
+    redis:
+      host: ${REDIS_HOST:}
+      port: ${REDIS_PORT:6379}
+
 server:
   port: ${PORT:8080}
   compression:
@@ -71,8 +76,28 @@ management:
   endpoint:
     health:
       show-details: when-authorized
+  health:
+    ldap:
+      enabled: false
+  otlp:
+    metrics:
+      export:
+        url: ${OTEL_ENDPOINT:http://localhost:4318}/v1/metrics
+        enabled: ${OTEL_ENABLED:false}
+    tracing:
+      endpoint: ${OTEL_ENDPOINT:http://localhost:4318}/v1/traces
+  tracing:
+    sampling:
+      probability: ${OTEL_SAMPLING:1.0}
+
+# OpenTelemetry configuration (active only when OTEL_ENABLED=true)
+otel:
+  service-name: ${OTEL_SERVICE_NAME:cf-llama-chat}
+  resource-attributes: ${OTEL_RESOURCE_ATTRIBUTES:}
 
 app:
+  model-access-control:
+    enabled: ${MODEL_ACCESS_CONTROL_ENABLED:false}
   admin:
     default-password: ${APP_ADMIN_DEFAULT_PASSWORD:Tanzu123}
   chat:
@@ -94,3 +119,88 @@ app:
     chunk-size: ${DOCUMENT_CHUNK_SIZE:350}  # Keep under 512 tokens for nomic embedding model
     chunk-overlap: ${DOCUMENT_CHUNK_OVERLAP:100}
     rag-top-k: ${RAG_TOP_K:5}
+
+# LDAP Authentication (optional)
+auth:
+  ldap:
+    enabled: ${LDAP_ENABLED:false}
+    url: ${LDAP_URL:ldap://localhost:389}
+    base: ${LDAP_BASE:dc=example,dc=com}
+    user-dn-pattern: ${LDAP_USER_DN_PATTERN:uid={0},ou=people}
+    user-search-filter: ${LDAP_USER_SEARCH_FILTER:(uid={0})}
+    group-search-base: ${LDAP_GROUP_SEARCH_BASE:ou=groups}
+    manager-dn: ${LDAP_MANAGER_DN:}
+    manager-password: ${LDAP_MANAGER_PASSWORD:}
+    default-role: ${LDAP_DEFAULT_ROLE:USER}
+  scim:
+    enabled: ${SCIM_ENABLED:false}
+    bearer-token: ${SCIM_BEARER_TOKEN:}
+
+# Web search configuration
+search:
+  enabled: ${SEARCH_ENABLED:false}
+  provider: ${SEARCH_PROVIDER:duckduckgo}
+  auto-inject: ${SEARCH_AUTO_INJECT:false}
+  tavily:
+    api-key: ${TAVILY_API_KEY:}
+  brave:
+    api-key: ${BRAVE_API_KEY:}
+
+# RAG configuration enhancements
+rag:
+  retrieval-mode: ${RAG_MODE:snippet}  # "snippet" (chunk-based) or "full" (whole document)
+  web:
+    max-content-length: ${RAG_WEB_MAX_CONTENT:50000}
+    timeout-ms: ${RAG_WEB_TIMEOUT:10000}
+  hybrid:
+    enabled: ${RAG_HYBRID_ENABLED:false}
+    bm25-weight: ${RAG_BM25_WEIGHT:0.3}
+    vector-weight: ${RAG_VECTOR_WEIGHT:0.7}
+    candidate-multiplier: ${RAG_CANDIDATE_MULTIPLIER:4}
+  query-rewrite:
+    enabled: ${RAG_QUERY_REWRITE:false}
+
+# Rate limiting
+rate-limit:
+  enabled: ${RATE_LIMIT_ENABLED:true}
+  roles:
+    ADMIN:
+      chat-per-minute: 0
+    USER:
+      chat-per-minute: ${RATE_LIMIT_USER_CHAT_PER_MIN:20}
+      chat-per-hour: ${RATE_LIMIT_USER_CHAT_PER_HOUR:200}
+      uploads-per-hour: ${RATE_LIMIT_USER_UPLOADS_PER_HOUR:50}
+    VIEWER:
+      chat-per-minute: ${RATE_LIMIT_VIEWER_CHAT_PER_MIN:10}
+      chat-per-hour: ${RATE_LIMIT_VIEWER_CHAT_PER_HOUR:60}
+
+# Translation configuration
+translation:
+  enabled: ${TRANSLATION_ENABLED:false}
+  provider: ${TRANSLATION_PROVIDER:libretranslate}
+  libretranslate:
+    url: ${LIBRETRANSLATE_URL:http://localhost:5000}
+
+
+# Storage configuration
+storage:
+  provider: ${STORAGE_PROVIDER:local}
+  local:
+    path: ${STORAGE_LOCAL_PATH:/tmp/cf-llama-uploads}
+  s3:
+    bucket: ${S3_BUCKET:}
+    region: ${AWS_REGION:us-east-1}
+    access-key: ${AWS_ACCESS_KEY_ID:}
+    secret-key: ${AWS_SECRET_ACCESS_KEY:}
+    endpoint: ${S3_ENDPOINT:}
+    path-style-access: ${S3_PATH_STYLE_ACCESS:false}
+    prefix: ${S3_PREFIX:}
+  gcs:
+    bucket: ${GCS_BUCKET:}
+    project-id: ${GCP_PROJECT:}
+    credentials-path: ${GOOGLE_APPLICATION_CREDENTIALS:}
+    prefix: ${GCS_PREFIX:}
+  azure:
+    container: ${AZURE_CONTAINER:}
+    connection-string: ${AZURE_STORAGE_CONNECTION:}
+    prefix: ${AZURE_PREFIX:}

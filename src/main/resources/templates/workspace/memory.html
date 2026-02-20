@@ -1,0 +1,314 @@
+<!DOCTYPE html>
+<html lang="en" xmlns:th="http://www.thymeleaf.org">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Memory - My Workspace</title>
+    <link rel="stylesheet" th:href="@{/css/style.css}">
+    <link rel="stylesheet" th:href="@{/css/admin.css}">
+    <style>
+        .memory-grid {
+            display: grid;
+            grid-template-columns: 1fr;
+            gap: 24px;
+            margin-top: 24px;
+        }
+        .memory-create-box {
+            background-color: var(--bg-secondary);
+            border: 1px solid var(--border-color);
+            border-radius: 12px;
+            padding: 20px;
+        }
+        .memory-create-box textarea {
+            width: 100%;
+            padding: 12px 14px;
+            border: 1px solid var(--border-color);
+            border-radius: 8px;
+            background-color: var(--bg-primary);
+            color: var(--text-primary);
+            font-size: 0.9rem;
+            line-height: 1.6;
+            resize: vertical;
+            min-height: 80px;
+            font-family: inherit;
+            margin-bottom: 12px;
+        }
+        .memory-create-row {
+            display: flex;
+            gap: 12px;
+            align-items: center;
+        }
+        .memory-create-row select {
+            padding: 10px 14px;
+            border: 1px solid var(--border-color);
+            border-radius: 8px;
+            background-color: var(--bg-primary);
+            color: var(--text-primary);
+            font-size: 0.9rem;
+        }
+        .memory-item {
+            background-color: var(--bg-secondary);
+            border: 1px solid var(--border-color);
+            border-radius: 10px;
+            padding: 16px;
+            margin-bottom: 10px;
+            display: flex;
+            justify-content: space-between;
+            align-items: flex-start;
+            gap: 16px;
+        }
+        .memory-item-content {
+            flex: 1;
+            font-size: 0.9rem;
+            line-height: 1.5;
+        }
+        .memory-item-meta {
+            display: flex;
+            gap: 8px;
+            align-items: center;
+            margin-top: 8px;
+        }
+        .memory-category-badge {
+            display: inline-block;
+            padding: 3px 10px;
+            border-radius: 20px;
+            font-size: 0.75rem;
+            font-weight: 600;
+            text-transform: uppercase;
+            background-color: var(--bg-tertiary);
+            color: var(--accent-color);
+        }
+        .memory-date {
+            font-size: 0.78rem;
+            color: var(--text-muted);
+        }
+        .memory-search {
+            margin-bottom: 16px;
+        }
+        .memory-search input {
+            width: 100%;
+            padding: 10px 14px;
+            border: 1px solid var(--border-color);
+            border-radius: 8px;
+            background-color: var(--bg-primary);
+            color: var(--text-primary);
+            font-size: 0.9rem;
+        }
+        .filter-row {
+            display: flex;
+            gap: 8px;
+            margin-bottom: 16px;
+            flex-wrap: wrap;
+        }
+        .filter-btn {
+            padding: 6px 14px;
+            border: 1px solid var(--border-color);
+            border-radius: 20px;
+            background: none;
+            color: var(--text-secondary);
+            cursor: pointer;
+            font-size: 0.85rem;
+        }
+        .filter-btn.active {
+            background-color: var(--accent-color);
+            color: white;
+            border-color: var(--accent-color);
+        }
+    </style>
+</head>
+<body>
+    <div class="admin-container">
+        <header class="admin-header">
+            <h1>Memory</h1>
+            <a href="/workspace" class="back-link">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                    <line x1="19" y1="12" x2="5" y2="12"></line>
+                    <polyline points="12 19 5 12 12 5"></polyline>
+                </svg>
+                Back to Workspace
+            </a>
+        </header>
+
+        <div class="stats-cards">
+            <div class="stat-card">
+                <div class="stat-value" id="totalMemories">--</div>
+                <div class="stat-label">Total Memories</div>
+            </div>
+            <div class="stat-card">
+                <div class="stat-value" id="factCount">--</div>
+                <div class="stat-label">Facts</div>
+            </div>
+            <div class="stat-card">
+                <div class="stat-value" id="prefCount">--</div>
+                <div class="stat-label">Preferences</div>
+            </div>
+            <div class="stat-card">
+                <div class="stat-value" id="instrCount">--</div>
+                <div class="stat-label">Instructions</div>
+            </div>
+        </div>
+
+        <div class="memory-grid">
+            <!-- Add Memory -->
+            <div class="memory-create-box">
+                <h3 style="margin: 0 0 12px;">Add Memory</h3>
+                <textarea id="memoryContentInput" placeholder="Add a memory entry... (e.g., 'I prefer Python over Java' or 'My project uses PostgreSQL')"></textarea>
+                <div class="memory-create-row">
+                    <select id="memoryCategorySelect">
+                        <option value="general">General</option>
+                        <option value="preference">Preference</option>
+                        <option value="fact">Fact</option>
+                        <option value="instruction">Instruction</option>
+                    </select>
+                    <button class="action-btn primary" id="addMemoryBtn" style="padding: 10px 24px;">Add Memory</button>
+                </div>
+            </div>
+
+            <!-- Memory List -->
+            <div>
+                <div class="memory-search">
+                    <input type="text" id="memorySearch" placeholder="Search memories...">
+                </div>
+                <div class="filter-row">
+                    <button class="filter-btn active" data-filter="all">All</button>
+                    <button class="filter-btn" data-filter="general">General</button>
+                    <button class="filter-btn" data-filter="preference">Preference</button>
+                    <button class="filter-btn" data-filter="fact">Fact</button>
+                    <button class="filter-btn" data-filter="instruction">Instruction</button>
+                </div>
+                <div id="memoryList">
+                    <p style="color: var(--text-muted);">Loading memories...</p>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div class="toast-container" id="toastContainer"></div>
+    <script th:src="@{/js/admin-theme.js}"></script>
+    <script th:src="@{/js/admin-toast.js}"></script>
+    <script>
+    // Memory page - uses safe DOM construction via textContent/createElement
+    (function() {
+        var allMemories = [];
+        var activeFilter = 'all';
+
+        function showToast(msg, type) {
+            if (window.showAdminToast) window.showAdminToast(msg, type || 'info');
+        }
+
+        function createEl(tag, className, textContent) {
+            var el = document.createElement(tag);
+            if (className) el.className = className;
+            if (textContent) el.textContent = textContent;
+            return el;
+        }
+
+        function updateStats() {
+            document.getElementById('totalMemories').textContent = allMemories.length;
+            document.getElementById('factCount').textContent = allMemories.filter(function(m) { return m.category === 'fact'; }).length;
+            document.getElementById('prefCount').textContent = allMemories.filter(function(m) { return m.category === 'preference'; }).length;
+            document.getElementById('instrCount').textContent = allMemories.filter(function(m) { return m.category === 'instruction'; }).length;
+        }
+
+        function renderMemories() {
+            var search = document.getElementById('memorySearch').value.toLowerCase();
+            var filtered = allMemories.filter(function(m) {
+                if (activeFilter !== 'all' && m.category !== activeFilter) return false;
+                if (search && !(m.content || '').toLowerCase().includes(search)) return false;
+                return true;
+            });
+
+            var list = document.getElementById('memoryList');
+            list.textContent = '';
+            if (filtered.length === 0) {
+                list.appendChild(createEl('p', '', 'No memories found.'));
+                list.firstChild.style.color = 'var(--text-muted)';
+                return;
+            }
+
+            filtered.forEach(function(m) {
+                var item = createEl('div', 'memory-item');
+                item.dataset.id = m.id;
+
+                var contentDiv = createEl('div', 'memory-item-content');
+                contentDiv.appendChild(document.createTextNode(m.content || ''));
+
+                var meta = createEl('div', 'memory-item-meta');
+                meta.appendChild(createEl('span', 'memory-category-badge', (m.category || 'general').toUpperCase()));
+                meta.appendChild(createEl('span', 'memory-date', m.createdAt ? new Date(m.createdAt).toLocaleDateString() : ''));
+                contentDiv.appendChild(meta);
+
+                var deleteBtn = createEl('button', 'action-btn danger delete-memory-btn', 'Delete');
+                deleteBtn.dataset.id = m.id;
+                deleteBtn.title = 'Delete';
+
+                item.appendChild(contentDiv);
+                item.appendChild(deleteBtn);
+                list.appendChild(item);
+            });
+        }
+
+        async function loadMemories() {
+            try {
+                var resp = await fetch('/api/memory');
+                if (!resp.ok) throw new Error();
+                allMemories = await resp.json();
+                updateStats();
+                renderMemories();
+            } catch(e) {
+                console.error('Failed to load memories:', e);
+            }
+        }
+
+        async function addMemory() {
+            var content = document.getElementById('memoryContentInput').value.trim();
+            if (!content) { showToast('Memory content is required', 'error'); return; }
+            var category = document.getElementById('memoryCategorySelect').value;
+
+            try {
+                var resp = await fetch('/api/memory', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ content: content, category: category })
+                });
+                if (!resp.ok) throw new Error();
+                document.getElementById('memoryContentInput').value = '';
+                showToast('Memory added', 'success');
+                loadMemories();
+            } catch(e) {
+                showToast('Failed to add memory', 'error');
+            }
+        }
+
+        async function deleteMemory(id) {
+            if (!confirm('Delete this memory?')) return;
+            try {
+                await fetch('/api/memory/' + id, { method: 'DELETE' });
+                showToast('Memory deleted', 'success');
+                loadMemories();
+            } catch(e) {
+                showToast('Failed to delete memory', 'error');
+            }
+        }
+
+        document.getElementById('addMemoryBtn').addEventListener('click', addMemory);
+        document.getElementById('memorySearch').addEventListener('input', renderMemories);
+        document.getElementById('memoryList').addEventListener('click', function(e) {
+            var btn = e.target.closest('.delete-memory-btn');
+            if (btn) deleteMemory(btn.dataset.id);
+        });
+
+        document.querySelectorAll('.filter-btn').forEach(function(btn) {
+            btn.addEventListener('click', function() {
+                document.querySelectorAll('.filter-btn').forEach(function(b) { b.classList.remove('active'); });
+                btn.classList.add('active');
+                activeFilter = btn.dataset.filter;
+                renderMemories();
+            });
+        });
+
+        loadMemories();
+    })();
+    </script>
+</body>
+</html>

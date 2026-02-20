@@ -333,6 +333,21 @@ public class VectorStoreConfig {
             return null;
         }
 
+        // Check if the database supports pgvector (PostgreSQL only)
+        boolean isPostgres = false;
+        try {
+            String dbProductName = jdbcTemplate.getDataSource().getConnection().getMetaData().getDatabaseProductName();
+            isPostgres = "PostgreSQL".equalsIgnoreCase(dbProductName);
+            log.info("Database product: {} - pgvector support: {}", dbProductName, isPostgres);
+        } catch (Exception e) {
+            log.warn("Could not determine database type: {}", e.getMessage());
+        }
+
+        if (!isPostgres) {
+            log.warn("Not using PostgreSQL - PgVectorStore requires PostgreSQL with pgvector extension. Document embedding disabled.");
+            return null;
+        }
+
         log.info("Creating PgVectorStore with dimensions: {}", embeddingDimensions);
 
         return PgVectorStore.builder(jdbcTemplate, embeddingModel)

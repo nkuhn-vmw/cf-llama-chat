@@ -1,0 +1,311 @@
+<!DOCTYPE html>
+<html lang="en" xmlns:th="http://www.thymeleaf.org">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>User Groups - Admin Portal</title>
+    <link rel="stylesheet" th:href="@{/css/style.css}">
+    <link rel="stylesheet" th:href="@{/css/admin.css}">
+    <style>
+        .permissions-list {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 4px;
+        }
+
+        .permission-badge {
+            display: inline-block;
+            padding: 2px 8px;
+            border-radius: 4px;
+            font-size: 0.75rem;
+            background-color: var(--bg-tertiary);
+            color: var(--text-secondary);
+        }
+
+        .member-count {
+            display: inline-flex;
+            align-items: center;
+            gap: 4px;
+            font-weight: 500;
+        }
+
+        .member-count svg {
+            width: 14px;
+            height: 14px;
+            color: var(--text-muted);
+        }
+
+        .checkbox-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fill, minmax(180px, 1fr));
+            gap: 8px;
+            margin-top: 8px;
+        }
+
+        .checkbox-item {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            padding: 8px 12px;
+            background-color: var(--bg-tertiary);
+            border: 1px solid var(--border-color);
+            border-radius: 8px;
+            font-size: 0.85rem;
+            cursor: pointer;
+            transition: border-color 0.2s;
+        }
+
+        .checkbox-item:hover {
+            border-color: var(--accent-color);
+        }
+
+        .checkbox-item input[type="checkbox"] {
+            accent-color: var(--accent-color);
+            width: 16px;
+            height: 16px;
+            cursor: pointer;
+        }
+
+        .checkbox-item label {
+            cursor: pointer;
+            white-space: nowrap;
+            overflow: hidden;
+            text-overflow: ellipsis;
+        }
+
+        .members-panel {
+            background-color: var(--bg-secondary);
+            border: 1px solid var(--border-color);
+            border-radius: 12px;
+            padding: 24px;
+            margin-top: 24px;
+            display: none;
+        }
+
+        .members-panel.open {
+            display: block;
+        }
+
+        .members-panel-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 16px;
+        }
+
+        .members-panel-header h3 {
+            font-size: 1.1rem;
+            font-weight: 600;
+        }
+
+        .member-item {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding: 10px 0;
+            border-bottom: 1px solid var(--border-color);
+        }
+
+        .member-item:last-child {
+            border-bottom: none;
+        }
+
+        .member-info {
+            display: flex;
+            flex-direction: column;
+        }
+
+        .member-name {
+            font-weight: 500;
+            font-size: 0.95rem;
+        }
+
+        .member-email {
+            font-size: 0.8rem;
+            color: var(--text-muted);
+        }
+
+        .add-member-row {
+            display: flex;
+            gap: 8px;
+            margin-bottom: 16px;
+        }
+
+        .add-member-row select {
+            flex: 1;
+            padding: 8px 12px;
+            background-color: var(--bg-tertiary);
+            border: 1px solid var(--border-color);
+            border-radius: 8px;
+            color: var(--text-primary);
+            font-size: 0.9rem;
+        }
+
+        .add-member-row select:focus {
+            outline: none;
+            border-color: var(--accent-color);
+        }
+
+        .description-cell {
+            max-width: 300px;
+            overflow: hidden;
+            text-overflow: ellipsis;
+            white-space: nowrap;
+            color: var(--text-secondary);
+            font-size: 0.9rem;
+        }
+
+        .modal.wide {
+            max-width: 600px;
+        }
+    </style>
+</head>
+<body>
+    <div class="admin-container">
+        <header class="admin-header">
+            <h1>User Groups</h1>
+            <div class="header-nav">
+                <a href="/admin" class="back-link">
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                        <line x1="19" y1="12" x2="5" y2="12"></line>
+                        <polyline points="12 19 5 12 12 5"></polyline>
+                    </svg>
+                    Back to Admin
+                </a>
+                <a href="/" class="back-link">
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                        <path d="M3 9l9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"></path>
+                        <polyline points="9 22 9 12 15 12 15 22"></polyline>
+                    </svg>
+                    Chat
+                </a>
+            </div>
+        </header>
+
+        <div class="stats-cards">
+            <div class="stat-card">
+                <div class="stat-value" id="totalGroups">0</div>
+                <div class="stat-label">Total Groups</div>
+            </div>
+        </div>
+
+        <section>
+            <div class="section-header">
+                <h2>All Groups</h2>
+                <button class="add-btn" id="createGroupBtn">
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                        <line x1="12" y1="5" x2="12" y2="19"></line>
+                        <line x1="5" y1="12" x2="19" y2="12"></line>
+                    </svg>
+                    Create Group
+                </button>
+            </div>
+            <div class="data-table">
+                <table>
+                    <thead>
+                        <tr>
+                            <th>Name</th>
+                            <th>Description</th>
+                            <th>Members</th>
+                            <th>Actions</th>
+                        </tr>
+                    </thead>
+                    <tbody id="groupsTableBody">
+                        <tr>
+                            <td colspan="4" class="empty-state">Loading groups...</td>
+                        </tr>
+                    </tbody>
+                </table>
+            </div>
+        </section>
+
+        <!-- Members Panel -->
+        <div class="members-panel" id="membersPanel">
+            <div class="members-panel-header">
+                <h3>Members of <span id="membersPanelGroupName"></span></h3>
+                <button class="action-btn" id="closeMembersPanel">Close</button>
+            </div>
+            <div class="add-member-row">
+                <select id="addMemberSelect">
+                    <option value="">Select a user to add...</option>
+                </select>
+                <button class="add-btn" id="addMemberBtn">Add</button>
+            </div>
+            <div id="membersList"></div>
+        </div>
+    </div>
+
+    <!-- Create/Edit Group Modal -->
+    <div class="modal-overlay" id="groupModal">
+        <div class="modal wide">
+            <h3 id="groupModalTitle">Create Group</h3>
+            <form id="groupForm">
+                <input type="hidden" id="groupId">
+                <div class="form-group">
+                    <label for="groupName">Name</label>
+                    <input type="text" id="groupName" required placeholder="Enter group name">
+                </div>
+                <div class="form-group">
+                    <label for="groupDescription">Description</label>
+                    <textarea id="groupDescription" placeholder="Describe the purpose of this group" rows="3"></textarea>
+                </div>
+                <div class="form-group">
+                    <label>Permissions</label>
+                    <div class="checkbox-grid" id="permissionsGrid">
+                        <div class="checkbox-item">
+                            <input type="checkbox" id="perm-chat" value="CHAT">
+                            <label for="perm-chat">Chat</label>
+                        </div>
+                        <div class="checkbox-item">
+                            <input type="checkbox" id="perm-rag" value="RAG">
+                            <label for="perm-rag">RAG / Documents</label>
+                        </div>
+                        <div class="checkbox-item">
+                            <input type="checkbox" id="perm-tools" value="TOOLS">
+                            <label for="perm-tools">Tools / MCP</label>
+                        </div>
+                        <div class="checkbox-item">
+                            <input type="checkbox" id="perm-channels" value="CHANNELS">
+                            <label for="perm-channels">Channels</label>
+                        </div>
+                        <div class="checkbox-item">
+                            <input type="checkbox" id="perm-notes" value="NOTES">
+                            <label for="perm-notes">Notes</label>
+                        </div>
+                        <div class="checkbox-item">
+                            <input type="checkbox" id="perm-memory" value="MEMORY">
+                            <label for="perm-memory">Memory</label>
+                        </div>
+                        <div class="checkbox-item">
+                            <input type="checkbox" id="perm-admin" value="ADMIN">
+                            <label for="perm-admin">Admin Access</label>
+                        </div>
+                    </div>
+                </div>
+                <div class="modal-actions">
+                    <button type="button" class="modal-btn cancel" id="cancelGroupBtn">Cancel</button>
+                    <button type="submit" class="modal-btn save">Save</button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <!-- Delete Confirmation Modal -->
+    <div class="modal-overlay" id="deleteGroupModal">
+        <div class="modal">
+            <h3>Delete Group</h3>
+            <p style="color: var(--text-secondary); margin-bottom: 20px;">
+                Are you sure you want to delete <strong id="deleteGroupName"></strong>?
+                This will remove all member associations.
+            </p>
+            <div class="modal-actions">
+                <button class="modal-btn cancel" id="cancelDeleteBtn">Cancel</button>
+                <button class="modal-btn confirm" id="confirmDeleteBtn">Delete</button>
+            </div>
+        </div>
+    </div>
+
+    <script th:src="@{/js/admin-toast.js}"></script>
+    <script th:src="@{/js/admin-groups.js}"></script>
+</body>
+</html>

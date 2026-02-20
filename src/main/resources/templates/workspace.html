@@ -1,0 +1,247 @@
+<!DOCTYPE html>
+<html lang="en" xmlns:th="http://www.thymeleaf.org">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>My Workspace - CF Llama Chat</title>
+    <link rel="stylesheet" th:href="@{/css/style.css}">
+    <link rel="stylesheet" th:href="@{/css/admin.css}">
+    <style>
+        .admin-nav {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+            gap: 24px;
+            margin-top: 32px;
+        }
+
+        .admin-nav-card {
+            background-color: var(--bg-secondary);
+            border: 1px solid var(--border-color);
+            border-radius: 16px;
+            padding: 24px;
+            text-decoration: none;
+            color: var(--text-primary);
+            transition: transform 0.2s, border-color 0.2s, box-shadow 0.2s;
+        }
+
+        .admin-nav-card:hover {
+            transform: translateY(-4px);
+            border-color: var(--accent-color);
+            box-shadow: 0 8px 24px rgba(0, 0, 0, 0.15);
+        }
+
+        .admin-nav-card .card-icon {
+            width: 48px;
+            height: 48px;
+            background-color: var(--bg-tertiary);
+            border-radius: 12px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            margin-bottom: 16px;
+        }
+
+        .admin-nav-card .card-icon svg {
+            width: 24px;
+            height: 24px;
+            color: var(--accent-color);
+        }
+
+        .admin-nav-card h3 {
+            font-size: 1.2rem;
+            font-weight: 600;
+            margin-bottom: 8px;
+        }
+
+        .admin-nav-card p {
+            font-size: 0.9rem;
+            color: var(--text-secondary);
+            line-height: 1.5;
+        }
+
+        .admin-nav-card .card-stat {
+            margin-top: 16px;
+            padding-top: 16px;
+            border-top: 1px solid var(--border-color);
+            font-size: 0.85rem;
+            color: var(--text-muted);
+        }
+
+        .admin-nav-card .card-stat strong {
+            color: var(--accent-color);
+        }
+    </style>
+</head>
+<body>
+    <div class="admin-container">
+        <header class="admin-header">
+            <h1>My Workspace</h1>
+            <a href="/" class="back-link">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                    <line x1="19" y1="12" x2="5" y2="12"></line>
+                    <polyline points="12 19 5 12 12 5"></polyline>
+                </svg>
+                Back to Chat
+            </a>
+        </header>
+
+        <div class="stats-cards">
+            <div class="stat-card">
+                <div class="stat-value" id="channelCount">--</div>
+                <div class="stat-label">Channels</div>
+            </div>
+            <div class="stat-card">
+                <div class="stat-value" id="noteCount">--</div>
+                <div class="stat-label">Notes</div>
+            </div>
+            <div class="stat-card">
+                <div class="stat-value" id="memoryCount">--</div>
+                <div class="stat-label">Memories</div>
+            </div>
+            <div class="stat-card">
+                <div class="stat-value" id="promptCount">--</div>
+                <div class="stat-label">Prompts</div>
+            </div>
+            <div class="stat-card">
+                <div class="stat-value" id="documentCount">--</div>
+                <div class="stat-label">Documents</div>
+            </div>
+            <div class="stat-card">
+                <div class="stat-value" id="toolCount">--</div>
+                <div class="stat-label">Tools</div>
+            </div>
+        </div>
+
+        <nav class="admin-nav">
+            <a href="/workspace/channels" class="admin-nav-card">
+                <div class="card-icon">
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                        <path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"></path>
+                        <line x1="9" y1="10" x2="15" y2="10"></line>
+                        <line x1="12" y1="7" x2="12" y2="13"></line>
+                    </svg>
+                </div>
+                <h3>Channels</h3>
+                <p>Create and manage group channels. Share messages and collaborate with other users in real-time.</p>
+                <div class="card-stat">
+                    <strong id="channelCountStat">--</strong> channels available
+                </div>
+            </a>
+
+            <a href="/workspace/notes" class="admin-nav-card">
+                <div class="card-icon">
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                        <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"></path>
+                        <polyline points="14 2 14 8 20 8"></polyline>
+                        <line x1="16" y1="13" x2="8" y2="13"></line>
+                        <line x1="16" y1="17" x2="8" y2="17"></line>
+                    </svg>
+                </div>
+                <h3>Notes</h3>
+                <p>Create and organize personal notes with markdown support. Keep track of important information.</p>
+                <div class="card-stat">
+                    <strong id="noteCountStat">--</strong> notes saved
+                </div>
+            </a>
+
+            <a href="/workspace/memory" class="admin-nav-card">
+                <div class="card-icon">
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                        <path d="M12 2a7 7 0 0 1 7 7c0 2.38-1.19 4.47-3 5.74V17a2 2 0 0 1-2 2H10a2 2 0 0 1-2-2v-2.26C6.19 13.47 5 11.38 5 9a7 7 0 0 1 7-7z"></path>
+                        <line x1="10" y1="21" x2="14" y2="21"></line>
+                    </svg>
+                </div>
+                <h3>Memory</h3>
+                <p>Manage AI memory entries. Add facts, preferences, and instructions that the AI remembers across conversations.</p>
+                <div class="card-stat">
+                    <strong id="memoryCountStat">--</strong> memories stored
+                </div>
+            </a>
+
+            <a href="/workspace/prompts" class="admin-nav-card">
+                <div class="card-icon">
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                        <path d="M4 4h16v2H4zM4 10h10v2H4zM4 16h16v2H4z"></path>
+                    </svg>
+                </div>
+                <h3>Prompts</h3>
+                <p>Create and manage prompt presets with variables. Share useful prompts with your team.</p>
+                <div class="card-stat">
+                    <strong id="promptCountStat">--</strong> prompts created
+                </div>
+            </a>
+
+            <a href="/workspace/tools" class="admin-nav-card">
+                <div class="card-icon">
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                        <path d="M14.7 6.3a1 1 0 0 0 0 1.4l1.6 1.6a1 1 0 0 0 1.4 0l3.77-3.77a6 6 0 0 1-7.94 7.94l-6.91 6.91a2.12 2.12 0 0 1-3-3l6.91-6.91a6 6 0 0 1 7.94-7.94l-3.76 3.76z"></path>
+                    </svg>
+                </div>
+                <h3>Tools</h3>
+                <p>Manage MCP and custom tools. Enable or disable individual tools that the AI can use during conversations.</p>
+                <div class="card-stat">
+                    <strong id="toolCountStat">--</strong> tools available
+                </div>
+            </a>
+
+            <a href="/workspace/documents" class="admin-nav-card">
+                <div class="card-icon">
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                        <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"></path>
+                        <polyline points="14 2 14 8 20 8"></polyline>
+                        <line x1="12" y1="18" x2="12" y2="12"></line>
+                        <line x1="9" y1="15" x2="15" y2="15"></line>
+                    </svg>
+                </div>
+                <h3>Documents</h3>
+                <p>Upload and manage documents for RAG context. Support for PDF, Word, text files, and YouTube transcripts.</p>
+                <div class="card-stat">
+                    <strong id="documentCountStat">--</strong> documents uploaded
+                </div>
+            </a>
+        </nav>
+    </div>
+
+    <script th:src="@{/js/admin-theme.js}"></script>
+    <script th:src="@{/js/admin-toast.js}"></script>
+    <script>
+        // Load workspace stats
+        Promise.allSettled([
+            fetch('/api/channels').then(r => r.ok ? r.json() : []),
+            fetch('/api/notes').then(r => r.ok ? r.json() : []),
+            fetch('/api/memory').then(r => r.ok ? r.json() : []),
+            fetch('/api/prompts').then(r => r.ok ? r.json() : []),
+            fetch('/api/documents').then(r => r.ok ? r.json() : []),
+            fetch('/api/chat/available-tools').then(r => r.ok ? r.json() : [])
+        ]).then(function(results) {
+            var channels = results[0].status === 'fulfilled' ? results[0].value : [];
+            var notes = results[1].status === 'fulfilled' ? results[1].value : [];
+            var memories = results[2].status === 'fulfilled' ? results[2].value : [];
+            var prompts = results[3].status === 'fulfilled' ? results[3].value : [];
+            var docs = results[4].status === 'fulfilled' ? results[4].value : [];
+            var tools = results[5].status === 'fulfilled' ? results[5].value : [];
+
+            var channelLen = Array.isArray(channels) ? channels.length : 0;
+            var noteLen = Array.isArray(notes) ? notes.length : 0;
+            var memoryLen = Array.isArray(memories) ? memories.length : 0;
+            var promptLen = Array.isArray(prompts) ? prompts.length : 0;
+            var docLen = Array.isArray(docs) ? docs.length : 0;
+            var toolLen = Array.isArray(tools) ? tools.length : 0;
+
+            document.getElementById('channelCount').textContent = channelLen;
+            document.getElementById('noteCount').textContent = noteLen;
+            document.getElementById('memoryCount').textContent = memoryLen;
+            document.getElementById('promptCount').textContent = promptLen;
+            document.getElementById('documentCount').textContent = docLen;
+            document.getElementById('toolCount').textContent = toolLen;
+
+            document.getElementById('channelCountStat').textContent = channelLen;
+            document.getElementById('noteCountStat').textContent = noteLen;
+            document.getElementById('memoryCountStat').textContent = memoryLen;
+            document.getElementById('promptCountStat').textContent = promptLen;
+            document.getElementById('documentCountStat').textContent = docLen;
+            document.getElementById('toolCountStat').textContent = toolLen;
+        });
+    </script>
+</body>
+</html>

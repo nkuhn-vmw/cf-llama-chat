@@ -3,6 +3,7 @@ package com.example.cfchat.service;
 import com.example.cfchat.auth.UserService;
 import com.example.cfchat.config.ChatConfig;
 import com.example.cfchat.dto.ChatRequest;
+import io.micrometer.observation.annotation.Observed;
 import com.example.cfchat.dto.ChatResponse;
 import com.example.cfchat.mcp.McpToolCallbackCacheService;
 import com.example.cfchat.model.Conversation;
@@ -36,6 +37,8 @@ import java.util.UUID;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.concurrent.atomic.AtomicLong;
+import java.util.regex.Matcher;
+import java.util.regex.Pattern;
 
 @Service
 @Slf4j
@@ -55,6 +58,12 @@ public class ChatService {
     private final McpToolCallbackCacheService mcpToolCallbackCacheService;
     private final DocumentEmbeddingService documentEmbeddingService;
     private final ExternalBindingService externalBindingService;
+    private final YouTubeTranscriptService youTubeTranscriptService;
+    private final RagPromptBuilder ragPromptBuilder;
+    private final WebContentService webContentService;
+
+    private static final Pattern YT_RAG_PATTERN = Pattern.compile("#\\s*(https?://(?:www\\.)?(?:youtube\\.com/watch\\?v=|youtu\\.be/)[\\w-]{11}\\S*)");
+    private static final Pattern WEB_RAG_PATTERN = Pattern.compile("#\\s*(https?://\\S+)");
 
     @Value("${spring.profiles.active:default}")
     private String activeProfile;
@@ -79,7 +88,10 @@ public class ChatService {
             @Autowired(required = false) SkillService skillService,
             @Autowired(required = false) McpToolCallbackCacheService mcpToolCallbackCacheService,
             @Autowired(required = false) DocumentEmbeddingService documentEmbeddingService,
-            @Autowired(required = false) ExternalBindingService externalBindingService) {
+            @Autowired(required = false) ExternalBindingService externalBindingService,
+            @Autowired(required = false) YouTubeTranscriptService youTubeTranscriptService,
+            @Autowired(required = false) WebContentService webContentService,
+            RagPromptBuilder ragPromptBuilder) {
         this.primaryChatClient = primaryChatClient;
         // Use OpenAI model as primary for streaming
         this.primaryChatModel = openAiChatModel;
@@ -95,6 +107,9 @@ public class ChatService {
         this.mcpToolCallbackCacheService = mcpToolCallbackCacheService;
         this.documentEmbeddingService = documentEmbeddingService;
         this.externalBindingService = externalBindingService;
+        this.youTubeTranscriptService = youTubeTranscriptService;
+        this.ragPromptBuilder = ragPromptBuilder;
+        this.webContentService = webContentService;
 
         log.info("ChatService initialized - primaryChatClient: {}, ollamaChatClient: {}, primaryChatModel: {}, mcpTools: {}, documentEmbedding: {}, externalBindings: {}",
                 primaryChatClient != null, ollamaChatClient != null,
@@ -104,9 +119,13 @@ public class ChatService {
                 externalBindingService != null);
     }
 
+    @Observed(name = "cfllama.chat",
+            contextualName = "chat-request",
+            lowCardinalityKeyValues = {"operation", "chat"})
     public ChatResponse chat(ChatRequest request) {
         String provider = request.getProvider() != null ? request.getProvider() : chatConfig.getDefaultProvider();
         String model = request.getModel();
+        boolean isTemporary = request.isTemporary();
 
         // Validate and resolve model name
         if (model != null && !model.isBlank()) {
@@ -118,11 +137,22 @@ public class ChatService {
         // Get current user ID
         UUID userId = userService.getCurrentUser().map(User::getId).orElse(null);
 
-        // Create or get conversation
+        // Create or get conversation (skip persistence for temporary chats)
         UUID conversationId = request.getConversationId();
         Conversation conversation;
 
-        if (conversationId == null) {
+        if (isTemporary) {
+            // For temporary chats, create an in-memory conversation object (not persisted)
+            conversation = Conversation.builder()
+                    .title("Temporary Chat")
+                    .modelProvider(provider)
+                    .modelName(model)
+                    .userId(userId)
+                    .build();
+            // Use a transient UUID for the response
+            conversationId = UUID.randomUUID();
+            log.debug("Temporary chat requested - skipping persistence");
+        } else if (conversationId == null) {
             conversation = conversationService.createConversation(null, provider, model, userId);
             conversationId = conversation.getId();
         } else {
@@ -133,12 +163,15 @@ public class ChatService {
                     .orElseThrow(() -> new IllegalArgumentException("Conversation not found"));
         }
 
-        // Save user message
-        conversationService.addMessage(conversationId, Message.MessageRole.USER, request.getMessage(), null);
+        // Save user message (skip for temporary chats)
+        if (!isTemporary) {
+            conversationService.addMessage(conversationId, Message.MessageRole.USER, request.getMessage(), null);
+        }
 
         // Build prompt with conversation history (with optional skill and document context)
         List<org.springframework.ai.chat.messages.Message> messages = buildMessageHistory(
-            conversation, request.getMessage(), request.getSkillId(), userId, request.isUseDocumentContext());
+            conversation, request.getMessage(), request.getSkillId(), userId,
+            request.isUseDocumentContext(), request.getRagRetrievalMode());
 
         // Get AI response - pass model name for GenAI multi-model support
         ChatClient chatClient = getChatClient(provider, model);
@@ -166,8 +199,12 @@ public class ChatService {
 
         long responseTime = System.currentTimeMillis() - startTime;
 
-        // Save assistant message
-        Message savedMessage = conversationService.addMessage(conversationId, Message.MessageRole.ASSISTANT, response, model);
+        // Save assistant message (skip for temporary chats)
+        UUID messageId = null;
+        if (!isTemporary) {
+            Message savedMessage = conversationService.addMessage(conversationId, Message.MessageRole.ASSISTANT, response, model);
+            messageId = savedMessage.getId();
+        }
 
         // Record metrics (estimate tokens based on content length)
         int promptTokens = estimateTokens(request.getMessage());
@@ -180,22 +217,25 @@ public class ChatService {
         Double tokensPerSecond = responseTime > 0 ?
                 (completionTokens / (responseTime / 1000.0)) : 0.0;
 
-        metricsService.recordUsage(userId, conversationId, model, provider, promptTokens, completionTokens,
-                responseTime, timeToFirstToken, tokensPerSecond);
+        if (!isTemporary) {
+            metricsService.recordUsage(userId, conversationId, model, provider, promptTokens, completionTokens,
+                    responseTime, timeToFirstToken, tokensPerSecond);
 
-        // Update conversation title if this is the first exchange
-        if (conversation.getMessages().size() <= 2) {
-            String title = generateTitle(request.getMessage());
-            conversationService.updateConversationTitle(conversationId, title);
+            // Update conversation title if this is the first exchange
+            if (conversation.getMessages().size() <= 2) {
+                String title = generateTitle(request.getMessage());
+                conversationService.updateConversationTitle(conversationId, title);
+            }
         }
 
         return ChatResponse.builder()
-                .conversationId(conversationId)
-                .messageId(savedMessage.getId())
+                .conversationId(isTemporary ? null : conversationId)
+                .messageId(messageId)
                 .content(response)
                 .htmlContent(markdownService.toHtml(response))
                 .model(model)
                 .complete(true)
+                .temporary(isTemporary)
                 .timeToFirstTokenMs(timeToFirstToken)
                 .tokensPerSecond(tokensPerSecond)
                 .totalResponseTimeMs(responseTime)
@@ -210,9 +250,13 @@ public class ChatService {
         return (int) Math.ceil(text.length() / 4.0);
     }
 
+    @Observed(name = "cfllama.chat.stream",
+            contextualName = "chat-stream-request",
+            lowCardinalityKeyValues = {"operation", "chat-stream"})
     public Flux<ChatResponse> chatStream(ChatRequest request) {
         String provider = request.getProvider() != null ? request.getProvider() : chatConfig.getDefaultProvider();
         String model = request.getModel();
+        boolean isTemporary = request.isTemporary();
 
         // Validate and resolve model name
         if (model != null && !model.isBlank()) {
@@ -224,11 +268,21 @@ public class ChatService {
         // Get current user ID
         UUID userId = userService.getCurrentUser().map(User::getId).orElse(null);
 
-        // Create or get conversation
+        // Create or get conversation (skip persistence for temporary chats)
         UUID conversationId = request.getConversationId();
         Conversation conversation;
 
-        if (conversationId == null) {
+        if (isTemporary) {
+            // For temporary chats, create an in-memory conversation object (not persisted)
+            conversation = Conversation.builder()
+                    .title("Temporary Chat")
+                    .modelProvider(provider)
+                    .modelName(model)
+                    .userId(userId)
+                    .build();
+            conversationId = UUID.randomUUID();
+            log.debug("Temporary streaming chat requested - skipping persistence");
+        } else if (conversationId == null) {
             conversation = conversationService.createConversation(null, provider, model, userId);
             conversationId = conversation.getId();
         } else {
@@ -244,13 +298,17 @@ public class ChatService {
         final String finalProvider = provider;
         final String finalModel = model;
         final String userMessage = request.getMessage();
+        final boolean finalIsTemporary = isTemporary;
 
-        // Save user message
-        conversationService.addMessage(conversationId, Message.MessageRole.USER, request.getMessage(), null);
+        // Save user message (skip for temporary chats)
+        if (!isTemporary) {
+            conversationService.addMessage(conversationId, Message.MessageRole.USER, request.getMessage(), null);
+        }
 
         // Build prompt with conversation history (with optional skill and document context)
         List<org.springframework.ai.chat.messages.Message> messages = buildMessageHistory(
-            conversation, request.getMessage(), request.getSkillId(), userId, request.isUseDocumentContext());
+            conversation, request.getMessage(), request.getSkillId(), userId,
+            request.isUseDocumentContext(), request.getRagRetrievalMode());
         Prompt prompt = new Prompt(messages);
 
         // Stream AI response
@@ -349,12 +407,6 @@ public class ChatService {
                 .concatWith(Flux.defer(() -> {
             // Save complete response
             String completeResponse = fullResponse.toString();
-            Message savedMessage = conversationService.addMessage(
-                    finalConversationId,
-                    Message.MessageRole.ASSISTANT,
-                    completeResponse,
-                    finalModel
-            );
 
             // Calculate metrics
             long endTime = System.currentTimeMillis();
@@ -373,24 +425,36 @@ public class ChatService {
             log.info("Streaming metrics - TTFT: {}ms, TPS: {}, Total: {}ms, Model: {}",
                     timeToFirstToken, String.format("%.1f", tokensPerSecond), responseTime, finalModel);
 
-            metricsService.recordUsage(finalUserId, finalConversationId, finalModel, finalProvider,
-                    promptTokens, completionTokens, responseTime, timeToFirstToken, tokensPerSecond);
+            UUID messageId = null;
+            if (!finalIsTemporary) {
+                Message savedMessage = conversationService.addMessage(
+                        finalConversationId,
+                        Message.MessageRole.ASSISTANT,
+                        completeResponse,
+                        finalModel
+                );
+                messageId = savedMessage.getId();
 
-            // Update conversation title if first exchange
-            Conversation conv = conversationService.getConversationEntity(finalConversationId).orElse(null);
-            if (conv != null && conv.getMessages().size() <= 2) {
-                String title = generateTitle(userMessage);
-                conversationService.updateConversationTitle(finalConversationId, title);
+                metricsService.recordUsage(finalUserId, finalConversationId, finalModel, finalProvider,
+                        promptTokens, completionTokens, responseTime, timeToFirstToken, tokensPerSecond);
+
+                // Update conversation title if first exchange
+                Conversation conv = conversationService.getConversationEntity(finalConversationId).orElse(null);
+                if (conv != null && conv.getMessages().size() <= 2) {
+                    String title = generateTitle(userMessage);
+                    conversationService.updateConversationTitle(finalConversationId, title);
+                }
             }
 
             ChatResponse finalResponse = ChatResponse.builder()
-                    .conversationId(finalConversationId)
-                    .messageId(savedMessage.getId())
+                    .conversationId(finalIsTemporary ? null : finalConversationId)
+                    .messageId(messageId)
                     .content("")
                     .htmlContent(markdownService.toHtml(completeResponse))
                     .model(finalModel)
                     .streaming(false)
                     .complete(true)
+                    .temporary(finalIsTemporary)
                     .timeToFirstTokenMs(timeToFirstToken)
                     .tokensPerSecond(tokensPerSecond)
                     .totalResponseTimeMs(responseTime)
@@ -577,16 +641,22 @@ public class ChatService {
 
     private List<org.springframework.ai.chat.messages.Message> buildMessageHistory(
             Conversation conversation, String currentMessage) {
-        return buildMessageHistory(conversation, currentMessage, null, null, false);
+        return buildMessageHistory(conversation, currentMessage, null, null, false, null);
     }
 
     private List<org.springframework.ai.chat.messages.Message> buildMessageHistory(
             Conversation conversation, String currentMessage, UUID skillId) {
-        return buildMessageHistory(conversation, currentMessage, skillId, null, false);
+        return buildMessageHistory(conversation, currentMessage, skillId, null, false, null);
     }
 
     private List<org.springframework.ai.chat.messages.Message> buildMessageHistory(
             Conversation conversation, String currentMessage, UUID skillId, UUID userId, boolean useDocumentContext) {
+        return buildMessageHistory(conversation, currentMessage, skillId, userId, useDocumentContext, null);
+    }
+
+    private List<org.springframework.ai.chat.messages.Message> buildMessageHistory(
+            Conversation conversation, String currentMessage, UUID skillId, UUID userId,
+            boolean useDocumentContext, String ragRetrievalMode) {
         List<org.springframework.ai.chat.messages.Message> messages = new ArrayList<>();
 
         // Build system prompt (base + optional skill augmentation + optional RAG instructions)
@@ -608,7 +678,7 @@ public class ChatService {
         // Add document context if user has documents and RAG is enabled
         String documentContext = null;
         if (useDocumentContext && userId != null && documentEmbeddingService != null && documentEmbeddingService.isAvailable()) {
-            documentContext = buildDocumentContext(userId, currentMessage);
+            documentContext = buildDocumentContext(userId, currentMessage, ragRetrievalMode);
             if (documentContext != null && !documentContext.isEmpty()) {
                 systemPromptBuilder.append("\n\n");
                 systemPromptBuilder.append("You have access to the user's uploaded documents. ");
@@ -642,17 +712,82 @@ public class ChatService {
             }
         }
 
-        // Add current message
-        messages.add(new UserMessage(currentMessage));
+        // Check for YouTube URLs prefixed with # for transcript RAG injection
+        String processedMessage = currentMessage;
+        if (youTubeTranscriptService != null) {
+            Matcher ytMatcher = YT_RAG_PATTERN.matcher(currentMessage);
+            if (ytMatcher.find()) {
+                String ytUrl = ytMatcher.group(1);
+                log.info("Detected YouTube RAG request for URL: {}", ytUrl);
+                try {
+                    String transcript = youTubeTranscriptService.getTranscript(ytUrl);
+                    if (transcript != null && !transcript.isEmpty()) {
+                        // Remove the # URL from the user's query to get the actual question
+                        String queryWithoutUrl = currentMessage.replaceAll("#\\s*https?://\\S+", "").trim();
+                        if (queryWithoutUrl.isEmpty()) {
+                            queryWithoutUrl = "Summarize this YouTube video.";
+                        }
+                        // Build prompt with transcript context using RagPromptBuilder
+                        processedMessage = ragPromptBuilder.buildPromptWithTranscript(
+                                queryWithoutUrl, transcript, ytUrl, null);
+                        log.info("Injected YouTube transcript ({} chars) as RAG context", transcript.length());
+                    } else {
+                        log.warn("No transcript available for YouTube URL: {}", ytUrl);
+                    }
+                } catch (Exception e) {
+                    log.warn("Failed to extract YouTube transcript for {}: {}", ytUrl, e.getMessage());
+                }
+            }
+        }
+
+
+        // Check for generic web URLs prefixed with # for web content RAG injection
+        if (webContentService != null && processedMessage.equals(currentMessage)) {
+            // Only run if YouTube didn't already process this message
+            Matcher webMatcher = WEB_RAG_PATTERN.matcher(currentMessage);
+            if (webMatcher.find()) {
+                String webUrl = webMatcher.group(1);
+                // Skip YouTube URLs (already handled above)
+                if (!webUrl.contains("youtube.com") && !webUrl.contains("youtu.be")) {
+                    log.info("Detected Web URL RAG request for URL: {}", webUrl);
+                    try {
+                        WebContentService.WebPageContent webContent = webContentService.fetch(webUrl);
+                        if (webContent != null && webContent.text() != null 
+                                && !webContent.text().isEmpty() 
+                                && !webContent.text().startsWith("Failed to fetch")) {
+                            String queryWithoutUrl = currentMessage.replaceAll("#\\s*https?://\\S+", "").trim();
+                            if (queryWithoutUrl.isEmpty()) {
+                                queryWithoutUrl = "Summarize the content of this web page.";
+                            }
+                            processedMessage = ragPromptBuilder.buildPromptWithTranscript(
+                                    queryWithoutUrl, webContent.text(), webUrl, null);
+                            log.info("Injected web content from '{}' ({} chars) as RAG context", 
+                                    webContent.title(), webContent.text().length());
+                        } else {
+                            log.warn("No usable content from URL: {}", webUrl);
+                        }
+                    } catch (Exception e) {
+                        log.warn("Failed to fetch web content for {}: {}", webUrl, e.getMessage());
+                    }
+                }
+            }
+        }
+
+        // Add current message (with possible YouTube transcript context)
+        messages.add(new UserMessage(processedMessage));
 
         return messages;
     }
 
     /**
      * Build document context by searching user's documents for relevant content.
-     * Formats context with source attribution from metadata for the LLM.
+     * Supports two retrieval modes:
+     *   - "snippet" (default): returns individual matched chunks
+     *   - "full": expands matched chunks to include all sibling chunks from the same parent document
+     *
+     * @param ragRetrievalMode "snippet", "full", or null for server default
      */
-    private String buildDocumentContext(UUID userId, String query) {
+    private String buildDocumentContext(UUID userId, String query, String ragRetrievalMode) {
         if (documentEmbeddingService == null || !documentEmbeddingService.isAvailable()) {
             return null;
         }
@@ -665,23 +800,71 @@ public class ChatService {
                 return null;
             }
 
-            StringBuilder contextBuilder = new StringBuilder();
-            for (int i = 0; i < relevantDocs.size(); i++) {
-                Document doc = relevantDocs.get(i);
-                String filename = (String) doc.getMetadata().getOrDefault("filename", "document");
-                Object chunkIndex = doc.getMetadata().get("chunk_index");
+            // Determine the effective retrieval mode
+            String mode = (ragRetrievalMode != null) ? ragRetrievalMode : ragPromptBuilder.getDefaultRetrievalMode();
 
-                // Format context with clear section markers (internal, not for display)
-                contextBuilder.append("--- From: ").append(filename);
-                if (chunkIndex != null) {
-                    contextBuilder.append(" (section ").append(((Number) chunkIndex).intValue() + 1).append(")");
+            // For full-document mode, expand matched chunks to include all sibling chunks
+            List<Document> docsForContext = relevantDocs;
+            if ("full".equalsIgnoreCase(mode)) {
+                java.util.Set<String> documentIds = relevantDocs.stream()
+                        .map(doc -> (String) doc.getMetadata().getOrDefault("document_id", ""))
+                        .filter(id -> !id.isEmpty())
+                        .collect(java.util.stream.Collectors.toSet());
+
+                if (!documentIds.isEmpty()) {
+                    List<Document> allChunks = documentEmbeddingService.getAllChunksForDocuments(userId, documentIds);
+                    if (!allChunks.isEmpty()) {
+                        docsForContext = allChunks;
+                        log.debug("Full-doc mode: expanded {} matched chunks to {} total chunks across {} documents",
+                                relevantDocs.size(), allChunks.size(), documentIds.size());
+                    }
                 }
-                contextBuilder.append(" ---\n");
-                contextBuilder.append(doc.getText());
-                contextBuilder.append("\n\n");
             }
 
-            log.debug("Built document context with {} chunks for user {}", relevantDocs.size(), userId);
+            // Build the context string
+            StringBuilder contextBuilder = new StringBuilder();
+            if ("full".equalsIgnoreCase(mode)) {
+                // Group by document_id for full-doc mode
+                java.util.Map<String, List<Document>> grouped = new java.util.LinkedHashMap<>();
+                for (Document doc : docsForContext) {
+                    String docId = (String) doc.getMetadata().getOrDefault("document_id", "unknown");
+                    grouped.computeIfAbsent(docId, k -> new java.util.ArrayList<>()).add(doc);
+                }
+
+                for (java.util.Map.Entry<String, List<Document>> entry : grouped.entrySet()) {
+                    List<Document> chunks = entry.getValue();
+                    // Sort by chunk_index for coherent reading order
+                    chunks.sort(java.util.Comparator.comparingInt(d -> {
+                        Object idx = d.getMetadata().get("chunk_index");
+                        return (idx instanceof Number) ? ((Number) idx).intValue() : 0;
+                    }));
+
+                    String filename = (String) chunks.get(0).getMetadata().getOrDefault("filename", "document");
+                    contextBuilder.append("--- Full document: ").append(filename).append(" ---\n");
+                    for (Document chunk : chunks) {
+                        contextBuilder.append(chunk.getText()).append("\n");
+                    }
+                    contextBuilder.append("\n");
+                }
+            } else {
+                // Snippet mode: original behavior
+                for (int i = 0; i < docsForContext.size(); i++) {
+                    Document doc = docsForContext.get(i);
+                    String filename = (String) doc.getMetadata().getOrDefault("filename", "document");
+                    Object chunkIndex = doc.getMetadata().get("chunk_index");
+
+                    contextBuilder.append("--- From: ").append(filename);
+                    if (chunkIndex != null) {
+                        contextBuilder.append(" (section ").append(((Number) chunkIndex).intValue() + 1).append(")");
+                    }
+                    contextBuilder.append(" ---\n");
+                    contextBuilder.append(doc.getText());
+                    contextBuilder.append("\n\n");
+                }
+            }
+
+            log.debug("Built document context ({} mode) with {} chunks for user {}",
+                    mode, docsForContext.size(), userId);
             return contextBuilder.toString().trim();
 
         } catch (Exception e) {

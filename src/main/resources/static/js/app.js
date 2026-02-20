@@ -12,16 +12,26 @@ class ChatApp {
         this.abortController = null;
         this.useDocumentContext = false;
         this.documentsAvailable = false;
+        this.ragRetrievalMode = localStorage.getItem('ragRetrievalMode') || 'snippet';
         this.useTools = true;
         this.toolsAvailable = false;
         this.tools = [];
         this.toolPreferences = {};
+        this.temporaryChat = false;
         this.initElements();
         this.initEventListeners();
         this.initMarkdown();
         this.initTheme();
         this.initDocuments();
         this.initTools();
+        this.initPasteDetection();
+        this.initKeyboardShortcuts();
+        this.initSettingsSearch();
+        this.initQuickActions();
+        this.initSidebar();
+        this.initSlashCommands();
+        this.initTags();
+
         this.restoreModelSelection();
         this.scrollToBottom();
     }
@@ -60,15 +70,19 @@ class ChatApp {
         this.useDocumentsToggle = document.getElementById('useDocumentsToggle');
         this.docToggleLabel = document.getElementById('docToggleLabel');
 
+        // RAG retrieval mode toggle elements
+        this.ragRetrievalModeSection = document.getElementById('ragRetrievalModeSection');
+        this.ragModeToggle = document.getElementById('ragModeToggle');
+        this.ragModeSnippetBtn = document.getElementById('ragModeSnippet');
+        this.ragModeFullBtn = document.getElementById('ragModeFull');
+
+        // Temporary chat toggle
+        this.tempChatToggle = document.getElementById('tempChatToggle');
+        this.tempChatToggleLabel = document.getElementById('tempChatToggleLabel');
+
         // Tools elements
         this.useToolsToggle = document.getElementById('useToolsToggle');
         this.toolsToggleLabel = document.getElementById('toolsToggleLabel');
-        this.toolsPanel = document.getElementById('toolsPanel');
-        this.toolsBtn = document.getElementById('toolsBtn');
-        this.closeToolsPanelBtn = document.getElementById('closeToolsPanelBtn');
-        this.toolsList = document.getElementById('toolsList');
-        this.toolCount = document.getElementById('toolCount');
-        this.enabledToolCount = document.getElementById('enabledToolCount');
     }
 
     initEventListeners() {
@@ -98,6 +112,7 @@ class ChatApp {
 
         // Sidebar toggle for mobile
         this.sidebarToggle.addEventListener('click', () => {
+            this.haptic();
             this.sidebar.classList.toggle('open');
             const overlay = document.getElementById('sidebarOverlay');
             if (overlay) overlay.classList.toggle('visible', this.sidebar.classList.contains('open'));
@@ -127,6 +142,27 @@ class ChatApp {
             } else if (item) {
                 const id = item.dataset.id;
                 this.loadConversation(id);
+            }
+        });
+
+        // Right-click context menu on conversations
+        this.conversationsList.addEventListener('contextmenu', (e) => {
+            const item = e.target.closest('.conversation-item');
+            if (item) {
+                e.preventDefault();
+                this.showConvContextMenu(e.clientX, e.clientY, item.dataset.id);
+            }
+        });
+
+        // Close context menu on click elsewhere
+        document.addEventListener('click', (e) => {
+            const ctxMenu = document.getElementById('convContextMenu');
+            if (ctxMenu && !ctxMenu.contains(e.target)) {
+                ctxMenu.style.display = 'none';
+            }
+            const picker = document.getElementById('folderPicker');
+            if (picker && !picker.contains(e.target)) {
+                picker.remove();
             }
         });
 
@@ -178,6 +214,28 @@ class ChatApp {
             });
         }
 
+        // Temporary chat toggle
+        if (this.tempChatToggle) {
+            this.tempChatToggle.addEventListener('change', (e) => {
+                this.temporaryChat = e.target.checked;
+                localStorage.setItem('temporaryChat', this.temporaryChat);
+                console.debug('Temporary chat toggle changed:', this.temporaryChat);
+                // Visual indicator when temporary mode is active
+                const indicator = document.getElementById('tempChatIndicator');
+                if (indicator) {
+                    indicator.style.display = this.temporaryChat ? 'inline-flex' : 'none';
+                }
+            });
+            // Restore saved preference
+            const savedTempChat = localStorage.getItem('temporaryChat');
+            if (savedTempChat === 'true') {
+                this.temporaryChat = true;
+                this.tempChatToggle.checked = true;
+                const indicator = document.getElementById('tempChatIndicator');
+                if (indicator) indicator.style.display = 'inline-flex';
+            }
+        }
+
         // Use tools toggle — registered here (synchronous) rather than in async
         // initTools() to ensure the listener is always attached
         if (this.useToolsToggle) {
@@ -185,6 +243,18 @@ class ChatApp {
                 this.useTools = e.target.checked;
                 localStorage.setItem('useTools', this.useTools);
                 console.debug('Tools toggle changed:', this.useTools);
+            });
+        }
+
+        // Message action buttons
+        if (this.messagesContainer) {
+            this.messagesContainer.addEventListener('click', (e) => {
+                const actionBtn = e.target.closest('.msg-action-btn');
+                if (actionBtn) {
+                    const action = actionBtn.dataset.action;
+                    const messageEl = actionBtn.closest('.message');
+                    this.handleMessageAction(action, messageEl);
+                }
             });
         }
     }
@@ -203,8 +273,35 @@ class ChatApp {
         const savedTheme = localStorage.getItem('theme') || 'dark';
         document.body.setAttribute('data-theme', savedTheme);
 
+        // Update theme toggle tooltip
+        if (this.themeToggle) {
+            const themeNames = { dark: 'Dark', light: 'Light', oled: 'OLED Dark' };
+            this.themeToggle.title = `Theme: ${themeNames[savedTheme] || savedTheme} (click to switch)`;
+        }
+
         // Load organization theme if user is part of an organization
         this.loadOrganizationTheme();
+
+        // Load user's saved theme preference
+        this.loadUserThemePreference();
+    }
+
+    async loadUserThemePreference() {
+        try {
+            const response = await fetch('/api/user/preferences');
+            if (!response.ok) return;
+            const data = await response.json();
+            if (data && data.theme) {
+                document.body.setAttribute('data-theme', data.theme);
+                localStorage.setItem('theme', data.theme);
+                if (this.themeToggle) {
+                    const themeNames = { dark: 'Dark', light: 'Light', oled: 'OLED Dark' };
+                    this.themeToggle.title = `Theme: ${themeNames[data.theme] || data.theme} (click to switch)`;
+                }
+            }
+        } catch (e) {
+            // Fall back to localStorage
+        }
     }
 
     async loadOrganizationTheme() {
@@ -314,10 +411,69 @@ class ChatApp {
     }
 
     toggleTheme() {
+        // Show theme selector popup instead of just cycling
+        this.showThemeSelector();
+    }
+
+    showThemeSelector() {
+        // Remove existing popup if any
+        const existing = document.getElementById('theme-selector-popup');
+        if (existing) { existing.remove(); return; }
+
+        const popup = document.createElement('div');
+        popup.id = 'theme-selector-popup';
+        popup.className = 'theme-selector-popup';
+
+        const themes = [
+            { id: 'dark', name: 'Dark', icon: '\u{1F319}', desc: 'Easy on the eyes' },
+            { id: 'light', name: 'Light', icon: '\u{2600}\u{FE0F}', desc: 'Classic bright mode' },
+            { id: 'oled', name: 'OLED Dark', icon: '\u{1F5A5}\u{FE0F}', desc: 'True black background' }
+        ];
+
         const currentTheme = document.body.getAttribute('data-theme') || 'dark';
-        const newTheme = currentTheme === 'dark' ? 'light' : 'dark';
-        document.body.setAttribute('data-theme', newTheme);
-        localStorage.setItem('theme', newTheme);
+
+        themes.forEach(theme => {
+            const option = document.createElement('button');
+            option.className = 'theme-option' + (theme.id === currentTheme ? ' active' : '');
+            option.innerHTML = `<span class="theme-icon">${theme.icon}</span><span class="theme-name">${theme.name}</span><span class="theme-desc">${theme.desc}</span>`;
+            option.addEventListener('click', () => {
+                document.body.setAttribute('data-theme', theme.id);
+                localStorage.setItem('theme', theme.id);
+                // Save to server for per-user persistence
+                fetch('/api/user/preferences/theme', {
+                    method: 'PUT',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ theme: theme.id })
+                }).catch(() => {});
+                if (this.themeToggle) {
+                    const themeNames = { dark: 'Dark', light: 'Light', oled: 'OLED Dark' };
+                    this.themeToggle.title = 'Theme: ' + (themeNames[theme.id] || theme.id);
+                }
+                popup.remove();
+                this.haptic();
+            });
+            popup.appendChild(option);
+        });
+
+        // Position near the theme toggle button
+        if (this.themeToggle) {
+            const rect = this.themeToggle.getBoundingClientRect();
+            popup.style.position = 'fixed';
+            popup.style.top = (rect.bottom + 4) + 'px';
+            popup.style.left = rect.left + 'px';
+            popup.style.zIndex = '10000';
+        }
+
+        document.body.appendChild(popup);
+
+        // Close on outside click
+        const closeHandler = (e) => {
+            if (!popup.contains(e.target) && e.target !== this.themeToggle) {
+                popup.remove();
+                document.removeEventListener('click', closeHandler);
+            }
+        };
+        setTimeout(() => document.addEventListener('click', closeHandler), 10);
     }
 
     // DOMPurify config that allows KaTeX MathML output
@@ -361,6 +517,127 @@ class ChatApp {
             result = result.replace(placeholder, blocks[i].content);
         }
         return result;
+    }
+
+    /**
+     * Extract LaTeX blocks ($$...$$ and $...$) before markdown parsing
+     * to prevent markdown from mangling them. Returns the sanitized text
+     * and an array of extracted blocks with their placeholders.
+     */
+    preprocessLatex(text) {
+        const blocks = [];
+        let result = text;
+
+        // Extract display math $$...$$ first
+        result = result.replace(/\$\$([\s\S]+?)\$\$/g, (match, inner) => {
+            const idx = blocks.length;
+            blocks.push({ type: 'display', latex: inner.trim(), original: match });
+            return `%%LATEX_DISPLAY_${idx}%%`;
+        });
+
+        // Extract display math \[...\]
+        result = result.replace(/\\\[([\s\S]+?)\\\]/g, (match, inner) => {
+            const idx = blocks.length;
+            blocks.push({ type: 'display', latex: inner.trim(), original: match });
+            return `%%LATEX_DISPLAY_${idx}%%`;
+        });
+
+        // Extract inline math $...$ (not currency like $100)
+        result = result.replace(/(?<!\$)\$(?!\$)(.+?)(?<!\$)\$(?!\$)/g, (match, inner) => {
+            if (/^\d/.test(inner.trim())) return match;
+            const idx = blocks.length;
+            blocks.push({ type: 'inline', latex: inner.trim(), original: match });
+            return `%%LATEX_INLINE_${idx}%%`;
+        });
+
+        // Extract inline math \(...\)
+        result = result.replace(/\\\(([\s\S]+?)\\\)/g, (match, inner) => {
+            const idx = blocks.length;
+            blocks.push({ type: 'inline', latex: inner.trim(), original: match });
+            return `%%LATEX_INLINE_${idx}%%`;
+        });
+
+        return { text: result, blocks };
+    }
+
+    /**
+     * Render extracted LaTeX blocks back into the HTML using KaTeX.
+     * Replaces placeholders with rendered KaTeX HTML output.
+     */
+    postprocessLatex(html, blocks) {
+        let result = html;
+        for (let i = 0; i < blocks.length; i++) {
+            const block = blocks[i];
+            const isDisplay = block.type === 'display';
+            const placeholder = isDisplay ? `%%LATEX_DISPLAY_${i}%%` : `%%LATEX_INLINE_${i}%%`;
+
+            let rendered;
+            if (typeof katex !== 'undefined') {
+                try {
+                    rendered = katex.renderToString(block.latex, {
+                        displayMode: isDisplay,
+                        throwOnError: false,
+                        output: 'htmlAndMathml'
+                    });
+                } catch (e) {
+                    console.warn('KaTeX render error for block', i, ':', e);
+                    rendered = block.original;
+                }
+            } else {
+                // KaTeX not available, restore original delimiters
+                rendered = block.original;
+            }
+            result = result.replace(placeholder, rendered);
+        }
+        return result;
+    }
+
+    /**
+     * Full rendering pipeline: preprocess LaTeX, parse markdown, postprocess LaTeX,
+     * and optionally sanitize with DOMPurify.
+     */
+    renderMarkdownWithLatex(text) {
+        const { text: preprocessed, blocks } = this.preprocessLatex(text);
+        let html = marked.parse(preprocessed);
+        html = this.postprocessLatex(html, blocks);
+        return this.sanitizeHtml(html);
+    }
+
+    /**
+     * RAG Citation rendering - replaces [Source N] markers with styled badges.
+     */
+    renderCitations(html, citations) {
+        if (!citations || citations.length === 0) return html;
+
+        return html.replace(/\[Source (\d+)\]/g, (match, num) => {
+            const idx = parseInt(num) - 1;
+            const citation = citations[idx];
+            if (!citation) return match;
+
+            const relevance = Math.round(citation.relevance * 100);
+            return `<span class="citation-badge" data-source="${num}" title="${citation.documentName} (${relevance}% relevance)">[${num}]</span>`;
+        });
+    }
+
+    /**
+     * Sanitize HTML output using DOMPurify if available.
+     */
+    sanitizeHtml(html) {
+        if (typeof DOMPurify !== 'undefined') {
+            return DOMPurify.sanitize(html, this.domPurifyConfig);
+        }
+        return html;
+    }
+
+    /**
+     * Detect text direction (RTL vs LTR) based on the proportion of RTL
+     * script characters in the first 100 characters of the text.
+     */
+    detectDirection(text) {
+        const rtl = /[\u0600-\u06FF\u0750-\u077F\u0590-\u05FF\uFB1D-\uFB4F]/;
+        const sample = text.substring(0, 100);
+        const count = (sample.match(new RegExp(rtl.source, 'g')) || []).length;
+        return count > sample.length * 0.3 ? 'rtl' : 'ltr';
     }
 
     renderMath(element) {
@@ -433,10 +710,11 @@ class ChatApp {
         this.messageInput.style.height = Math.min(this.messageInput.scrollHeight, 200) + 'px';
     }
 
-    async sendMessage() {
-        const message = this.messageInput.value.trim();
+    async sendMessage(overrideText) {
+        const message = overrideText ? overrideText.trim() : this.messageInput.value.trim();
         if (!message || this.isWaiting) return;
 
+        this.haptic();
         this.isWaiting = true;
         this.sendBtn.disabled = true;
 
@@ -470,16 +748,19 @@ class ChatApp {
             // Read toggle state directly from DOM for reliability
             const toolsEnabled = this.useToolsToggle ? this.useToolsToggle.checked : this.useTools;
 
+            const useDocContext = this.useDocumentContext && this.documentsAvailable;
             const request = {
-                conversationId: this.conversationId,
+                conversationId: this.temporaryChat ? null : this.conversationId,
                 message: message,
                 provider: provider,
                 model: model,
-                useDocumentContext: this.useDocumentContext && this.documentsAvailable,
-                useTools: toolsEnabled && this.toolsAvailable
+                useDocumentContext: useDocContext,
+                useTools: toolsEnabled && this.toolsAvailable,
+                temporary: this.temporaryChat,
+                ragRetrievalMode: useDocContext ? this.ragRetrievalMode : null
             };
 
-            console.debug('Chat request - useTools:', request.useTools, '(toggle:', toolsEnabled, ', available:', this.toolsAvailable, ')');
+            console.debug('Chat request - useTools:', request.useTools, '(toggle:', toolsEnabled, ', available:', this.toolsAvailable, '), temporary:', request.temporary, ', ragMode:', request.ragRetrievalMode);
 
             if (this.isStreaming) {
                 await this.sendStreamingMessage(request, typingIndicator);
@@ -513,10 +794,13 @@ class ChatApp {
         const data = await response.json();
         typingIndicator.remove();
 
-        this.conversationId = data.conversationId;
-        this.addMessage('assistant', data.content, data.htmlContent, data.model);
-        this.updateURL(data.conversationId);
-        this.refreshConversationsList();
+        // For temporary chats, do not update conversationId or URL
+        if (!data.temporary) {
+            this.conversationId = data.conversationId;
+            this.updateURL(data.conversationId);
+            this.refreshConversationsList();
+        }
+        this.addMessage('assistant', data.content, data.htmlContent, data.model, data.citations);
     }
 
     async sendStreamingMessage(request, typingIndicator) {
@@ -546,6 +830,23 @@ class ChatApp {
             let fullContent = '';
             let streamComplete = false;
 
+            // Streaming debounce: re-render content at most every 100ms
+            let streamRenderTimer = null;
+            let pendingRender = false;
+            const debouncedStreamRender = () => {
+                pendingRender = true;
+                if (streamRenderTimer) return;
+                streamRenderTimer = setTimeout(() => {
+                    streamRenderTimer = null;
+                    if (pendingRender) {
+                        pendingRender = false;
+                        const displayContent = this.prepareStreamingContent(fullContent);
+                        textEl.innerHTML = this.renderMarkdownWithLatex(displayContent);
+                        this.scrollToBottom();
+                    }
+                }, 100);
+            };
+
             const reader = response.body.getReader();
             const decoder = new TextDecoder();
             let buffer = '';  // Buffer for incomplete SSE events
@@ -567,23 +868,38 @@ class ChatApp {
                             if (!jsonStr) continue;
                             const data = JSON.parse(jsonStr);
 
-                            if (!this.conversationId && data.conversationId) {
+                            if (!this.conversationId && data.conversationId && !data.temporary) {
                                 this.conversationId = data.conversationId;
                                 this.updateURL(data.conversationId);
                             }
 
                             if (data.error) {
                                 streamComplete = true;
-                                textEl.innerHTML = DOMPurify.sanitize(`<div class="stream-error">${this.escapeHtml(data.error)}</div>`);
+                                // Clear any pending debounced render
+                                if (streamRenderTimer) { clearTimeout(streamRenderTimer); streamRenderTimer = null; }
+                                const errorHtml = `<div class="stream-error">${this.escapeHtml(data.error)}</div>`;
+                                textEl.innerHTML = this.sanitizeHtml(errorHtml);
                                 this.scrollToBottom();
                             } else if (data.complete) {
                                 streamComplete = true;
+                                // Clear any pending debounced render
+                                if (streamRenderTimer) { clearTimeout(streamRenderTimer); streamRenderTimer = null; }
                                 // Final message with full HTML content from backend
                                 if (data.htmlContent) {
-                                    textEl.innerHTML = DOMPurify.sanitize(data.htmlContent, this.domPurifyConfig);
+                                    let finalHtml = this.sanitizeHtml(data.htmlContent);
+                                    if (data.citations && data.citations.length > 0) {
+                                        finalHtml = this.renderCitations(finalHtml, data.citations);
+                                    }
+                                    textEl.innerHTML = finalHtml;
                                 }
                                 this.highlightCode(textEl);
                                 this.renderMath(textEl);
+                                this.renderArtifacts(textEl);
+
+                                // Update RTL direction based on final content
+                                if (fullContent) {
+                                    messageEl.setAttribute('dir', this.detectDirection(fullContent));
+                                }
 
                                 // Add performance metrics if available (check for existence, not truthiness)
                                 const hasMetrics = data.timeToFirstTokenMs != null ||
@@ -615,12 +931,13 @@ class ChatApp {
                                     }
                                 }
 
-                                this.refreshConversationsList();
+                                if (!data.temporary) {
+                                    this.refreshConversationsList();
+                                }
                             } else if (data.content) {
                                 fullContent += data.content;
-                                const displayContent = this.prepareStreamingContent(fullContent);
-                                textEl.innerHTML = DOMPurify.sanitize(marked.parse(displayContent));
-                                this.scrollToBottom();
+                                // Use debounced rendering during streaming (100ms)
+                                debouncedStreamRender();
                             }
                         } catch (e) {
                             console.warn('SSE parse error:', e.message, 'Line:', line);
@@ -628,6 +945,9 @@ class ChatApp {
                     }
                 }
             }
+
+            // Clear any pending debounced render before final processing
+            if (streamRenderTimer) { clearTimeout(streamRenderTimer); streamRenderTimer = null; }
 
             // Flush any remaining data left in the SSE buffer (e.g. final event
             // that arrived without a trailing newline before the connection closed)
@@ -640,9 +960,14 @@ class ChatApp {
                             const data = JSON.parse(jsonStr);
                             if (data.complete && data.htmlContent) {
                                 streamComplete = true;
-                                textEl.innerHTML = DOMPurify.sanitize(data.htmlContent, this.domPurifyConfig);
+                                let finalHtml = this.sanitizeHtml(data.htmlContent);
+                                if (data.citations && data.citations.length > 0) {
+                                    finalHtml = this.renderCitations(finalHtml, data.citations);
+                                }
+                                textEl.innerHTML = finalHtml;
                                 this.highlightCode(textEl);
                                 this.renderMath(textEl);
+                                this.renderArtifacts(textEl);
                             } else if (data.content) {
                                 fullContent += data.content;
                             }
@@ -655,9 +980,12 @@ class ChatApp {
 
             // Fallback: only re-render if stream ended without a complete event
             if (fullContent && !streamComplete) {
-                textEl.innerHTML = DOMPurify.sanitize(marked.parse(fullContent));
+                textEl.innerHTML = this.renderMarkdownWithLatex(fullContent);
                 this.highlightCode(textEl);
                 this.renderMath(textEl);
+                this.renderArtifacts(textEl);
+                // Update RTL direction based on final content
+                messageEl.setAttribute('dir', this.detectDirection(fullContent));
                 this.scrollToBottom();
             }
         } finally {
@@ -692,7 +1020,7 @@ class ChatApp {
         this.hideCancelButton();
     }
 
-    addMessage(role, content, htmlContent = null, model = null) {
+    addMessage(role, content, htmlContent = null, model = null, citations = null, messageId = null) {
         if (!this.messages) {
             const messagesDiv = document.createElement('div');
             messagesDiv.className = 'messages';
@@ -701,27 +1029,114 @@ class ChatApp {
             this.messages = messagesDiv;
         }
 
-        const messageEl = this.createMessageElement(role, content, htmlContent, model);
+        const messageEl = this.createMessageElement(role, content, htmlContent, model, citations, messageId);
         this.messages.appendChild(messageEl);
         this.highlightCode(messageEl);
         this.renderMath(messageEl);
+        this.renderArtifacts(messageEl);
         this.scrollToBottom();
     }
 
-    createMessageElement(role, content, htmlContent = null, model = null) {
+    createMessageElement(role, content, htmlContent = null, model = null, citations = null, messageId = null) {
         const div = document.createElement('div');
         div.className = `message ${role}`;
+        if (messageId) div.dataset.messageId = messageId;
+
+        // Detect text direction for RTL language support
+        const rawText = content || '';
+        const dir = this.detectDirection(rawText);
+        div.setAttribute('dir', dir);
 
         const avatarText = role === 'user' ? 'U' : 'AI';
-        const displayContent = DOMPurify.sanitize(htmlContent || (content ? marked.parse(content) : ''), this.domPurifyConfig);
+        // Use the enhanced rendering pipeline with LaTeX preprocessing and DOMPurify sanitization
+        const displayContent = htmlContent
+            ? this.sanitizeHtml(htmlContent)
+            : (content ? this.renderMarkdownWithLatex(content) : '');
 
-        div.innerHTML = `
-            <div class="message-avatar">${avatarText}</div>
-            <div class="message-content">
-                <div class="message-text">${displayContent}</div>
-                ${model ? `<div class="message-meta">${model}</div>` : ''}
-            </div>
-        `;
+        // Build message element using safe DOM construction
+        const avatarDiv = document.createElement('div');
+        avatarDiv.className = 'message-avatar';
+        avatarDiv.textContent = avatarText;
+
+        const contentDiv = document.createElement('div');
+        contentDiv.className = 'message-content';
+
+        const textDiv = document.createElement('div');
+        textDiv.className = 'message-text';
+        // displayContent is sanitized via DOMPurify in renderMarkdownWithLatex / sanitizeHtml
+        textDiv.innerHTML = displayContent;
+
+        // Apply citation rendering if citations are provided
+        if (citations && citations.length > 0 && role === 'assistant') {
+            textDiv.innerHTML = this.renderCitations(textDiv.innerHTML, citations);
+        }
+
+        contentDiv.appendChild(textDiv);
+
+        if (model) {
+            const metaDiv = document.createElement('div');
+            metaDiv.className = 'message-meta';
+            metaDiv.textContent = model;
+            contentDiv.appendChild(metaDiv);
+        }
+
+        // Add message actions toolbar
+        const actionsDiv = document.createElement('div');
+        actionsDiv.className = 'message-actions';
+
+        if (role === 'user') {
+            // Edit button for user messages
+            actionsDiv.innerHTML = `
+                <button class="msg-action-btn" data-action="edit" title="Edit message">
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="14" height="14">
+                        <path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"></path>
+                        <path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"></path>
+                    </svg>
+                </button>
+                <button class="msg-action-btn" data-action="copy" title="Copy message">
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="14" height="14">
+                        <rect x="9" y="9" width="13" height="13" rx="2" ry="2"></rect>
+                        <path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"></path>
+                    </svg>
+                </button>
+            `;
+        } else {
+            // Regenerate + copy + favorite for assistant messages
+            actionsDiv.innerHTML = `
+                <button class="msg-action-btn" data-action="regenerate" title="Regenerate response">
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="14" height="14">
+                        <polyline points="23 4 23 10 17 10"></polyline>
+                        <path d="M20.49 15a9 9 0 1 1-2.12-9.36L23 10"></path>
+                    </svg>
+                </button>
+                <button class="msg-action-btn" data-action="favorite" title="Favorite response">
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="14" height="14">
+                        <polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2"></polygon>
+                    </svg>
+                </button>
+                <button class="msg-action-btn" data-action="copy" title="Copy message">
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="14" height="14">
+                        <rect x="9" y="9" width="13" height="13" rx="2" ry="2"></rect>
+                        <path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"></path>
+                    </svg>
+                </button>
+                <button class="msg-action-btn" data-action="translate" title="Translate">
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="14" height="14">
+                        <path d="M5 8l6 6"></path>
+                        <path d="M4 14l6-6 2-3"></path>
+                        <path d="M2 5h12"></path>
+                        <path d="M7 2h1"></path>
+                        <path d="M22 22l-5-10-5 10"></path>
+                        <path d="M14 18h6"></path>
+                    </svg>
+                </button>
+            `;
+        }
+
+        contentDiv.appendChild(actionsDiv);
+
+        div.appendChild(avatarDiv);
+        div.appendChild(contentDiv);
 
         return div;
     }
@@ -750,6 +1165,45 @@ class ChatApp {
         div.textContent = text;
         this.messages?.appendChild(div);
         this.scrollToBottom();
+    }
+
+    // Interactive Artifacts - renders HTML/SVG code blocks as sandboxed iframes
+    renderArtifacts(container) {
+        if (!container) return;
+        container.querySelectorAll('pre code').forEach(codeBlock => {
+            const lang = (codeBlock.className.match(/language-(\w+)/) || [])[1];
+            if (lang && ['html', 'svg'].includes(lang.toLowerCase())) {
+                const code = codeBlock.textContent;
+                const wrapper = document.createElement('div');
+                wrapper.className = 'artifact-container';
+                wrapper.style.cssText = 'margin: 8px 0; position: relative;';
+
+                const toggleBtn = document.createElement('button');
+                toggleBtn.textContent = '\u25b6 Run';
+                toggleBtn.className = 'artifact-toggle';
+                toggleBtn.style.cssText = 'background: var(--accent-color, #4a9eff); color: white; border: none; padding: 4px 12px; border-radius: 4px; cursor: pointer; font-size: 12px; margin-bottom: 4px;';
+
+                const iframe = document.createElement('iframe');
+                iframe.sandbox = 'allow-scripts';
+                iframe.style.cssText = 'width:100%;border:1px solid var(--border-color, #ddd);border-radius:8px;min-height:200px;display:none;background:white;';
+
+                toggleBtn.addEventListener('click', () => {
+                    if (iframe.style.display === 'none') {
+                        iframe.srcdoc = code;
+                        iframe.style.display = 'block';
+                        toggleBtn.textContent = '\u25bc Hide';
+                    } else {
+                        iframe.style.display = 'none';
+                        iframe.srcdoc = '';
+                        toggleBtn.textContent = '\u25b6 Run';
+                    }
+                });
+
+                wrapper.appendChild(toggleBtn);
+                wrapper.appendChild(iframe);
+                codeBlock.parentElement.after(wrapper);
+            }
+        });
     }
 
     highlightCode(element) {
@@ -904,6 +1358,7 @@ class ChatApp {
     }
 
     startNewChat() {
+        this.haptic();
         this.conversationId = null;
         window.history.pushState({}, '', '/');
 
@@ -958,7 +1413,7 @@ class ChatApp {
 
             this.messages.innerHTML = '';
             conversation.messages?.forEach(msg => {
-                this.addMessage(msg.role, msg.content, msg.htmlContent, msg.modelUsed);
+                this.addMessage(msg.role, msg.content, msg.htmlContent, msg.modelUsed, msg.citations, msg.id);
             });
 
             this.sidebar.classList.remove('open');
@@ -969,6 +1424,7 @@ class ChatApp {
     }
 
     async deleteConversation(id) {
+        this.haptic('heavy');
         if (!confirm('Are you sure you want to delete this conversation?')) {
             return;
         }
@@ -997,6 +1453,7 @@ class ChatApp {
     }
 
     async clearAllHistory() {
+        this.haptic('heavy');
         const conversationCount = this.conversationsList?.querySelectorAll('.conversation-item').length || 0;
         if (conversationCount === 0) {
             alert('No conversations to clear.');
@@ -1078,10 +1535,31 @@ class ChatApp {
                 if (data.available) {
                     this.initDocumentEventListeners();
                     await this.loadDocuments();
+                    // Load saved RAG retrieval mode preference from server
+                    this.loadRagRetrievalModePreference();
                 }
             }
         } catch (error) {
             console.warn('Document service not available:', error);
+        }
+    }
+
+    /**
+     * Load the RAG retrieval mode preference from the server and apply it.
+     */
+    async loadRagRetrievalModePreference() {
+        try {
+            const response = await fetch('/api/user/preferences');
+            if (response.ok) {
+                const prefs = await response.json();
+                if (prefs && prefs.ragRetrievalMode) {
+                    this.ragRetrievalMode = prefs.ragRetrievalMode;
+                    localStorage.setItem('ragRetrievalMode', prefs.ragRetrievalMode);
+                    this.applyRagModeUI(prefs.ragRetrievalMode);
+                }
+            }
+        } catch (error) {
+            console.warn('Failed to load RAG retrieval mode preference:', error);
         }
     }
 
@@ -1102,7 +1580,8 @@ class ChatApp {
 
         // Upload area click
         if (this.uploadArea) {
-            this.uploadArea.addEventListener('click', () => {
+            this.uploadArea.addEventListener('click', (e) => {
+                if (e.target === this.fileInput) return;
                 this.fileInput.click();
             });
 
@@ -1138,6 +1617,48 @@ class ChatApp {
             });
         }
 
+        // RAG retrieval mode toggle buttons
+        if (this.ragModeToggle) {
+            this.ragModeToggle.querySelectorAll('.rag-mode-btn').forEach(btn => {
+                btn.addEventListener('click', () => {
+                    const mode = btn.dataset.mode;
+                    this.setRagRetrievalMode(mode);
+                });
+            });
+            // Apply saved mode on init
+            this.applyRagModeUI(this.ragRetrievalMode);
+        }
+
+    }
+
+    /**
+     * Set the RAG retrieval mode and persist to server and localStorage.
+     * @param {string} mode - "snippet" or "full"
+     */
+    setRagRetrievalMode(mode) {
+        this.ragRetrievalMode = mode;
+        localStorage.setItem('ragRetrievalMode', mode);
+        this.applyRagModeUI(mode);
+
+        // Persist to server
+        fetch('/api/user/preferences/rag-retrieval-mode', {
+            method: 'PUT',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ ragRetrievalMode: mode })
+        }).catch(err => console.warn('Failed to save RAG mode preference:', err));
+
+        console.debug('RAG retrieval mode set to:', mode);
+    }
+
+    /**
+     * Update the RAG mode toggle UI to reflect the active mode.
+     * @param {string} mode - "snippet" or "full"
+     */
+    applyRagModeUI(mode) {
+        if (!this.ragModeToggle) return;
+        this.ragModeToggle.querySelectorAll('.rag-mode-btn').forEach(btn => {
+            btn.classList.toggle('active', btn.dataset.mode === mode);
+        });
     }
 
     toggleDocumentsPanel() {
@@ -1171,11 +1692,7 @@ class ChatApp {
                 this.renderDocuments(documents);
                 this.updateDocumentStats(stats);
 
-                // Show "Use My Docs" toggle if user has documents
                 this.documentsAvailable = stats.completedDocuments > 0;
-                if (this.docToggleLabel) {
-                    this.docToggleLabel.style.display = this.documentsAvailable ? 'flex' : 'none';
-                }
             }
         } catch (error) {
             console.error('Error loading documents:', error);
@@ -1198,11 +1715,6 @@ class ChatApp {
                     this.toolsToggleLabel.style.display = this.toolsAvailable ? 'flex' : 'none';
                 }
 
-                // Show Tools button if tools are available
-                if (this.toolsBtn) {
-                    this.toolsBtn.style.display = this.toolsAvailable ? 'flex' : 'none';
-                }
-
                 // Set initial toggle state from saved preference (defaults to true from constructor)
                 const savedPref = localStorage.getItem('useTools');
                 if (savedPref !== null) {
@@ -1211,125 +1723,12 @@ class ChatApp {
                 if (this.useToolsToggle) {
                     this.useToolsToggle.checked = this.useTools;
                 }
-
-                // Set up tools panel if tools are available
-                if (this.toolsAvailable) {
-                    this.initToolsEventListeners();
-                    this.renderTools();
-                    this.updateToolStats();
-                }
             }
         } catch (error) {
             console.warn('Could not check tools availability:', error);
-            // Hide the toggle and button if we can't determine availability
             if (this.toolsToggleLabel) {
                 this.toolsToggleLabel.style.display = 'none';
             }
-            if (this.toolsBtn) {
-                this.toolsBtn.style.display = 'none';
-            }
-        }
-    }
-
-    initToolsEventListeners() {
-        // Tools button
-        if (this.toolsBtn) {
-            this.toolsBtn.addEventListener('click', () => {
-                this.toggleToolsPanel();
-            });
-        }
-
-        // Close tools panel button
-        if (this.closeToolsPanelBtn) {
-            this.closeToolsPanelBtn.addEventListener('click', () => {
-                this.closeToolsPanel();
-            });
-        }
-    }
-
-    toggleToolsPanel() {
-        if (this.toolsPanel) {
-            // Close documents panel if open
-            this.closeDocumentsPanel();
-            this.toolsPanel.classList.toggle('open');
-            if (this.toolsPanel.classList.contains('open')) {
-                this.loadTools();
-            }
-        }
-    }
-
-    closeToolsPanel() {
-        if (this.toolsPanel) {
-            this.toolsPanel.classList.remove('open');
-        }
-    }
-
-    async loadTools() {
-        try {
-            const response = await fetch('/api/chat/available-tools');
-            if (response.ok) {
-                this.tools = await response.json();
-                this.renderTools();
-                this.updateToolStats();
-            }
-        } catch (error) {
-            console.error('Error loading tools:', error);
-        }
-    }
-
-    renderTools() {
-        if (!this.toolsList) return;
-
-        if (this.tools.length === 0) {
-            this.toolsList.innerHTML = '<p class="no-tools">No tools available</p>';
-            return;
-        }
-
-        this.toolsList.innerHTML = this.tools.map(tool => {
-            const isEnabled = this.isToolEnabled(tool.id);
-            const badgeClass = tool.type === 'MCP' ? 'mcp' : 'custom';
-            const serverInfo = tool.mcpServerName ? `<div class="tool-server">Server: ${this.escapeHtml(tool.mcpServerName)}</div>` : '';
-
-            return `
-                <div class="tool-item" data-id="${tool.id}">
-                    <div class="tool-icon">
-                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="20" height="20">
-                            <path d="M14.7 6.3a1 1 0 0 0 0 1.4l1.6 1.6a1 1 0 0 0 1.4 0l3.77-3.77a6 6 0 0 1-7.94 7.94l-6.91 6.91a2.12 2.12 0 0 1-3-3l6.91-6.91a6 6 0 0 1 7.94-7.94l-3.76 3.76z"></path>
-                        </svg>
-                    </div>
-                    <div class="tool-info">
-                        <div class="tool-header">
-                            <span class="tool-name" title="${this.escapeHtml(tool.displayName || tool.name)}">${this.escapeHtml(tool.displayName || tool.name)}</span>
-                            <span class="tool-badge ${badgeClass}">${tool.type}</span>
-                        </div>
-                        ${tool.description ? `<div class="tool-description" title="${this.escapeHtml(tool.description)}">${this.escapeHtml(tool.description)}</div>` : ''}
-                        ${serverInfo}
-                    </div>
-                    <div class="tool-toggle">
-                        <input type="checkbox" ${isEnabled ? 'checked' : ''}
-                               data-tool-id="${tool.id}"
-                               title="${isEnabled ? 'Disable tool' : 'Enable tool'}">
-                    </div>
-                </div>
-            `;
-        }).join('');
-
-        // Attach event listeners (CSP-compliant, no inline handlers)
-        this.toolsList.querySelectorAll('input[data-tool-id]').forEach(checkbox => {
-            checkbox.addEventListener('change', () => {
-                this.toggleToolEnabled(checkbox);
-            });
-        });
-    }
-
-    updateToolStats() {
-        const enabledCount = this.tools.filter(tool => this.isToolEnabled(tool.id)).length;
-
-        if (this.toolCount) {
-            this.toolCount.textContent = `${this.tools.length} tool${this.tools.length !== 1 ? 's' : ''}`;
-        }
-        if (this.enabledToolCount) {
-            this.enabledToolCount.textContent = `${enabledCount} enabled`;
         }
     }
 
@@ -1471,6 +1870,7 @@ class ChatApp {
             const result = await response.json();
 
             if (response.ok && result.status === 'COMPLETED') {
+                this.haptic();
                 this.progressText.textContent = `${file.name} uploaded successfully!`;
                 this.progressFill.style.width = '100%';
             } else {
@@ -1515,6 +1915,1132 @@ class ChatApp {
         } catch (error) {
             console.error('Error deleting document:', error);
             alert('Failed to delete document');
+        }
+    }
+
+    // Feature 53: Large text paste detection
+    initPasteDetection() {
+        if (this.messageInput) {
+            this.messageInput.addEventListener('paste', (e) => {
+                const text = e.clipboardData.getData('text');
+                if (text.length > 5000) {
+                    e.preventDefault();
+                    if (confirm(`Large text detected (${text.length} characters). Upload as document for RAG instead?`)) {
+                        const timestamp = new Date().toISOString().replace(/[:.]/g, '-');
+                        const file = new File([text], `pasted-content-${timestamp}.txt`, { type: 'text/plain' });
+                        this.uploadPastedDocument(file);
+                    } else {
+                        // Insert text at cursor position preserving selection
+                        const start = this.messageInput.selectionStart;
+                        const end = this.messageInput.selectionEnd;
+                        this.messageInput.value =
+                            this.messageInput.value.substring(0, start) +
+                            text +
+                            this.messageInput.value.substring(end);
+                        this.messageInput.selectionStart = this.messageInput.selectionEnd = start + text.length;
+                        this.autoResizeTextarea();
+                    }
+                }
+            });
+        }
+    }
+
+    async uploadPastedDocument(file) {
+        const formData = new FormData();
+        formData.append('file', file);
+
+        try {
+            const response = await fetch('/api/documents/upload', {
+                method: 'POST',
+                body: formData
+            });
+
+            if (response.ok) {
+                const result = await response.json();
+                if (result.status === 'COMPLETED') {
+                    alert('Pasted content uploaded as document successfully.');
+                    await this.loadDocuments();
+                } else {
+                    alert(`Document upload status: ${result.status}. ${result.message || ''}`);
+                }
+            } else {
+                alert('Failed to upload pasted content as document.');
+            }
+        } catch (error) {
+            console.error('Error uploading pasted document:', error);
+            alert('Failed to upload pasted content.');
+        }
+    }
+
+    // Feature 57: Keyboard shortcuts
+    initKeyboardShortcuts() {
+        document.addEventListener('keydown', (e) => {
+            if (e.ctrlKey || e.metaKey) {
+                switch (e.key) {
+                    case 'n':
+                        e.preventDefault();
+                        this.startNewChat();
+                        break;
+                    case 'k':
+                        e.preventDefault();
+                        this.toggleSearchPanel();
+                        break;
+                    case '/':
+                        e.preventDefault();
+                        if (this.messageInput) this.messageInput.focus();
+                        break;
+                }
+            }
+            if (e.key === 'Escape') {
+                this.closePanels();
+            }
+        });
+    }
+
+    toggleSearchPanel() {
+        // Toggle the documents panel as a search/reference panel
+        this.toggleDocumentsPanel();
+    }
+
+    closePanels() {
+        this.closeDocumentsPanel();
+        this.closeToolsPanel();
+        this.closeChannelsPanel();
+        this.closeNotesPanel();
+        this.closeMemoryPanel();
+        // Close user menu dropdown if open
+        if (this.userMenuDropdown) {
+            this.userMenuDropdown.classList.remove('open');
+        }
+        // Close sidebar on mobile
+        if (window.innerWidth <= 768) {
+            this.sidebar.classList.remove('open');
+            const overlay = document.getElementById('sidebarOverlay');
+            if (overlay) overlay.classList.remove('visible');
+        }
+    }
+
+    // Feature 58: Settings search functionality
+    initSettingsSearch() {
+        const searchInput = document.getElementById('settings-search');
+        if (!searchInput) return;
+
+        searchInput.addEventListener('input', (e) => {
+            const query = e.target.value.toLowerCase();
+            document.querySelectorAll('.settings-section').forEach(section => {
+                const keywords = (section.dataset.searchKeywords || section.textContent).toLowerCase();
+                section.style.display = keywords.includes(query) ? '' : 'none';
+            });
+        });
+    }
+
+    // Feature 59: Haptic feedback for mobile
+    haptic(style = 'light') {
+        if (navigator.vibrate) {
+            navigator.vibrate(style === 'heavy' ? 50 : 10);
+        }
+    }
+
+    // Feature 64: Quick actions on text selection
+    initQuickActions() {
+        let toolbar = document.getElementById('quick-actions-toolbar');
+        if (!toolbar) {
+            toolbar = document.createElement('div');
+            toolbar.id = 'quick-actions-toolbar';
+            toolbar.className = 'quick-actions-toolbar';
+            toolbar.style.display = 'none';
+            toolbar.innerHTML = `
+                <button class="quick-action-btn" data-action="ask">Ask</button>
+                <button class="quick-action-btn" data-action="explain">Explain</button>
+                <button class="quick-action-btn" data-action="copy">Copy</button>
+            `;
+            document.body.appendChild(toolbar);
+        }
+
+        document.addEventListener('selectionchange', () => {
+            const sel = window.getSelection();
+            if (sel.rangeCount && sel.toString().trim().length > 0) {
+                const range = sel.getRangeAt(0);
+                const rect = range.getBoundingClientRect();
+                // Only show within message area
+                const msgArea = document.querySelector('.chat-messages, .messages-container, #messages');
+                if (msgArea && msgArea.contains(range.startContainer)) {
+                    toolbar.style.top = (rect.top + window.scrollY - 45) + 'px';
+                    toolbar.style.left = (rect.left + window.scrollX) + 'px';
+                    toolbar.style.display = 'flex';
+                    toolbar.dataset.selectedText = sel.toString();
+                }
+            } else {
+                toolbar.style.display = 'none';
+            }
+        });
+
+        toolbar.addEventListener('click', (e) => {
+            const btn = e.target.closest('.quick-action-btn');
+            if (!btn) return;
+            const text = toolbar.dataset.selectedText;
+            const action = btn.dataset.action;
+            toolbar.style.display = 'none';
+
+            if (action === 'copy') {
+                navigator.clipboard.writeText(text);
+                this.haptic();
+            } else if (action === 'ask') {
+                if (this.messageInput) {
+                    this.messageInput.value = 'Tell me more about: ' + text;
+                    this.messageInput.focus();
+                }
+                this.haptic();
+            } else if (action === 'explain') {
+                if (this.messageInput) {
+                    this.messageInput.value = 'Please explain this: ' + text;
+                    this.messageInput.focus();
+                }
+                this.haptic();
+            }
+        });
+    }
+
+    handleMessageAction(action, messageEl) {
+        const textEl = messageEl.querySelector('.message-text');
+        const rawText = textEl ? textEl.innerText : '';
+
+        switch(action) {
+            case 'copy':
+                navigator.clipboard.writeText(rawText).then(() => {
+                    this.showToast('Copied to clipboard');
+                });
+                break;
+            case 'edit':
+                // Put text in input and remove the message + subsequent messages
+                this.messageInput.value = rawText;
+                this.messageInput.focus();
+                this.autoResizeTextarea();
+                // Remove this message and all following
+                const messages = Array.from(this.messages.children);
+                const idx = messages.indexOf(messageEl);
+                for (let i = messages.length - 1; i >= idx; i--) {
+                    messages[i].remove();
+                }
+                break;
+            case 'regenerate':
+                // Re-send the last user message
+                const userMsgs = this.messages.querySelectorAll('.message.user');
+                const lastUserMsg = userMsgs[userMsgs.length - 1];
+                if (lastUserMsg) {
+                    const userText = lastUserMsg.querySelector('.message-text').innerText;
+                    // Remove the last assistant message
+                    messageEl.remove();
+                    // Re-send
+                    this.sendMessage(userText);
+                }
+                break;
+            case 'favorite':
+                this.toggleFavorite(messageEl);
+                break;
+            case 'translate':
+                this.showTranslateDropdown(messageEl);
+                break;
+        }
+    }
+
+    async toggleFavorite(messageEl) {
+        if (!this.conversationId) return;
+        const msgId = messageEl.dataset.messageId;
+        if (!msgId) return;
+        try {
+            const resp = await fetch(`/api/conversations/${this.conversationId}/messages/${msgId}/favorite`, {
+                method: 'PATCH'
+            });
+            if (resp.ok) {
+                const btn = messageEl.querySelector('[data-action="favorite"]');
+                btn.classList.toggle('active');
+                const svg = btn.querySelector('svg');
+                svg.setAttribute('fill', btn.classList.contains('active') ? 'currentColor' : 'none');
+            }
+        } catch(e) { console.error('Failed to toggle favorite:', e); }
+    }
+
+    showToast(message) {
+        const toast = document.createElement('div');
+        toast.className = 'toast-message';
+        toast.textContent = message;
+        document.body.appendChild(toast);
+        setTimeout(() => toast.classList.add('visible'), 10);
+        setTimeout(() => { toast.classList.remove('visible'); setTimeout(() => toast.remove(), 300); }, 2000);
+    }
+
+    initSidebar() {
+        // Search
+        const searchInput = document.getElementById('sidebarSearch');
+        if (searchInput) {
+            let debounceTimer;
+            searchInput.addEventListener('input', () => {
+                clearTimeout(debounceTimer);
+                debounceTimer = setTimeout(() => this.searchConversations(searchInput.value), 300);
+            });
+        }
+
+        // Tabs
+        const tabs = document.querySelectorAll('.sidebar-tab');
+        tabs.forEach(tab => {
+            tab.addEventListener('click', () => {
+                tabs.forEach(t => t.classList.remove('active'));
+                tab.classList.add('active');
+                this.loadSidebarTab(tab.dataset.tab);
+            });
+        });
+
+        // Load folders for the folders tab
+        this.folders = [];
+        this.loadFolders();
+    }
+
+    async searchConversations(query) {
+        if (!query.trim()) {
+            // Reset to show all
+            document.querySelectorAll('.conversation-item').forEach(el => el.style.display = '');
+            return;
+        }
+        try {
+            const resp = await fetch(`/api/conversations/search?q=${encodeURIComponent(query)}&size=20`);
+            if (resp.ok) {
+                const data = await resp.json();
+                const ids = new Set(data.content.map(c => c.id));
+                document.querySelectorAll('.conversation-item').forEach(el => {
+                    el.style.display = ids.has(el.dataset.id) ? '' : 'none';
+                });
+            }
+        } catch(e) { console.error('Search failed:', e); }
+    }
+
+    async loadSidebarTab(tab) {
+        const list = this.conversationsList;
+        if (!list) return;
+
+        switch(tab) {
+            case 'all':
+                document.querySelectorAll('.conversation-item').forEach(el => el.style.display = '');
+                document.querySelectorAll('.folder-section').forEach(el => el.style.display = 'none');
+                { const fv = document.getElementById('foldersView'); if (fv) fv.style.display = 'none'; }
+                break;
+            case 'pinned':
+                try {
+                    const resp = await fetch('/api/conversations/pinned');
+                    if (resp.ok) {
+                        const pinned = await resp.json();
+                        const pinnedIds = new Set(pinned.map(c => c.id));
+                        document.querySelectorAll('.conversation-item').forEach(el => {
+                            el.style.display = pinnedIds.has(el.dataset.id) ? '' : 'none';
+                        });
+                        document.querySelectorAll('.folder-section').forEach(el => el.style.display = 'none');
+                        { const fv = document.getElementById('foldersView'); if (fv) fv.style.display = 'none'; }
+                    }
+                } catch(e) {}
+                break;
+            case 'folders':
+                this.showFolderView();
+                break;
+        }
+    }
+
+    async loadFolders() {
+        try {
+            const resp = await fetch('/api/folders');
+            if (resp.ok) {
+                this.folders = await resp.json();
+            }
+        } catch(e) { this.folders = []; }
+    }
+
+    showFolderView() {
+        document.querySelectorAll('.conversation-item').forEach(el => el.style.display = 'none');
+        let existing = document.getElementById('archivedItems');
+        if (existing) existing.style.display = 'none';
+
+        let foldersContainer = document.getElementById('foldersView');
+        if (!foldersContainer) {
+            foldersContainer = document.createElement('div');
+            foldersContainer.id = 'foldersView';
+            this.conversationsList.appendChild(foldersContainer);
+        }
+
+        foldersContainer.textContent = '';
+        this._buildFolderListView(foldersContainer);
+        foldersContainer.style.display = '';
+    }
+
+    _buildFolderListView(container) {
+        container.textContent = '';
+
+        // New Folder button
+        const newBtn = document.createElement('button');
+        newBtn.className = 'new-folder-btn';
+        const plusSvg = document.createElementNS('http://www.w3.org/2000/svg', 'svg');
+        plusSvg.setAttribute('viewBox', '0 0 24 24');
+        plusSvg.setAttribute('fill', 'none');
+        plusSvg.setAttribute('stroke', 'currentColor');
+        plusSvg.setAttribute('stroke-width', '2');
+        plusSvg.setAttribute('width', '16');
+        plusSvg.setAttribute('height', '16');
+        const l1 = document.createElementNS('http://www.w3.org/2000/svg', 'line');
+        l1.setAttribute('x1', '12'); l1.setAttribute('y1', '5'); l1.setAttribute('x2', '12'); l1.setAttribute('y2', '19');
+        const l2 = document.createElementNS('http://www.w3.org/2000/svg', 'line');
+        l2.setAttribute('x1', '5'); l2.setAttribute('y1', '12'); l2.setAttribute('x2', '19'); l2.setAttribute('y2', '12');
+        plusSvg.appendChild(l1);
+        plusSvg.appendChild(l2);
+        newBtn.appendChild(plusSvg);
+        newBtn.appendChild(document.createTextNode(' New Project'));
+        newBtn.addEventListener('click', () => this.createFolder());
+        container.appendChild(newBtn);
+
+        if (this.folders.length === 0) {
+            const empty = document.createElement('div');
+            empty.className = 'empty-state';
+            empty.textContent = 'No projects yet. Create one to organize your chats.';
+            container.appendChild(empty);
+        } else {
+            this.folders.forEach(f => {
+                const row = document.createElement('div');
+                row.className = 'folder-row';
+                row.dataset.folderId = f.id;
+
+                const folderSvg = document.createElementNS('http://www.w3.org/2000/svg', 'svg');
+                folderSvg.setAttribute('viewBox', '0 0 24 24');
+                folderSvg.setAttribute('fill', 'none');
+                folderSvg.setAttribute('stroke', 'currentColor');
+                folderSvg.setAttribute('stroke-width', '2');
+                folderSvg.setAttribute('width', '16');
+                folderSvg.setAttribute('height', '16');
+                const path = document.createElementNS('http://www.w3.org/2000/svg', 'path');
+                path.setAttribute('d', 'M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z');
+                folderSvg.appendChild(path);
+                row.appendChild(folderSvg);
+
+                const nameSpan = document.createElement('span');
+                nameSpan.className = 'folder-name';
+                nameSpan.textContent = f.name;
+                row.appendChild(nameSpan);
+
+                const countSpan = document.createElement('span');
+                countSpan.className = 'folder-count';
+                countSpan.textContent = f.conversationCount || 0;
+                row.appendChild(countSpan);
+
+                // Chevron right arrow
+                const chevron = document.createElementNS('http://www.w3.org/2000/svg', 'svg');
+                chevron.setAttribute('viewBox', '0 0 24 24');
+                chevron.setAttribute('fill', 'none');
+                chevron.setAttribute('stroke', 'currentColor');
+                chevron.setAttribute('stroke-width', '2');
+                chevron.setAttribute('width', '14');
+                chevron.setAttribute('height', '14');
+                chevron.classList.add('folder-chevron');
+                const chevPath = document.createElementNS('http://www.w3.org/2000/svg', 'path');
+                chevPath.setAttribute('d', 'M9 18l6-6-6-6');
+                chevron.appendChild(chevPath);
+                row.appendChild(chevron);
+
+                row.addEventListener('click', () => this._openFolder(f));
+                container.appendChild(row);
+            });
+        }
+    }
+
+    async _openFolder(folder) {
+        const container = document.getElementById('foldersView');
+        if (!container) return;
+        container.textContent = '';
+
+        // Back button header
+        const backHeader = document.createElement('div');
+        backHeader.className = 'folder-back-header';
+
+        const backBtn = document.createElement('button');
+        backBtn.className = 'folder-back-btn';
+        const backSvg = document.createElementNS('http://www.w3.org/2000/svg', 'svg');
+        backSvg.setAttribute('viewBox', '0 0 24 24');
+        backSvg.setAttribute('fill', 'none');
+        backSvg.setAttribute('stroke', 'currentColor');
+        backSvg.setAttribute('stroke-width', '2');
+        backSvg.setAttribute('width', '16');
+        backSvg.setAttribute('height', '16');
+        const backPath = document.createElementNS('http://www.w3.org/2000/svg', 'path');
+        backPath.setAttribute('d', 'M19 12H5M12 19l-7-7 7-7');
+        backSvg.appendChild(backPath);
+        backBtn.appendChild(backSvg);
+        backBtn.appendChild(document.createTextNode(' Projects'));
+        backBtn.addEventListener('click', () => this._buildFolderListView(container));
+        backHeader.appendChild(backBtn);
+
+        // Delete folder button
+        const deleteBtn = document.createElement('button');
+        deleteBtn.className = 'folder-delete-btn';
+        deleteBtn.title = 'Delete project';
+        const delSvg = document.createElementNS('http://www.w3.org/2000/svg', 'svg');
+        delSvg.setAttribute('viewBox', '0 0 24 24');
+        delSvg.setAttribute('fill', 'none');
+        delSvg.setAttribute('stroke', 'currentColor');
+        delSvg.setAttribute('stroke-width', '2');
+        delSvg.setAttribute('width', '14');
+        delSvg.setAttribute('height', '14');
+        const delPath = document.createElementNS('http://www.w3.org/2000/svg', 'path');
+        delPath.setAttribute('d', 'M3 6h18M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2');
+        delSvg.appendChild(delPath);
+        deleteBtn.appendChild(delSvg);
+        deleteBtn.addEventListener('click', async () => {
+            if (!confirm(`Delete project "${folder.name}"? Conversations will be removed from the project, not deleted.`)) return;
+            try {
+                const resp = await fetch(`/api/folders/${folder.id}`, { method: 'DELETE' });
+                if (resp.ok) {
+                    await this.loadFolders();
+                    this._buildFolderListView(container);
+                    this.showToast('Project deleted');
+                }
+            } catch(e) { this.showToast('Failed to delete project'); }
+        });
+        backHeader.appendChild(deleteBtn);
+
+        container.appendChild(backHeader);
+
+        // Folder title
+        const titleEl = document.createElement('div');
+        titleEl.className = 'folder-title';
+        const folderSvg = document.createElementNS('http://www.w3.org/2000/svg', 'svg');
+        folderSvg.setAttribute('viewBox', '0 0 24 24');
+        folderSvg.setAttribute('fill', 'none');
+        folderSvg.setAttribute('stroke', 'currentColor');
+        folderSvg.setAttribute('stroke-width', '2');
+        folderSvg.setAttribute('width', '18');
+        folderSvg.setAttribute('height', '18');
+        const fPath = document.createElementNS('http://www.w3.org/2000/svg', 'path');
+        fPath.setAttribute('d', 'M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z');
+        folderSvg.appendChild(fPath);
+        titleEl.appendChild(folderSvg);
+        const titleText = document.createElement('span');
+        titleText.textContent = folder.name;
+        titleEl.appendChild(titleText);
+        container.appendChild(titleEl);
+
+        // Loading indicator
+        const loading = document.createElement('div');
+        loading.className = 'empty-state';
+        loading.textContent = 'Loading conversations...';
+        container.appendChild(loading);
+
+        // Fetch conversations
+        try {
+            const resp = await fetch(`/api/folders/${folder.id}/conversations`);
+            if (resp.ok) {
+                const convs = await resp.json();
+                container.removeChild(loading);
+                if (convs.length === 0) {
+                    const empty = document.createElement('div');
+                    empty.className = 'empty-state';
+                    empty.textContent = 'No conversations in this project.';
+                    container.appendChild(empty);
+                } else {
+                    convs.forEach(c => {
+                        const item = document.createElement('div');
+                        item.className = 'conversation-item folder-conv-item';
+                        item.dataset.id = c.id;
+
+                        const titleSpan = document.createElement('div');
+                        titleSpan.className = 'conv-title';
+                        titleSpan.textContent = c.title || 'Untitled';
+                        item.appendChild(titleSpan);
+
+                        const meta = document.createElement('div');
+                        meta.className = 'conv-meta';
+                        meta.textContent = `${c.messageCount} message${c.messageCount !== 1 ? 's' : ''}`;
+                        item.appendChild(meta);
+
+                        item.addEventListener('click', () => this.loadConversation(c.id));
+                        container.appendChild(item);
+                    });
+                }
+            }
+        } catch(e) {
+            container.removeChild(loading);
+            const err = document.createElement('div');
+            err.className = 'empty-state';
+            err.textContent = 'Failed to load conversations.';
+            container.appendChild(err);
+        }
+    }
+
+    async createFolder() {
+        const name = prompt('Project name:');
+        if (!name || !name.trim()) return;
+        try {
+            const resp = await fetch('/api/folders', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ name: name.trim() })
+            });
+            if (resp.ok) {
+                await this.loadFolders();
+                this.showFolderView();
+                this.showToast('Project created');
+            }
+        } catch(e) {
+            console.error('Failed to create project:', e);
+            this.showToast('Failed to create project');
+        }
+    }
+
+    // --- Conversation Context Menu ---
+
+    showConvContextMenu(x, y, convId) {
+        const menu = document.getElementById('convContextMenu');
+        if (!menu) return;
+        this.ctxMenuConvId = convId;
+
+        // Determine if already pinned
+        const item = document.querySelector(`.conversation-item[data-id="${convId}"]`);
+        const isPinned = item && item.dataset.pinned === 'true';
+        const pinLabel = document.getElementById('ctxPinLabel');
+        if (pinLabel) pinLabel.textContent = isPinned ? 'Unfavorite' : 'Favorite';
+
+        // Position
+        menu.style.display = 'block';
+        const menuRect = menu.getBoundingClientRect();
+        const maxX = window.innerWidth - menuRect.width - 8;
+        const maxY = window.innerHeight - menuRect.height - 8;
+        menu.style.left = Math.min(x, maxX) + 'px';
+        menu.style.top = Math.min(y, maxY) + 'px';
+
+        // Attach action handlers (remove old ones by cloning)
+        menu.querySelectorAll('.ctx-menu-item').forEach(btn => {
+            const clone = btn.cloneNode(true);
+            btn.parentNode.replaceChild(clone, btn);
+        });
+
+        menu.querySelector('[data-action="pin"]').addEventListener('click', () => {
+            menu.style.display = 'none';
+            this.togglePinConversation(convId);
+        });
+        menu.querySelector('[data-action="rename"]').addEventListener('click', () => {
+            menu.style.display = 'none';
+            this.renameConversation(convId);
+        });
+        menu.querySelector('[data-action="folder"]').addEventListener('click', (e) => {
+            e.stopPropagation();
+            menu.style.display = 'none';
+            this.showFolderPicker(e.clientX, e.clientY, convId);
+        });
+        menu.querySelector('[data-action="delete"]').addEventListener('click', () => {
+            menu.style.display = 'none';
+            this.deleteConversation(convId);
+        });
+        const tagBtn = menu.querySelector('[data-action="tag"]');
+        if (tagBtn) {
+            tagBtn.addEventListener('click', () => {
+                menu.style.display = 'none';
+                this.showTagsModal(convId);
+            });
+        }
+    }
+
+    async togglePinConversation(convId) {
+        const item = document.querySelector(`.conversation-item[data-id="${convId}"]`);
+        const isPinned = item && item.dataset.pinned === 'true';
+        try {
+            const resp = await fetch(`/api/conversations/${convId}`, {
+                method: 'PATCH',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ pinned: !isPinned })
+            });
+            if (resp.ok) {
+                if (item) {
+                    item.dataset.pinned = String(!isPinned);
+                    let indicator = item.querySelector('.pin-indicator');
+                    if (!isPinned) {
+                        if (!indicator) {
+                            indicator = document.createElement('span');
+                            indicator.className = 'pin-indicator';
+                            indicator.textContent = '\u{2764}';
+                            item.querySelector('.conversation-title').appendChild(indicator);
+                        }
+                    } else {
+                        if (indicator) indicator.remove();
+                    }
+                }
+                this.showToast(isPinned ? 'Removed from favorites' : 'Added to favorites');
+            }
+        } catch(e) { this.showToast('Failed to update favorite'); }
+    }
+
+    async renameConversation(convId) {
+        const item = document.querySelector(`.conversation-item[data-id="${convId}"]`);
+        const titleEl = item ? item.querySelector('.conversation-title') : null;
+        const currentTitle = titleEl ? titleEl.textContent.replace('\u{2764}', '').trim() : '';
+        const newTitle = prompt('Rename conversation:', currentTitle);
+        if (!newTitle || newTitle.trim() === currentTitle) return;
+        try {
+            const resp = await fetch(`/api/conversations/${convId}`, {
+                method: 'PATCH',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ title: newTitle.trim() })
+            });
+            if (resp.ok && titleEl) {
+                titleEl.textContent = newTitle.trim();
+                if (item && item.dataset.pinned === 'true') {
+                    const indicator = document.createElement('span');
+                    indicator.className = 'pin-indicator';
+                    indicator.textContent = '\u{2764}';
+                    titleEl.appendChild(indicator);
+                }
+                this.showToast('Renamed');
+            }
+        } catch(e) { this.showToast('Failed to rename'); }
+    }
+
+    async showFolderPicker(x, y, convId) {
+        const existing = document.getElementById('folderPicker');
+        if (existing) existing.remove();
+
+        // Refresh folders list before showing picker
+        await this.loadFolders();
+
+        const picker = document.createElement('div');
+        picker.id = 'folderPicker';
+        picker.className = 'folder-picker';
+
+        const noFolder = document.createElement('button');
+        noFolder.className = 'folder-picker-item remove-folder';
+        noFolder.textContent = 'No project';
+        noFolder.addEventListener('click', () => {
+            this.moveToFolder(convId, null);
+            picker.remove();
+        });
+        picker.appendChild(noFolder);
+
+        if (this.folders.length === 0) {
+            const empty = document.createElement('div');
+            empty.style.cssText = 'padding: 8px 12px; color: var(--text-muted); font-size: 0.85rem;';
+            empty.textContent = 'No projects. Create one in the Projects tab.';
+            picker.appendChild(empty);
+        } else {
+            this.folders.forEach(f => {
+                const item = document.createElement('button');
+                item.className = 'folder-picker-item';
+                item.textContent = f.name;
+                item.addEventListener('click', () => {
+                    this.moveToFolder(convId, f.id);
+                    picker.remove();
+                });
+                picker.appendChild(item);
+            });
+        }
+
+        document.body.appendChild(picker);
+        const pickerRect = picker.getBoundingClientRect();
+        const maxX = window.innerWidth - pickerRect.width - 8;
+        const maxY = window.innerHeight - pickerRect.height - 8;
+        picker.style.left = Math.min(x, maxX) + 'px';
+        picker.style.top = Math.min(y, maxY) + 'px';
+    }
+
+    async moveToFolder(convId, folderId) {
+        try {
+            const resp = await fetch(`/api/conversations/${convId}`, {
+                method: 'PATCH',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ folderId: folderId })
+            });
+            if (resp.ok) {
+                this.showToast(folderId ? 'Moved to project' : 'Removed from project');
+                await this.loadFolders();
+            }
+        } catch(e) { this.showToast('Failed to move'); }
+    }
+
+    initSlashCommands() {
+        this.slashDropdown = null;
+        this.messageInput.addEventListener('input', () => {
+            const val = this.messageInput.value;
+            if (val.startsWith('/')) {
+                this.showSlashDropdown(val.substring(1));
+            } else {
+                this.hideSlashDropdown();
+            }
+        });
+
+        this.messageInput.addEventListener('keydown', (e) => {
+            if (this.slashDropdown && this.slashDropdown.style.display !== 'none') {
+                if (e.key === 'ArrowDown' || e.key === 'ArrowUp') {
+                    e.preventDefault();
+                    this.navigateSlashDropdown(e.key === 'ArrowDown' ? 1 : -1);
+                } else if (e.key === 'Tab' || (e.key === 'Enter' && !e.shiftKey)) {
+                    const active = this.slashDropdown.querySelector('.slash-item.active');
+                    if (active) {
+                        e.preventDefault();
+                        e.stopPropagation();
+                        active.click();
+                    }
+                } else if (e.key === 'Escape') {
+                    this.hideSlashDropdown();
+                }
+            }
+        });
+    }
+
+    async showSlashDropdown(query) {
+        try {
+            const resp = await fetch(`/api/prompts/search?q=${encodeURIComponent(query)}&size=8`);
+            if (!resp.ok) { this.hideSlashDropdown(); return; }
+            const presets = await resp.json();
+
+            if (presets.length === 0) { this.hideSlashDropdown(); return; }
+
+            if (!this.slashDropdown) {
+                this.slashDropdown = document.createElement('div');
+                this.slashDropdown.className = 'slash-dropdown';
+                this.messageInput.parentElement.parentElement.appendChild(this.slashDropdown);
+            }
+
+            this.slashDropdown.innerHTML = presets.map((p, i) => `
+                <div class="slash-item${i === 0 ? ' active' : ''}" data-content="${this.escapeHtml(p.content || p.promptText || '')}">
+                    <div class="slash-name">/${this.escapeHtml(p.name || p.title)}</div>
+                    <div class="slash-desc">${this.escapeHtml(p.description || '')}</div>
+                </div>
+            `).join('');
+
+            this.slashDropdown.style.display = 'block';
+
+            // Click handler
+            this.slashDropdown.querySelectorAll('.slash-item').forEach(item => {
+                item.addEventListener('click', () => {
+                    this.messageInput.value = item.dataset.content;
+                    this.hideSlashDropdown();
+                    this.messageInput.focus();
+                    this.autoResizeTextarea();
+                });
+            });
+        } catch(e) { this.hideSlashDropdown(); }
+    }
+
+    hideSlashDropdown() {
+        if (this.slashDropdown) this.slashDropdown.style.display = 'none';
+    }
+
+    navigateSlashDropdown(dir) {
+        const items = this.slashDropdown.querySelectorAll('.slash-item');
+        const activeIdx = Array.from(items).findIndex(i => i.classList.contains('active'));
+        items[activeIdx]?.classList.remove('active');
+        const newIdx = Math.max(0, Math.min(items.length - 1, activeIdx + dir));
+        items[newIdx]?.classList.add('active');
+        items[newIdx]?.scrollIntoView({ block: 'nearest' });
+    }
+
+    // Channels, Notes, Memory, Prompts, Tools — managed via /workspace sub-pages
+    // Stub methods to prevent errors from any remaining references
+    closeChannelsPanel() {}
+    closeNotesPanel() {}
+    closeMemoryPanel() {}
+    closeToolsPanel() {}
+
+    // --- Tags ---
+
+    initTags() {
+        this.tags = [];
+        this.tagsModalConvId = null;
+
+        const tagsModal = document.getElementById('tagsModal');
+        if (!tagsModal) return;
+
+        // Close button
+        const closeBtn = tagsModal.querySelector('[data-action="closeTagsModal"]');
+        if (closeBtn) {
+            closeBtn.addEventListener('click', () => tagsModal.classList.remove('open'));
+        }
+        tagsModal.addEventListener('click', (e) => {
+            if (e.target === tagsModal) tagsModal.classList.remove('open');
+        });
+
+        // Create tag
+        const createTagBtn = document.getElementById('createTagBtn');
+        if (createTagBtn) {
+            createTagBtn.addEventListener('click', () => {
+                const name = document.getElementById('tagNameInput').value.trim();
+                const color = document.getElementById('tagColorInput').value;
+                if (name) {
+                    this.createTag(name, color);
+                }
+            });
+        }
+
+        // Tag list click delegation (delete + assign)
+        const tagList = document.getElementById('tagList');
+        if (tagList) {
+            tagList.addEventListener('click', (e) => {
+                const deleteBtn = e.target.closest('.tag-item-delete');
+                if (deleteBtn) {
+                    this.deleteTag(deleteBtn.dataset.tagId);
+                }
+            });
+        }
+
+        const tagAssignList = document.getElementById('tagAssignList');
+        if (tagAssignList) {
+            tagAssignList.addEventListener('click', (e) => {
+                const tagItem = e.target.closest('.tag-item');
+                if (!tagItem || !this.tagsModalConvId) return;
+                const tagId = tagItem.dataset.tagId;
+                if (tagItem.classList.contains('assigned')) {
+                    this.untagConversation(tagId, this.tagsModalConvId);
+                } else {
+                    this.tagConversation(tagId, this.tagsModalConvId);
+                }
+            });
+        }
+
+        // Tag action is now handled by the unified context menu (showConvContextMenu)
+    }
+
+    async loadTags() {
+        try {
+            const resp = await fetch('/api/tags');
+            if (!resp.ok) return;
+            this.tags = await resp.json();
+            this.renderTagList();
+        } catch (e) {
+            console.error('Failed to load tags:', e);
+        }
+    }
+
+    renderTagList() {
+        const tagList = document.getElementById('tagList');
+        if (!tagList) return;
+
+        if (this.tags.length === 0) {
+            tagList.innerHTML = '<p class="tag-list-empty">No tags yet</p>';
+            return;
+        }
+
+        tagList.innerHTML = this.tags.map(tag => `
+            <div class="tag-item" data-tag-id="${tag.id}">
+                <div class="tag-color" style="background-color: ${this.escapeHtml(tag.color || '#10a37f')}"></div>
+                <span class="tag-item-name">${this.escapeHtml(tag.name)}</span>
+                <button class="tag-item-delete" data-tag-id="${tag.id}" title="Delete tag">
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="14" height="14">
+                        <line x1="18" y1="6" x2="6" y2="18"></line>
+                        <line x1="6" y1="6" x2="18" y2="18"></line>
+                    </svg>
+                </button>
+            </div>
+        `).join('');
+    }
+
+    async createTag(name, color) {
+        try {
+            const resp = await fetch('/api/tags', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ name, color })
+            });
+            if (!resp.ok) throw new Error('Failed to create tag');
+            document.getElementById('tagNameInput').value = '';
+            this.showToast('Tag created');
+            await this.loadTags();
+            if (this.tagsModalConvId) {
+                this.renderTagAssignList(this.tagsModalConvId);
+            }
+        } catch (e) {
+            console.error('Failed to create tag:', e);
+            this.showToast('Failed to create tag');
+        }
+    }
+
+    async deleteTag(id) {
+        if (!confirm('Delete this tag?')) return;
+        try {
+            const resp = await fetch(`/api/tags/${id}`, { method: 'DELETE' });
+            if (!resp.ok) throw new Error('Failed to delete tag');
+            this.showToast('Tag deleted');
+            await this.loadTags();
+            if (this.tagsModalConvId) {
+                this.renderTagAssignList(this.tagsModalConvId);
+            }
+        } catch (e) {
+            console.error('Failed to delete tag:', e);
+            this.showToast('Failed to delete tag');
+        }
+    }
+
+    async tagConversation(tagId, convId) {
+        try {
+            const resp = await fetch(`/api/tags/${tagId}/conversations/${convId}`, { method: 'POST' });
+            if (!resp.ok) throw new Error('Failed to tag conversation');
+            this.showToast('Tag assigned');
+            this.renderTagAssignList(convId);
+        } catch (e) {
+            console.error('Failed to tag conversation:', e);
+        }
+    }
+
+    async untagConversation(tagId, convId) {
+        try {
+            const resp = await fetch(`/api/tags/${tagId}/conversations/${convId}`, { method: 'DELETE' });
+            if (!resp.ok) throw new Error('Failed to untag conversation');
+            this.showToast('Tag removed');
+            this.renderTagAssignList(convId);
+        } catch (e) {
+            console.error('Failed to untag conversation:', e);
+        }
+    }
+
+    async showTagsModal(convId) {
+        this.tagsModalConvId = convId || null;
+        const tagsModal = document.getElementById('tagsModal');
+        if (!tagsModal) return;
+
+        await this.loadTags();
+
+        const assignSection = document.getElementById('tagAssignSection');
+        if (convId && assignSection) {
+            assignSection.style.display = '';
+            this.renderTagAssignList(convId);
+        } else if (assignSection) {
+            assignSection.style.display = 'none';
+        }
+
+        tagsModal.classList.add('open');
+    }
+
+    async renderTagAssignList(convId) {
+        const assignList = document.getElementById('tagAssignList');
+        if (!assignList) return;
+
+        // Determine which tags are already on this conversation
+        const assignedTagIds = new Set();
+        for (const tag of this.tags) {
+            try {
+                const resp = await fetch(`/api/tags/${tag.id}/conversations`);
+                if (resp.ok) {
+                    const convs = await resp.json();
+                    if (convs.some(c => c.id === convId)) {
+                        assignedTagIds.add(tag.id);
+                    }
+                }
+            } catch (e) { /* skip */ }
+        }
+
+        assignList.innerHTML = this.tags.map(tag => `
+            <div class="tag-item ${assignedTagIds.has(tag.id) ? 'assigned' : ''}" data-tag-id="${tag.id}">
+                <div class="tag-color" style="background-color: ${this.escapeHtml(tag.color || '#10a37f')}"></div>
+                <span class="tag-item-name">${this.escapeHtml(tag.name)}</span>
+            </div>
+        `).join('');
+    }
+
+    // --- Translation ---
+
+    showTranslateDropdown(messageEl) {
+        // Remove any existing dropdown
+        const existing = document.querySelector('.translate-dropdown');
+        if (existing) existing.remove();
+
+        const translateBtn = messageEl.querySelector('[data-action="translate"]');
+        if (!translateBtn) return;
+
+        const languages = [
+            { code: 'es', name: 'Spanish' },
+            { code: 'fr', name: 'French' },
+            { code: 'de', name: 'German' },
+            { code: 'it', name: 'Italian' },
+            { code: 'pt', name: 'Portuguese' },
+            { code: 'zh', name: 'Chinese' },
+            { code: 'ja', name: 'Japanese' },
+            { code: 'ko', name: 'Korean' },
+            { code: 'ar', name: 'Arabic' },
+            { code: 'hi', name: 'Hindi' },
+            { code: 'ru', name: 'Russian' },
+            { code: 'en', name: 'English' }
+        ];
+
+        const dropdown = document.createElement('div');
+        dropdown.className = 'translate-dropdown';
+        dropdown.innerHTML = languages.map(lang =>
+            `<button class="translate-dropdown-item" data-lang="${lang.code}">${lang.name}</button>`
+        ).join('');
+
+        translateBtn.style.position = 'relative';
+        translateBtn.appendChild(dropdown);
+
+        const handleClick = (e) => {
+            const item = e.target.closest('.translate-dropdown-item');
+            if (item) {
+                this.translateMessage(messageEl, item.dataset.lang);
+                dropdown.remove();
+            }
+        };
+        dropdown.addEventListener('click', handleClick);
+
+        // Close on outside click
+        const closeDropdown = (e) => {
+            if (!dropdown.contains(e.target) && e.target !== translateBtn) {
+                dropdown.remove();
+                document.removeEventListener('click', closeDropdown);
+            }
+        };
+        setTimeout(() => document.addEventListener('click', closeDropdown), 0);
+    }
+
+    async translateMessage(messageEl, targetLang) {
+        const textEl = messageEl.querySelector('.message-text');
+        if (!textEl) return;
+
+        const text = textEl.innerText;
+        if (!text.trim()) return;
+
+        // Remove any existing translation
+        const existingTranslation = messageEl.querySelector('.translated-text');
+        if (existingTranslation) existingTranslation.remove();
+
+        // Show loading
+        const loadingEl = document.createElement('div');
+        loadingEl.className = 'translated-text';
+        loadingEl.innerHTML = '<div class="search-loading"><div class="search-loading-spinner"></div> Translating...</div>';
+        textEl.after(loadingEl);
+
+        try {
+            const resp = await fetch('/api/translate', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ text, sourceLanguage: 'auto', targetLanguage: targetLang })
+            });
+            if (!resp.ok) throw new Error('Translation failed');
+            const result = await resp.json();
+
+            const langNames = {
+                es: 'Spanish', fr: 'French', de: 'German', it: 'Italian',
+                pt: 'Portuguese', zh: 'Chinese', ja: 'Japanese', ko: 'Korean',
+                ar: 'Arabic', hi: 'Hindi', ru: 'Russian', en: 'English'
+            };
+
+            loadingEl.innerHTML = `
+                <div class="translated-text-header">
+                    <span class="translated-text-label">Translated to ${langNames[targetLang] || targetLang}</span>
+                    <button class="translated-text-close" title="Remove translation">
+                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="14" height="14">
+                            <line x1="18" y1="6" x2="6" y2="18"></line>
+                            <line x1="6" y1="6" x2="18" y2="18"></line>
+                        </svg>
+                    </button>
+                </div>
+                <div>${this.escapeHtml(result.translatedText || result.translation || '')}</div>
+            `;
+
+            const closeBtn = loadingEl.querySelector('.translated-text-close');
+            if (closeBtn) {
+                closeBtn.addEventListener('click', () => loadingEl.remove());
+            }
+        } catch (e) {
+            console.error('Translation failed:', e);
+            loadingEl.remove();
+            this.showToast('Translation failed');
         }
     }
 

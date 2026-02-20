@@ -44,6 +44,21 @@ public class Conversation {
     @Column(name = "updated_at")
     private LocalDateTime updatedAt;
 
+    @Column(name = "archived")
+    @Builder.Default
+    private Boolean archived = false;
+
+    @Column(name = "pinned")
+    @Builder.Default
+    private Boolean pinned = false;
+
+    @Column(name = "folder_id")
+    private String folderId;
+
+    @ManyToOne(fetch = FetchType.LAZY)
+    @JoinColumn(name = "organization_id")
+    private Organization organization;
+
     @OneToMany(mappedBy = "conversation", cascade = CascadeType.ALL, orphanRemoval = true, fetch = FetchType.LAZY)
     @OrderBy("createdAt ASC")
     @Builder.Default

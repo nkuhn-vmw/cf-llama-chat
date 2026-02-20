@@ -6,6 +6,7 @@ import lombok.Builder;
 import lombok.Data;
 import lombok.NoArgsConstructor;
 
+import java.util.List;
 import java.util.UUID;
 
 @Data
@@ -22,9 +23,23 @@ public class ChatResponse {
     private String error;
     private boolean streaming;
     private boolean complete;
+    private boolean temporary;
 
     // Performance metrics
     private Long timeToFirstTokenMs;
     private Double tokensPerSecond;
     private Long totalResponseTimeMs;
+
+    // RAG citation metadata
+    private List<CitationMeta> citations;
+
+    @Data
+    @NoArgsConstructor
+    @AllArgsConstructor
+    @Builder
+    public static class CitationMeta {
+        private int sourceNumber;
+        private String documentName;
+        private double relevance;
+    }
 }

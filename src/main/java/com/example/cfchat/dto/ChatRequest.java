@@ -40,4 +40,20 @@ public class ChatRequest {
      */
     @Builder.Default
     private boolean useTools = true;
+
+    /**
+     * Whether this is a temporary (ephemeral) chat.
+     * When true, messages are not persisted to the database.
+     * The conversation exists only for the duration of the session.
+     */
+    @Builder.Default
+    private boolean temporary = false;
+
+    /**
+     * RAG retrieval mode: "snippet" (default) returns individual matching chunks,
+     * "full" returns all chunks from matched parent documents grouped together.
+     * When null, falls back to the server-configured default (rag.retrieval-mode).
+     */
+    private String ragRetrievalMode;
+
 }
