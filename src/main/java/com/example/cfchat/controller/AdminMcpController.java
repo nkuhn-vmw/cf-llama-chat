@@ -1,6 +1,7 @@
 package com.example.cfchat.controller;
 
 import com.example.cfchat.auth.UserService;
+import com.example.cfchat.mcp.McpServerService;
 import com.example.cfchat.mcp.McpToolCallbackCacheService;
 import com.example.cfchat.model.McpServer;
 import com.example.cfchat.model.McpTransportType;
@@ -45,9 +46,28 @@ public class AdminMcpController {
             serverDataList.add(serverData);
         }
 
+        // CF service binding MCP servers (auto-discovered, with health check)
+        List<Map<String, Object>> bindingDataList = new ArrayList<>();
+        for (var service : mcpToolCallbackCacheService.getMcpServerServices()) {
+            McpServerService.McpServerInfo info = service.getHealthyMcpServer();
+            Map<String, Object> data = new HashMap<>();
+            data.put("name", service.getName());
+            data.put("url", service.getServerUrl());
+            data.put("protocol", service.getProtocol().displayName());
+            data.put("healthy", info.healthy());
+            data.put("serverName", info.serverName());
+            data.put("toolCount", info.tools().size());
+            data.put("tools", info.tools());
+            data.put("hasToken", service.hasAdditionalHeaders());
+            data.put("displayName", service.getDisplayName());
+            data.put("hasCustomDisplayName", service.hasCustomDisplayName());
+            bindingDataList.add(data);
+        }
+
         model.addAttribute("servers", serverDataList);
-        model.addAttribute("totalServers", servers.size());
-        model.addAttribute("enabledServers", servers.stream().filter(McpServer::isEnabled).count());
+        model.addAttribute("bindingServers", bindingDataList);
+        model.addAttribute("totalServers", servers.size() + bindingDataList.size());
+        model.addAttribute("enabledServers", servers.stream().filter(McpServer::isEnabled).count() + bindingDataList.size());
 
         return "admin/mcp";
     }
@@ -325,5 +345,90 @@ public class AdminMcpController {
         } catch (IllegalArgumentException e) {
             return ResponseEntity.badRequest().body(Map.of("error", e.getMessage()));
         }
+    }
+
+    @PostMapping("/api/admin/mcp/bindings/{name}/display-name")
+    @ResponseBody
+    public ResponseEntity<Map<String, Object>> setBindingDisplayName(
+            @PathVariable String name,
+            @RequestBody Map<String, String> body) {
+
+        Optional<User> currentUser = userService.getCurrentUser();
+        if (currentUser.isEmpty() || currentUser.get().getRole() != User.UserRole.ADMIN) {
+            return ResponseEntity.status(403).body(Map.of("error", "Forbidden"));
+        }
+
+        Optional<McpServerService> service = mcpToolCallbackCacheService.getMcpServerServices().stream()
+                .filter(s -> s.getName().equals(name))
+                .findFirst();
+
+        if (service.isEmpty()) {
+            return ResponseEntity.badRequest().body(Map.of("error", "Service binding not found: " + name));
+        }
+
+        String displayName = body.get("displayName");
+        service.get().setDisplayName(displayName);
+        log.info("Admin {} set display name for binding {}: {}", currentUser.get().getUsername(), name, displayName);
+
+        return ResponseEntity.ok(Map.of("success", true, "displayName", service.get().getDisplayName()));
+    }
+
+    @PostMapping("/api/admin/mcp/bindings/{name}/token")
+    @ResponseBody
+    public ResponseEntity<Map<String, Object>> setBindingToken(
+            @PathVariable String name,
+            @RequestBody Map<String, String> body) {
+
+        Optional<User> currentUser = userService.getCurrentUser();
+        if (currentUser.isEmpty() || currentUser.get().getRole() != User.UserRole.ADMIN) {
+            return ResponseEntity.status(403).body(Map.of("error", "Forbidden"));
+        }
+
+        String token = body.get("token");
+        if (token == null || token.isBlank()) {
+            return ResponseEntity.badRequest().body(Map.of("error", "Token is required"));
+        }
+
+        Optional<McpServerService> service = mcpToolCallbackCacheService.getMcpServerServices().stream()
+                .filter(s -> s.getName().equals(name))
+                .findFirst();
+
+        if (service.isEmpty()) {
+            return ResponseEntity.badRequest().body(Map.of("error", "Service binding not found: " + name));
+        }
+
+        service.get().setAdditionalHeaders(Map.of("Authorization", "Bearer " + token.trim()));
+        mcpToolCallbackCacheService.invalidateCache();
+        log.info("Admin {} set auth token for binding: {}", currentUser.get().getUsername(), name);
+
+        return ResponseEntity.ok(Map.of("success", true));
+    }
+
+    @PostMapping("/api/admin/mcp/bindings/{name}/probe")
+    @ResponseBody
+    public ResponseEntity<Map<String, Object>> probeBindingServer(@PathVariable String name) {
+        Optional<User> currentUser = userService.getCurrentUser();
+        if (currentUser.isEmpty() || currentUser.get().getRole() != User.UserRole.ADMIN) {
+            return ResponseEntity.status(403).body(Map.of("error", "Forbidden"));
+        }
+
+        Optional<McpServerService> service = mcpToolCallbackCacheService.getMcpServerServices().stream()
+                .filter(s -> s.getName().equals(name))
+                .findFirst();
+
+        if (service.isEmpty()) {
+            return ResponseEntity.badRequest().body(Map.of("error", "Service binding not found: " + name));
+        }
+
+        McpServerService.McpServerInfo info = service.get().getHealthyMcpServer();
+        Map<String, Object> result = new HashMap<>();
+        result.put("healthy", info.healthy());
+        result.put("serverName", info.serverName());
+        result.put("toolCount", info.tools().size());
+        result.put("tools", info.tools().stream()
+                .map(t -> Map.of("name", t.name(), "description", t.description() != null ? t.description() : ""))
+                .toList());
+
+        return ResponseEntity.ok(result);
     }
 }

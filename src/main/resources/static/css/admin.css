@@ -141,6 +141,11 @@
     background-color: rgba(16, 163, 127, 0.1);
 }
 
+.action-btn.has-token {
+    color: var(--accent-color);
+    border-color: var(--accent-color);
+}
+
 /* Data Table */
 .data-table {
     width: 100%;

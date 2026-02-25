@@ -103,7 +103,11 @@ public class McpDiscoveryService {
         if (tagBasedConfig != null) {
             return tagBasedConfig;
         }
-        return extractFromCredentials(service);
+        McpServiceConfiguration credentialConfig = extractFromCredentials(service);
+        if (credentialConfig != null) {
+            return credentialConfig;
+        }
+        return extractFromLabel(service);
     }
 
     private McpServiceConfiguration extractFromTags(CfService service) {
@@ -179,6 +183,33 @@ public class McpDiscoveryService {
         }
 
         return null;
+    }
+
+    private McpServiceConfiguration extractFromLabel(CfService service) {
+        String label = service.getLabel();
+        if (label == null || !label.toLowerCase().contains("mcp")) {
+            return null;
+        }
+
+        CfCredentials credentials = service.getCredentials();
+        if (credentials == null) {
+            return null;
+        }
+
+        String uri = credentials.getString(CREDENTIALS_URI_KEY);
+        if (!isValidUrl(uri)) {
+            return null;
+        }
+
+        Map<String, String> headers = extractHeaders(credentials);
+        logger.info("Found MCP service '{}' via label '{}' with URI: {}, headers: {}",
+                service.getName(), label, uri, headers.keySet());
+        return new McpServiceConfiguration(
+                service.getName(),
+                uri,
+                new ProtocolType.StreamableHttp(),
+                headers
+        );
     }
 
     private boolean isValidUrl(String url) {

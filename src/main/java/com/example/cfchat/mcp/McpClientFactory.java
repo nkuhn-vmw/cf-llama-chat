@@ -43,10 +43,11 @@ public class McpClientFactory {
         HttpClientSseClientTransport.Builder transportBuilder = HttpClientSseClientTransport.builder(serverUrl)
                 .clientBuilder(clientBuilder);
 
-        // Add custom headers if provided
+        // Use httpRequestCustomizer for per-request header injection (applied on every request)
         if (!headers.isEmpty()) {
-            transportBuilder.customizeRequest(requestBuilder -> {
-                headers.forEach(requestBuilder::header);
+            logger.info("Creating SSE client for {} with {} custom header(s): {}", serverUrl, headers.size(), headers.keySet());
+            transportBuilder.httpRequestCustomizer((builder, method, endpoint, body, context) -> {
+                headers.forEach(builder::header);
             });
         }
 
@@ -75,10 +76,11 @@ public class McpClientFactory {
                 .clientBuilder(clientBuilder)
                 .resumableStreams(true);
 
-        // Add custom headers if provided
+        // Use httpRequestCustomizer for per-request header injection (applied on every request)
         if (!headers.isEmpty()) {
-            transportBuilder.customizeRequest(requestBuilder -> {
-                headers.forEach(requestBuilder::header);
+            logger.info("Creating Streamable HTTP client for {} with {} custom header(s): {}", serverUrl, headers.size(), headers.keySet());
+            transportBuilder.httpRequestCustomizer((builder, method, endpoint, body, context) -> {
+                headers.forEach(builder::header);
             });
         }
 

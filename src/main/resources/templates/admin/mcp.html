@@ -40,6 +40,77 @@
             </div>
         </div>
 
+        <section th:if="${!bindingServers.isEmpty()}">
+            <div class="section-header">
+                <h2>Service Bindings (Auto-discovered)</h2>
+            </div>
+
+            <div class="data-table">
+                <table>
+                    <thead>
+                        <tr>
+                            <th>Name</th>
+                            <th>Transport</th>
+                            <th>URL</th>
+                            <th>Status</th>
+                            <th>Tools</th>
+                            <th>Actions</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        <tr th:each="binding : ${bindingServers}">
+                            <td>
+                                <div style="font-weight: 500; display: flex; align-items: center; gap: 6px;">
+                                    <span th:text="${binding.displayName}">Server Name</span>
+                                    <button class="action-btn" style="padding: 2px 4px; font-size: 0.75rem; border: none;"
+                                            th:data-binding-name="${binding.name}"
+                                            th:data-current-name="${binding.displayName}"
+                                            data-action="editBindingName"
+                                            title="Edit display name">
+                                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="width: 12px; height: 12px;">
+                                            <path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"></path>
+                                            <path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"></path>
+                                        </svg>
+                                    </button>
+                                </div>
+                                <div style="font-size: 0.8rem; color: var(--text-muted);">
+                                    <span class="transport-badge" style="background: var(--primary); color: white; font-size: 0.7rem;">SERVICE BINDING</span>
+                                    <span th:text="'(' + ${binding.name} + ')'" style="margin-left: 4px;"></span>
+                                </div>
+                            </td>
+                            <td>
+                                <span class="transport-badge" th:text="${binding.protocol}">Streamable HTTP</span>
+                            </td>
+                            <td style="max-width: 200px; overflow: hidden; text-overflow: ellipsis;"
+                                th:text="${binding.url}">URL</td>
+                            <td>
+                                <span class="status-badge" th:classappend="${binding.healthy} ? 'connected' : 'error'">
+                                    <span class="dot"></span>
+                                    <span th:text="${binding.healthy} ? 'Connected' : 'Unavailable'">Status</span>
+                                </span>
+                            </td>
+                            <td th:text="${binding.toolCount}">0</td>
+                            <td>
+                                <button class="action-btn"
+                                        th:data-binding-name="${binding.name}"
+                                        th:classappend="${binding.hasToken} ? ' has-token' : ''"
+                                        data-action="showTokenModal">
+                                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="width: 14px; height: 14px; vertical-align: middle; margin-right: 2px;">
+                                        <rect x="3" y="11" width="18" height="11" rx="2" ry="2"></rect>
+                                        <path d="M7 11V7a5 5 0 0 1 10 0v4"></path>
+                                    </svg>
+                                    <span th:text="${binding.hasToken} ? 'Token Set' : 'Auth Token'">Auth Token</span>
+                                </button>
+                                <button class="action-btn primary"
+                                        th:data-binding-name="${binding.name}"
+                                        data-action="probeBinding">Refresh</button>
+                            </td>
+                        </tr>
+                    </tbody>
+                </table>
+            </div>
+        </section>
+
         <section>
             <div class="section-header">
                 <h2>MCP Server Configuration</h2>
@@ -198,6 +269,44 @@
                 <button class="modal-btn cancel">Cancel</button>
                 <button class="modal-btn confirm" id="confirmDeleteBtn">Delete</button>
             </div>
+        </div>
+    </div>
+
+    <!-- Auth Token Modal -->
+    <div class="modal-overlay" id="tokenModal">
+        <div class="modal">
+            <h3>Set Auth Token</h3>
+            <p>Paste an OAuth bearer token for <strong id="tokenBindingName"></strong>.</p>
+            <p style="color: var(--text-muted); font-size: 0.85rem;">Token is stored in memory only and cleared on app restart.</p>
+            <form id="tokenForm">
+                <div class="form-group">
+                    <label for="tokenValue">Bearer Token</label>
+                    <textarea id="tokenValue" rows="4" placeholder="Paste your OAuth token here..." style="font-family: monospace; font-size: 0.85rem;"></textarea>
+                </div>
+                <div class="modal-actions">
+                    <button type="button" class="modal-btn cancel">Cancel</button>
+                    <button type="submit" class="modal-btn save">Save Token</button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <!-- Rename Binding Modal -->
+    <div class="modal-overlay" id="renameModal">
+        <div class="modal">
+            <h3>Rename Service Binding</h3>
+            <p style="color: var(--text-muted); font-size: 0.85rem;">Customize the display name for <strong id="renameBindingName"></strong>. Stored in memory only.</p>
+            <form id="renameForm">
+                <div class="form-group">
+                    <label for="renameValue">Display Name</label>
+                    <input type="text" id="renameValue" placeholder="Custom display name...">
+                    <small>Leave empty to reset to the default name.</small>
+                </div>
+                <div class="modal-actions">
+                    <button type="button" class="modal-btn cancel">Cancel</button>
+                    <button type="submit" class="modal-btn save">Save</button>
+                </div>
+            </form>
         </div>
     </div>
 

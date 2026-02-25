@@ -5,6 +5,8 @@ import com.example.cfchat.dto.ChatRequest;
 import com.example.cfchat.dto.ChatResponse;
 import com.example.cfchat.model.ModelInfo;
 import com.example.cfchat.model.Skill;
+import com.example.cfchat.mcp.McpServerService;
+import com.example.cfchat.mcp.McpToolCallbackCacheService;
 import com.example.cfchat.model.Tool;
 import com.example.cfchat.model.User;
 import com.example.cfchat.service.ChatService;
@@ -32,6 +34,7 @@ public class ChatController {
     private final ToolService toolService;
     private final SkillService skillService;
     private final McpService mcpService;
+    private final McpToolCallbackCacheService mcpToolCallbackCacheService;
 
     @PostMapping
     public ResponseEntity<ChatResponse> chat(@Valid @RequestBody ChatRequest request) {
@@ -75,6 +78,18 @@ public class ChatController {
                     .ifPresent(server -> toolData.put("mcpServerName", server.getName()));
             }
 
+            result.add(toolData);
+        }
+
+        // Include auto-discovered CF binding server tools
+        for (McpServerService service : mcpToolCallbackCacheService.getMcpServerServices()) {
+            Map<String, Object> toolData = new HashMap<>();
+            toolData.put("id", "binding-" + service.getName());
+            toolData.put("name", service.getName());
+            toolData.put("displayName", service.getDisplayName());
+            toolData.put("description", "Auto-discovered from CF service binding");
+            toolData.put("type", "MCP_BINDING");
+            toolData.put("mcpServerName", service.getDisplayName());
             result.add(toolData);
         }
 

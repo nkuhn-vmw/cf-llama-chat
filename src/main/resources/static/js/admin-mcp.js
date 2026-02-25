@@ -232,6 +232,138 @@ document.querySelectorAll('.toggle-switch input[type="checkbox"]').forEach(cb =>
 
 document.getElementById('transportType')?.addEventListener('change', updateTransportFields);
 
+function probeBinding(btn) {
+    const name = btn.dataset.bindingName;
+    btn.disabled = true;
+    btn.textContent = 'Probing...';
+
+    fetch(`/api/admin/mcp/bindings/${encodeURIComponent(name)}/probe`, { method: 'POST' })
+        .then(response => response.json())
+        .then(result => {
+            const statusEl = document.getElementById('binding-status-' + name);
+            const toolsEl = document.getElementById('binding-tools-' + name);
+
+            if (result.healthy) {
+                statusEl.className = 'status-badge connected';
+                statusEl.innerHTML = '<span class="dot"></span><span>Connected</span>';
+                toolsEl.textContent = result.toolCount;
+                toast.success(result.serverName + ': ' + result.toolCount + ' tools available');
+            } else {
+                statusEl.className = 'status-badge error';
+                statusEl.innerHTML = '<span class="dot"></span><span>Unavailable</span>';
+                toolsEl.textContent = '0';
+                toast.error('Service binding ' + name + ' is not reachable');
+            }
+
+            btn.disabled = false;
+            btn.textContent = 'Probe';
+        })
+        .catch(error => {
+            console.error('Error:', error);
+            toast.error('Failed to probe service binding');
+            btn.disabled = false;
+            btn.textContent = 'Probe';
+        });
+}
+
+let tokenBindingName = null;
+
+function showTokenModal(btn) {
+    tokenBindingName = btn.dataset.bindingName;
+    document.getElementById('tokenBindingName').textContent = tokenBindingName;
+    document.getElementById('tokenValue').value = '';
+    document.getElementById('tokenModal').classList.add('open');
+}
+
+function closeTokenModal() {
+    document.getElementById('tokenModal').classList.remove('open');
+    tokenBindingName = null;
+}
+
+document.getElementById('tokenForm').addEventListener('submit', function(e) {
+    e.preventDefault();
+    if (!tokenBindingName) return;
+
+    const token = document.getElementById('tokenValue').value.replace(/[\r\n]+/g, '').trim();
+    if (!token) {
+        toast.error('Token is required');
+        return;
+    }
+
+    const saveBtn = this.querySelector('.modal-btn.save');
+    saveBtn.disabled = true;
+    saveBtn.textContent = 'Saving...';
+
+    fetch(`/api/admin/mcp/bindings/${encodeURIComponent(tokenBindingName)}/token`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ token: token })
+    })
+    .then(response => response.json())
+    .then(result => {
+        if (result.error) {
+            toast.error(result.error);
+            saveBtn.disabled = false;
+            saveBtn.textContent = 'Save Token';
+        } else {
+            toast.success('Token saved for ' + tokenBindingName);
+            closeTokenModal();
+            location.reload();
+        }
+    })
+    .catch(error => {
+        console.error('Error:', error);
+        toast.error('Failed to save token');
+        saveBtn.disabled = false;
+        saveBtn.textContent = 'Save Token';
+    });
+});
+
+document.querySelector('#tokenModal .modal-btn.cancel')?.addEventListener('click', closeTokenModal);
+
+let renameBindingName = null;
+
+function editBindingName(btn) {
+    renameBindingName = btn.dataset.bindingName;
+    document.getElementById('renameBindingName').textContent = renameBindingName;
+    document.getElementById('renameValue').value = btn.dataset.currentName || '';
+    document.getElementById('renameModal').classList.add('open');
+}
+
+function closeRenameModal() {
+    document.getElementById('renameModal').classList.remove('open');
+    renameBindingName = null;
+}
+
+document.getElementById('renameForm').addEventListener('submit', function(e) {
+    e.preventDefault();
+    if (!renameBindingName) return;
+
+    const displayName = document.getElementById('renameValue').value.trim();
+
+    fetch(`/api/admin/mcp/bindings/${encodeURIComponent(renameBindingName)}/display-name`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ displayName: displayName })
+    })
+    .then(response => response.json())
+    .then(result => {
+        if (result.error) {
+            toast.error(result.error);
+        } else {
+            toast.success('Display name updated');
+            closeRenameModal();
+            location.reload();
+        }
+    })
+    .catch(error => {
+        console.error('Error:', error);
+        toast.error('Failed to update display name');
+    });
+});
+
+document.querySelector('#renameModal .modal-btn.cancel')?.addEventListener('click', closeRenameModal);
+
 // Event delegation for action buttons in server rows
 document.addEventListener('click', function(e) {
     const btn = e.target.closest('[data-action]');
@@ -243,6 +375,9 @@ document.addEventListener('click', function(e) {
         case 'syncTools': syncTools(btn); break;
         case 'edit': showEditModal(btn); break;
         case 'delete': showDeleteModal(btn); break;
+        case 'probeBinding': probeBinding(btn); break;
+        case 'showTokenModal': showTokenModal(btn); break;
+        case 'editBindingName': editBindingName(btn); break;
     }
 });
 
