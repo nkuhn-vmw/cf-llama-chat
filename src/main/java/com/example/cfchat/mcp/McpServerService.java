@@ -23,6 +23,7 @@ public class McpServerService {
     private final McpClientFactory clientFactory;
     private final AtomicReference<Map<String, String>> additionalHeaders = new AtomicReference<>(Map.of());
     private final AtomicReference<String> displayName = new AtomicReference<>(null);
+    private final AtomicReference<McpServerInfo> cachedHealthCheck = new AtomicReference<>(null);
 
     public McpServerService(String name, String serverUrl, ProtocolType protocol, McpClientFactory clientFactory) {
         this(name, serverUrl, protocol, Map.of(), clientFactory);
@@ -73,6 +74,7 @@ public class McpServerService {
     }
 
     public McpServerInfo getHealthyMcpServer() {
+        McpServerInfo result;
         try (McpSyncClient client = createHealthCheckClient()) {
             McpSchema.InitializeResult initResult = client.initialize();
             logger.debug("Initialized MCP server {}: protocol version {}", name, initResult.protocolVersion());
@@ -90,13 +92,19 @@ public class McpServerService {
             logger.info("MCP server {} is healthy with {} tools ({})",
                     serverName, tools.size(), protocol.displayName());
 
-            return new McpServerInfo(name, serverName, true, tools, protocol);
+            result = new McpServerInfo(name, serverName, true, tools, protocol);
 
         } catch (Exception e) {
             logger.warn("Health check failed for MCP server {} ({}): {}",
                     name, protocol.displayName(), e.getMessage());
-            return new McpServerInfo(name, name, false, Collections.emptyList(), protocol);
+            result = new McpServerInfo(name, name, false, Collections.emptyList(), protocol);
         }
+        cachedHealthCheck.set(result);
+        return result;
+    }
+
+    public McpServerInfo getCachedHealthCheck() {
+        return cachedHealthCheck.get();
     }
 
     public String getName() {

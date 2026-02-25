@@ -1,6 +1,8 @@
 package com.example.cfchat.controller;
 
 import com.example.cfchat.auth.UserService;
+import com.example.cfchat.mcp.McpServerService;
+import com.example.cfchat.mcp.McpToolCallbackCacheService;
 import com.example.cfchat.model.McpServer;
 import com.example.cfchat.model.Tool;
 import com.example.cfchat.model.User;
@@ -23,6 +25,7 @@ public class AdminToolsController {
     private final UserService userService;
     private final ToolService toolService;
     private final McpService mcpService;
+    private final McpToolCallbackCacheService mcpToolCallbackCacheService;
 
     /**
      * Public endpoint to check if any MCP tools are available for the current user.
@@ -40,9 +43,18 @@ public class AdminToolsController {
         List<Tool> tools = toolService.getAccessibleTools(currentUser.get().getId());
         long enabledCount = tools.stream().filter(Tool::isEnabled).count();
 
+        // Include auto-discovered binding server tools
+        long bindingToolCount = mcpToolCallbackCacheService.getMcpServerServices().stream()
+                .map(McpServerService::getCachedHealthCheck)
+                .filter(info -> info != null && info.healthy())
+                .mapToLong(info -> info.tools().size())
+                .sum();
+
+        long totalEnabled = enabledCount + bindingToolCount;
+
         return ResponseEntity.ok(Map.of(
-                "available", enabledCount > 0,
-                "count", enabledCount
+                "available", totalEnabled > 0,
+                "count", totalEnabled
         ));
     }
 
@@ -68,9 +80,36 @@ public class AdminToolsController {
             toolDataList.add(toolData);
         }
 
+        // Include auto-discovered binding server tools
+        int bindingToolCount = 0;
+        for (McpServerService service : mcpToolCallbackCacheService.getMcpServerServices()) {
+            McpServerService.McpServerInfo healthCheck = service.getCachedHealthCheck();
+            if (healthCheck == null) {
+                healthCheck = service.getHealthyMcpServer();
+            }
+            if (healthCheck.healthy()) {
+                for (McpServerService.ToolInfo toolInfo : healthCheck.tools()) {
+                    Map<String, Object> toolData = new HashMap<>();
+                    // Create a lightweight Tool-like object for the template
+                    Tool bindingTool = Tool.builder()
+                            .id(null)
+                            .name(toolInfo.name())
+                            .displayName(toolInfo.name())
+                            .description(toolInfo.description())
+                            .enabled(true)
+                            .build();
+                    toolData.put("tool", bindingTool);
+                    toolData.put("mcpServerName", service.getDisplayName());
+                    toolData.put("binding", true);
+                    toolDataList.add(toolData);
+                    bindingToolCount++;
+                }
+            }
+        }
+
         model.addAttribute("tools", toolDataList);
-        model.addAttribute("totalTools", tools.size());
-        model.addAttribute("enabledTools", tools.stream().filter(Tool::isEnabled).count());
+        model.addAttribute("totalTools", tools.size() + bindingToolCount);
+        model.addAttribute("enabledTools", tools.stream().filter(Tool::isEnabled).count() + bindingToolCount);
 
         // Add MCP servers for filtering
         model.addAttribute("mcpServers", mcpService.getAllServers());

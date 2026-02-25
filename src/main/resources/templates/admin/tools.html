@@ -130,21 +130,23 @@
                             <td>
                                 <span class="type-badge" th:classappend="${data.tool.type.name().toLowerCase()}"
                                       th:text="${data.tool.type}">MCP</span>
+                                <span th:if="${data.binding}" class="transport-badge" style="background: var(--primary); color: white; font-size: 0.65rem; margin-left: 4px;">BINDING</span>
                             </td>
                             <td>
                                 <span th:if="${data.mcpServerName != null}" th:text="${data.mcpServerName}">Server</span>
                                 <span th:if="${data.mcpServerName == null}" style="color: var(--text-muted);">-</span>
                             </td>
                             <td>
-                                <label class="toggle-switch">
+                                <label class="toggle-switch" th:if="${data.tool.id != null}">
                                     <input type="checkbox"
                                            th:checked="${data.tool.enabled}"
                                            th:data-tool-id="${data.tool.id}">
                                     <span class="toggle-slider"></span>
                                 </label>
+                                <span th:if="${data.tool.id == null}" style="color: var(--text-muted); font-size: 0.85rem;">Always on</span>
                             </td>
                             <td>
-                                <button class="action-btn"
+                                <button class="action-btn" th:if="${data.tool.id != null}"
                                         th:data-tool-id="${data.tool.id}"
                                         th:data-tool-name="${data.tool.displayName != null ? data.tool.displayName : data.tool.name}"
                                         th:data-input-schema="${data.tool.inputSchema}">View Schema</button>

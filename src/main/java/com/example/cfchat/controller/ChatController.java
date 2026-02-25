@@ -81,16 +81,25 @@ public class ChatController {
             result.add(toolData);
         }
 
-        // Include auto-discovered CF binding server tools
+        // Include individual tools from auto-discovered CF binding servers
         for (McpServerService service : mcpToolCallbackCacheService.getMcpServerServices()) {
-            Map<String, Object> toolData = new HashMap<>();
-            toolData.put("id", "binding-" + service.getName());
-            toolData.put("name", service.getName());
-            toolData.put("displayName", service.getDisplayName());
-            toolData.put("description", "Auto-discovered from CF service binding");
-            toolData.put("type", "MCP_BINDING");
-            toolData.put("mcpServerName", service.getDisplayName());
-            result.add(toolData);
+            McpServerService.McpServerInfo healthCheck = service.getCachedHealthCheck();
+            if (healthCheck == null) {
+                // No cached data yet — trigger health check to populate tool list
+                healthCheck = service.getHealthyMcpServer();
+            }
+            if (healthCheck.healthy()) {
+                for (McpServerService.ToolInfo tool : healthCheck.tools()) {
+                    Map<String, Object> toolData = new HashMap<>();
+                    toolData.put("id", "binding-" + service.getName() + "-" + tool.name());
+                    toolData.put("name", tool.name());
+                    toolData.put("displayName", tool.name());
+                    toolData.put("description", tool.description());
+                    toolData.put("type", "MCP");
+                    toolData.put("mcpServerName", service.getDisplayName());
+                    result.add(toolData);
+                }
+            }
         }
 
         return ResponseEntity.ok(result);
