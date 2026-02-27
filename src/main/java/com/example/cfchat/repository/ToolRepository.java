@@ -3,6 +3,7 @@ package com.example.cfchat.repository;
 import com.example.cfchat.model.Tool;
 import com.example.cfchat.model.ToolType;
 import org.springframework.data.jpa.repository.JpaRepository;
+import org.springframework.data.jpa.repository.Modifying;
 import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
 import org.springframework.stereotype.Repository;
@@ -30,4 +31,8 @@ public interface ToolRepository extends JpaRepository<Tool, UUID> {
     List<Tool> findEnabledByIds(@Param("ids") List<UUID> ids);
 
     void deleteByMcpServerId(UUID mcpServerId);
+
+    @Modifying
+    @Query("UPDATE Tool t SET t.enabled = :enabled WHERE t.mcpServerId = :mcpServerId")
+    int updateEnabledByMcpServerId(@Param("mcpServerId") UUID mcpServerId, @Param("enabled") boolean enabled);
 }

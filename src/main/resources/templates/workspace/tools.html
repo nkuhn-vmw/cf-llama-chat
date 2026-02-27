@@ -170,6 +170,15 @@
             Tool preferences are saved per-browser and apply immediately to new conversations.
         </div>
 
+        <div style="display:flex; align-items:center; gap:12px; margin-top:16px;">
+            <label for="serverFilter" style="font-size:0.9rem; color:var(--text-secondary);">Filter by Server:</label>
+            <select id="serverFilter" style="padding:8px 12px; background-color:var(--bg-tertiary); border:1px solid var(--border-color); border-radius:6px; color:var(--text-primary); font-size:0.9rem;">
+                <option value="">All Servers</option>
+            </select>
+            <button class="action-btn" id="bulkEnableBtn" style="display:none;">Enable All</button>
+            <button class="action-btn" id="bulkDisableBtn" style="display:none;">Disable All</button>
+        </div>
+
         <div class="tools-grid" id="toolsGrid">
             <div class="empty-tools">
                 <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
@@ -244,6 +253,8 @@
                 card.appendChild(icon);
                 card.appendChild(info);
                 card.appendChild(toggle);
+
+                card.dataset.serverName = tool.mcpServerName || '';
                 return card;
             }
 
@@ -276,6 +287,58 @@
                         var card = createToolCard(tool);
                         grid.appendChild(card);
                     });
+
+                    // Populate server filter dropdown
+                    var serverNames = [];
+                    tools.forEach(function(t) {
+                        if (t.mcpServerName && serverNames.indexOf(t.mcpServerName) === -1) {
+                            serverNames.push(t.mcpServerName);
+                        }
+                    });
+                    serverNames.sort();
+                    var filterSelect = document.getElementById('serverFilter');
+                    serverNames.forEach(function(name) {
+                        var opt = document.createElement('option');
+                        opt.value = name;
+                        opt.textContent = name;
+                        filterSelect.appendChild(opt);
+                    });
+
+                    function filterCards() {
+                        var selected = filterSelect.value;
+                        var cards = grid.querySelectorAll('.tool-card');
+                        cards.forEach(function(card) {
+                            if (!selected || card.dataset.serverName === selected) {
+                                card.style.display = '';
+                            } else {
+                                card.style.display = 'none';
+                            }
+                        });
+                        // Show bulk buttons when a server is selected
+                        document.getElementById('bulkEnableBtn').style.display = selected ? '' : 'none';
+                        document.getElementById('bulkDisableBtn').style.display = selected ? '' : 'none';
+                    }
+
+                    function bulkToggle(enabled) {
+                        var cards = grid.querySelectorAll('.tool-card');
+                        cards.forEach(function(card) {
+                            if (card.style.display !== 'none') {
+                                var cb = card.querySelector('input[type="checkbox"]');
+                                if (cb && cb.dataset.toolId) {
+                                    cb.checked = enabled;
+                                    toolPreferences[cb.dataset.toolId] = enabled;
+                                }
+                            }
+                        });
+                        savePreferences();
+                        var en = tools.filter(function(t) { return isToolEnabled(t.id); });
+                        document.getElementById('enabledCount').textContent = en.length;
+                        if (window.showToast) window.showToast(enabled ? 'All visible tools enabled' : 'All visible tools disabled');
+                    }
+
+                    filterSelect.addEventListener('change', filterCards);
+                    document.getElementById('bulkEnableBtn').addEventListener('click', function() { bulkToggle(true); });
+                    document.getElementById('bulkDisableBtn').addEventListener('click', function() { bulkToggle(false); });
 
                     grid.addEventListener('change', function(e) {
                         var cb = e.target;

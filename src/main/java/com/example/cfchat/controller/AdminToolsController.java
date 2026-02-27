@@ -101,6 +101,7 @@ public class AdminToolsController {
                     toolData.put("tool", bindingTool);
                     toolData.put("mcpServerName", service.getDisplayName());
                     toolData.put("binding", true);
+                    toolData.put("filterKey", "binding:" + service.getName());
                     toolDataList.add(toolData);
                     bindingToolCount++;
                 }
@@ -111,8 +112,18 @@ public class AdminToolsController {
         model.addAttribute("totalTools", tools.size() + bindingToolCount);
         model.addAttribute("enabledTools", tools.stream().filter(Tool::isEnabled).count() + bindingToolCount);
 
-        // Add MCP servers for filtering
-        model.addAttribute("mcpServers", mcpService.getAllServers());
+        // Build unified server filter options (DB servers + binding servers)
+        List<Map<String, String>> serverFilterOptions = new ArrayList<>();
+        for (McpServer server : mcpService.getAllServers()) {
+            serverFilterOptions.add(Map.of("value", server.getId().toString(), "label", server.getName()));
+        }
+        for (McpServerService service : mcpToolCallbackCacheService.getMcpServerServices()) {
+            McpServerService.McpServerInfo info = service.getCachedHealthCheck();
+            if (info != null && info.healthy()) {
+                serverFilterOptions.add(Map.of("value", "binding:" + service.getName(), "label", service.getDisplayName() + " (binding)"));
+            }
+        }
+        model.addAttribute("serverFilterOptions", serverFilterOptions);
 
         return "admin/tools";
     }
@@ -239,6 +250,36 @@ public class AdminToolsController {
                 currentUser.get().getUsername(), tool.getName(), enabled);
 
             return ResponseEntity.ok(Map.of("success", true, "enabled", tool.isEnabled()));
+        } catch (IllegalArgumentException e) {
+            return ResponseEntity.badRequest().body(Map.of("error", e.getMessage()));
+        }
+    }
+
+    @PutMapping("/api/admin/tools/bulk-enabled")
+    @ResponseBody
+    public ResponseEntity<Map<String, Object>> bulkSetEnabled(@RequestBody Map<String, Object> body) {
+        Optional<User> currentUser = userService.getCurrentUser();
+        if (currentUser.isEmpty() || currentUser.get().getRole() != User.UserRole.ADMIN) {
+            return ResponseEntity.status(403).body(Map.of("error", "Forbidden"));
+        }
+
+        String mcpServerIdStr = (String) body.get("mcpServerId");
+        Boolean enabled = (Boolean) body.get("enabled");
+
+        if (mcpServerIdStr == null || enabled == null) {
+            return ResponseEntity.badRequest().body(Map.of("error", "mcpServerId and enabled fields are required"));
+        }
+
+        if (mcpServerIdStr.startsWith("binding:")) {
+            return ResponseEntity.badRequest().body(Map.of("error", "Cannot bulk toggle binding server tools"));
+        }
+
+        try {
+            UUID mcpServerId = UUID.fromString(mcpServerIdStr);
+            int count = toolService.setEnabledByMcpServer(mcpServerId, enabled);
+            log.info("Admin {} bulk set enabled={} for MCP server {}, affected {} tools",
+                    currentUser.get().getUsername(), enabled, mcpServerId, count);
+            return ResponseEntity.ok(Map.of("success", true, "count", count));
         } catch (IllegalArgumentException e) {
             return ResponseEntity.badRequest().body(Map.of("error", e.getMessage()));
         }

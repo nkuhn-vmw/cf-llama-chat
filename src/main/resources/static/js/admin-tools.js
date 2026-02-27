@@ -2,15 +2,50 @@ const savedTheme = localStorage.getItem('theme') || 'dark';
 document.body.setAttribute('data-theme', savedTheme);
 
 function filterTools() {
-    const mcpId = document.getElementById('mcpFilter').value;
+    const filterValue = document.getElementById('mcpFilter').value;
     const rows = document.querySelectorAll('#toolsTableBody tr');
 
     rows.forEach(row => {
-        if (!mcpId || row.dataset.mcpId === mcpId) {
+        if (!filterValue || row.dataset.mcpId === filterValue) {
             row.style.display = '';
         } else {
             row.style.display = 'none';
         }
+    });
+
+    // Show bulk buttons only when a specific DB server is selected (not binding or "All")
+    const isDbServer = filterValue && !filterValue.startsWith('binding:');
+    document.getElementById('bulkEnableBtn').style.display = isDbServer ? '' : 'none';
+    document.getElementById('bulkDisableBtn').style.display = isDbServer ? '' : 'none';
+}
+
+function bulkSetEnabled(enabled) {
+    const mcpServerId = document.getElementById('mcpFilter').value;
+    if (!mcpServerId || mcpServerId.startsWith('binding:')) return;
+
+    fetch('/api/admin/tools/bulk-enabled', {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ mcpServerId, enabled })
+    })
+    .then(response => response.json())
+    .then(result => {
+        if (result.error) {
+            toast.error(result.error);
+            return;
+        }
+        // Update checkboxes in-place for visible rows matching this server
+        document.querySelectorAll('#toolsTableBody tr').forEach(row => {
+            if (row.dataset.mcpId === mcpServerId) {
+                const cb = row.querySelector('input[data-tool-id]');
+                if (cb) cb.checked = enabled;
+            }
+        });
+        toast.success((enabled ? 'Enabled' : 'Disabled') + ' ' + result.count + ' tools');
+    })
+    .catch(error => {
+        console.error('Error:', error);
+        toast.error('Failed to update tools');
     });
 }
 
@@ -80,3 +115,6 @@ document.querySelectorAll('.action-btn[data-tool-name]').forEach(btn => {
 });
 
 document.querySelector('#schemaModal .modal-btn.cancel')?.addEventListener('click', closeSchemaModal);
+
+document.getElementById('bulkEnableBtn')?.addEventListener('click', function() { bulkSetEnabled(true); });
+document.getElementById('bulkDisableBtn')?.addEventListener('click', function() { bulkSetEnabled(false); });

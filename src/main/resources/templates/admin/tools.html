@@ -96,13 +96,15 @@
             <div class="section-header">
                 <h2>Available Tools</h2>
                 <div class="filter-group">
-                    <label for="mcpFilter">Filter by MCP Server:</label>
+                    <label for="mcpFilter">Filter by Server:</label>
                     <select id="mcpFilter">
                         <option value="">All Servers</option>
-                        <option th:each="server : ${mcpServers}"
-                                th:value="${server.id}"
-                                th:text="${server.name}">Server</option>
+                        <option th:each="opt : ${serverFilterOptions}"
+                                th:value="${opt.value}"
+                                th:text="${opt.label}">Server</option>
                     </select>
+                    <button class="action-btn" id="bulkEnableBtn" style="display:none;">Enable All</button>
+                    <button class="action-btn" id="bulkDisableBtn" style="display:none;">Disable All</button>
                 </div>
             </div>
 
@@ -119,7 +121,7 @@
                         </tr>
                     </thead>
                     <tbody id="toolsTableBody">
-                        <tr th:each="data : ${tools}" th:data-mcp-id="${data.tool.mcpServerId}">
+                        <tr th:each="data : ${tools}" th:data-mcp-id="${data.filterKey != null ? data.filterKey : data.tool.mcpServerId}">
                             <td>
                                 <div style="font-weight: 500;" th:text="${data.tool.displayName != null ? data.tool.displayName : data.tool.name}">Tool Name</div>
                                 <div style="font-size: 0.8rem; color: var(--text-muted);" th:text="${data.tool.name}">tool-name</div>

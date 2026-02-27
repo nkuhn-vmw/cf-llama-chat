@@ -148,4 +148,9 @@ public class ToolService {
     public long getEnabledToolCount() {
         return toolRepository.findByEnabled(true).size();
     }
+
+    @Transactional
+    public int setEnabledByMcpServer(UUID mcpServerId, boolean enabled) {
+        return toolRepository.updateEnabledByMcpServerId(mcpServerId, enabled);
+    }
 }
