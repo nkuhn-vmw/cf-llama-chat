@@ -35,6 +35,13 @@ public class NoteController {
         return ResponseEntity.ok(toDto(noteRepo.save(note)));
     }
 
+    @GetMapping("/{id}")
+    public ResponseEntity<NoteDto> get(@PathVariable UUID id) {
+        UserNote note = noteRepo.findById(id).orElseThrow();
+        if (!note.getUserId().equals(getCurrentUserId())) throw new SecurityException("Access denied");
+        return ResponseEntity.ok(toDto(note));
+    }
+
     @PutMapping("/{id}")
     public ResponseEntity<NoteDto> update(@PathVariable UUID id, @RequestBody UpdateNoteRequest req) {
         UserNote note = noteRepo.findById(id).orElseThrow();

@@ -220,10 +220,10 @@
                 card.dataset.id = d.id;
 
                 var info = createEl('div', 'doc-card-info');
-                info.appendChild(createEl('div', 'doc-card-name', d.fileName || d.name || 'Document'));
+                info.appendChild(createEl('div', 'doc-card-name', d.originalFilename || d.filename || 'Document'));
 
                 var meta = createEl('div', 'doc-card-meta');
-                meta.appendChild(createEl('span', '', formatFileSize(d.fileSize || d.size)));
+                meta.appendChild(createEl('span', '', formatFileSize(d.fileSize || 0)));
                 meta.appendChild(createEl('span', '', (d.chunkCount || 0) + ' chunks'));
                 meta.appendChild(createEl('span', '', d.uploadedAt || d.createdAt ? new Date(d.uploadedAt || d.createdAt).toLocaleDateString() : ''));
                 info.appendChild(meta);

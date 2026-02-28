@@ -200,7 +200,7 @@
             var list = document.getElementById('promptList');
             list.textContent = '';
             document.getElementById('totalPrompts').textContent = prompts.length;
-            document.getElementById('sharedPrompts').textContent = prompts.filter(function(p) { return p.isShared; }).length;
+            document.getElementById('sharedPrompts').textContent = prompts.filter(function(p) { return p.shared; }).length;
 
             if (prompts.length === 0) {
                 list.appendChild(createEl('p', '', 'No prompts yet. Create one above.'));
@@ -218,7 +218,7 @@
                 titleGroup.appendChild(createEl('div', 'prompt-card-title', p.title || p.name || ''));
                 if (p.command) titleGroup.appendChild(createEl('div', 'prompt-card-command', p.command));
                 header.appendChild(titleGroup);
-                if (p.isShared) header.appendChild(createEl('span', 'shared-badge', 'Shared'));
+                if (p.shared) header.appendChild(createEl('span', 'shared-badge', 'Shared'));
                 card.appendChild(header);
 
                 // Content preview
@@ -300,7 +300,7 @@
                 return;
             }
 
-            var data = { title: title, command: command, content: content, description: description, isShared: isShared };
+            var data = { title: title, command: command, content: content, description: description, shared: isShared };
             try {
                 var url = editingPromptId ? '/api/prompts/' + editingPromptId : '/api/prompts';
                 var method = editingPromptId ? 'PUT' : 'POST';
@@ -332,7 +332,7 @@
                 document.getElementById('promptCommandInput').value = prompt.command || '';
                 document.getElementById('promptContentInput').value = prompt.content || prompt.promptText || '';
                 document.getElementById('promptDescInput').value = prompt.description || '';
-                document.getElementById('promptSharedToggle').checked = prompt.isShared || false;
+                document.getElementById('promptSharedToggle').checked = prompt.shared || false;
                 document.getElementById('savePromptBtn').textContent = 'Update Prompt';
                 document.getElementById('cancelEditBtn').style.display = '';
                 document.getElementById('promptFormBox').scrollIntoView({ behavior: 'smooth' });
