@@ -16,4 +16,6 @@ public interface ChannelMessageRepository extends JpaRepository<ChannelMessage, 
     List<ChannelMessage> findByChannelIdOrderByCreatedAtDesc(UUID channelId, Pageable pageable);
 
     long countByChannelId(UUID channelId);
+
+    void deleteByChannelId(UUID channelId);
 }

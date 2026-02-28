@@ -56,6 +56,7 @@ public class ChannelService {
         if (!isAdmin && !userId.equals(channel.getCreatedBy())) {
             return false;
         }
+        channelMessageRepository.deleteByChannelId(channelId);
         channelRepository.delete(channel);
         log.info("Deleted channel '{}' (id: {}) by user {}", channel.getName(), channelId, userId);
         return true;
