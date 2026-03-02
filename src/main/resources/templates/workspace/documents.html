@@ -116,6 +116,16 @@
             gap: 8px;
             flex-shrink: 0;
         }
+        .tools-info {
+            background-color: var(--bg-secondary);
+            border: 1px solid var(--border-color);
+            border-radius: 12px;
+            padding: 16px 20px;
+            margin-top: 16px;
+            font-size: 0.85rem;
+            color: var(--text-secondary);
+            line-height: 1.6;
+        }
     </style>
 </head>
 <body>
@@ -140,6 +150,11 @@
                 <div class="stat-value" id="totalChunks">--</div>
                 <div class="stat-label">Chunks</div>
             </div>
+        </div>
+
+        <div class="tools-info">
+            Upload documents for RAG (Retrieval-Augmented Generation) context. Supported formats: PDF, Word (.doc/.docx), and text files (.txt/.md) up to 100MB.
+            You can also import YouTube transcripts by URL. Files are automatically chunked and indexed so the AI can reference them in conversations.
         </div>
 
         <!-- Upload Area -->

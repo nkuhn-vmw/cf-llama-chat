@@ -114,6 +114,16 @@
             color: white;
             border-color: var(--accent-color);
         }
+        .tools-info {
+            background-color: var(--bg-secondary);
+            border: 1px solid var(--border-color);
+            border-radius: 12px;
+            padding: 16px 20px;
+            margin-top: 16px;
+            font-size: 0.85rem;
+            color: var(--text-secondary);
+            line-height: 1.6;
+        }
     </style>
 </head>
 <body>
@@ -146,6 +156,13 @@
                 <div class="stat-value" id="instrCount">--</div>
                 <div class="stat-label">Instructions</div>
             </div>
+        </div>
+
+        <div class="tools-info">
+            Memory entries help the AI remember things about you across conversations. Use categories to organize:
+            <strong>Fact</strong> for true statements, <strong>Preference</strong> for your likes/dislikes,
+            <strong>Instruction</strong> for standing directives, and <strong>General</strong> for everything else.
+            Search and filter to find specific entries.
         </div>
 
         <div class="memory-grid">

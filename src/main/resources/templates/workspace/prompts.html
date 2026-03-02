@@ -116,6 +116,16 @@
             color: var(--accent-color);
             margin: 2px;
         }
+        .tools-info {
+            background-color: var(--bg-secondary);
+            border: 1px solid var(--border-color);
+            border-radius: 12px;
+            padding: 16px 20px;
+            margin-top: 16px;
+            font-size: 0.85rem;
+            color: var(--text-secondary);
+            line-height: 1.6;
+        }
     </style>
 </head>
 <body>
@@ -140,6 +150,11 @@
                 <div class="stat-value" id="sharedPrompts">--</div>
                 <div class="stat-label">Shared</div>
             </div>
+        </div>
+
+        <div class="tools-info">
+            Create reusable prompt templates with <strong>{{variable}}</strong> placeholders that get filled in at use time.
+            Assign a slash command (e.g., /summarize) for quick access in chat. Check "Shared with team" to make a prompt available to all users.
         </div>
 
         <!-- Create/Edit Prompt -->
