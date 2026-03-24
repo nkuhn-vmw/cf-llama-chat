@@ -54,7 +54,10 @@ public class GenAiConfig {
     private void initializeModelsFromVcap() {
         try {
             CfEnv cfEnv = new CfEnv();
-            List<CfService> genaiServices = cfEnv.findServicesByLabel("genai");
+            // Support both "genai" (legacy) and "ai-models" (new) service labels
+            List<CfService> genaiServices = new ArrayList<>();
+            genaiServices.addAll(cfEnv.findServicesByLabel("genai"));
+            genaiServices.addAll(cfEnv.findServicesByLabel("ai-models"));
 
             log.info("Found {} GenAI service(s) in VCAP_SERVICES", genaiServices.size());
 
