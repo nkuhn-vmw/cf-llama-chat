@@ -75,17 +75,19 @@ public class ChatController {
         };
         applicationEventMulticaster.addApplicationListener(wikiListener);
 
+        // The chat flux drives the lifecycle. When it terminates we *must*
+        // complete the wiki sink, otherwise Flux.merge() will wait forever
+        // (the sink only emits via the listener) and the SSE connection
+        // never closes — frontend hangs in "streaming" state until cancel.
         Flux<ServerSentEvent<Object>> chatFlux = chatService.chatStream(request)
                 .map(resp -> ServerSentEvent.<Object>builder()
                         .event("message")
                         .data(resp)
-                        .build());
+                        .build())
+                .doFinally(sig -> wikiSink.tryEmitComplete());
 
         return Flux.merge(chatFlux, wikiSink.asFlux())
-                .doFinally(sig -> {
-                    applicationEventMulticaster.removeApplicationListener(wikiListener);
-                    wikiSink.tryEmitComplete();
-                });
+                .doFinally(sig -> applicationEventMulticaster.removeApplicationListener(wikiListener));
     }
 
     @GetMapping("/models")
