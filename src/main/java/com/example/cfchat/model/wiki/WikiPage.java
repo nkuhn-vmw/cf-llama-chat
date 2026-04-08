@@ -2,6 +2,10 @@ package com.example.cfchat.model.wiki;
 
 import jakarta.persistence.*;
 import jakarta.validation.constraints.Pattern;
+import lombok.AllArgsConstructor;
+import lombok.Builder;
+import lombok.Data;
+import lombok.NoArgsConstructor;
 import org.hibernate.annotations.JdbcTypeCode;
 import org.hibernate.type.SqlTypes;
 
@@ -19,6 +23,10 @@ import java.util.UUID;
            @Index(name = "idx_wiki_page_user_updated", columnList = "user_id,updated_at"),
            @Index(name = "idx_wiki_page_embed_status", columnList = "embedding_status")
        })
+@Data
+@NoArgsConstructor
+@AllArgsConstructor
+@Builder
 public class WikiPage {
 
     @Id @GeneratedValue
@@ -73,7 +81,7 @@ public class WikiPage {
     private Instant updatedAt;
 
     @PrePersist
-    void onCreate() {
+    protected void onCreate() {
         Instant now = Instant.now();
         this.createdAt = now;
         this.updatedAt = now;
@@ -82,37 +90,5 @@ public class WikiPage {
     }
 
     @PreUpdate
-    void onUpdate() { this.updatedAt = Instant.now(); }
-
-    // --- getters / setters ---
-    public UUID getId() { return id; }
-    public void setId(UUID id) { this.id = id; }
-    public UUID getUserId() { return userId; }
-    public void setUserId(UUID userId) { this.userId = userId; }
-    public UUID getWorkspaceId() { return workspaceId; }
-    public void setWorkspaceId(UUID workspaceId) { this.workspaceId = workspaceId; }
-    public String getSlug() { return slug; }
-    public void setSlug(String slug) { this.slug = slug; }
-    public String getTitle() { return title; }
-    public void setTitle(String title) { this.title = title; }
-    public String getKind() { return kind; }
-    public void setKind(String kind) { this.kind = kind; }
-    public String getOrigin() { return origin; }
-    public void setOrigin(String origin) { this.origin = origin; }
-    public String getBodyMd() { return bodyMd; }
-    public void setBodyMd(String bodyMd) { this.bodyMd = bodyMd; }
-    public Map<String, Object> getFrontmatter() { return frontmatter; }
-    public void setFrontmatter(Map<String, Object> f) { this.frontmatter = f; }
-    public UUID getSourceConversationId() { return sourceConversationId; }
-    public void setSourceConversationId(UUID id) { this.sourceConversationId = id; }
-    public int getVersion() { return version; }
-    public void setVersion(int version) { this.version = version; }
-    public Instant getLastReadAt() { return lastReadAt; }
-    public void setLastReadAt(Instant t) { this.lastReadAt = t; }
-    public String getEmbeddingStatus() { return embeddingStatus; }
-    public void setEmbeddingStatus(String s) { this.embeddingStatus = s; }
-    public String getEmbeddingError() { return embeddingError; }
-    public void setEmbeddingError(String e) { this.embeddingError = e; }
-    public Instant getCreatedAt() { return createdAt; }
-    public Instant getUpdatedAt() { return updatedAt; }
+    protected void onUpdate() { this.updatedAt = Instant.now(); }
 }
