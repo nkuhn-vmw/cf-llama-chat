@@ -10,6 +10,7 @@ import com.example.cfchat.model.wiki.WikiPageHistory;
 import com.example.cfchat.repository.wiki.WikiLogRepository;
 import com.example.cfchat.repository.wiki.WikiPageHistoryRepository;
 import com.example.cfchat.repository.wiki.WikiPageRepository;
+import com.example.cfchat.service.wiki.WikiFeatureService;
 import com.example.cfchat.service.wiki.WikiScope;
 import com.example.cfchat.service.wiki.WikiService;
 import org.springframework.data.domain.PageRequest;
@@ -30,16 +31,19 @@ public class WikiController {
     private final WikiPageRepository pageRepo;
     private final WikiPageHistoryRepository historyRepo;
     private final WikiLogRepository logRepo;
+    private final WikiFeatureService wikiFeatureService;
 
     public WikiController(WikiService wikiService, UserService userService,
                           WikiPageRepository pageRepo,
                           WikiPageHistoryRepository historyRepo,
-                          WikiLogRepository logRepo) {
+                          WikiLogRepository logRepo,
+                          WikiFeatureService wikiFeatureService) {
         this.wikiService = wikiService;
         this.userService = userService;
         this.pageRepo = pageRepo;
         this.historyRepo = historyRepo;
         this.logRepo = logRepo;
+        this.wikiFeatureService = wikiFeatureService;
     }
 
     private UUID currentUserId() {
@@ -48,10 +52,31 @@ public class WikiController {
                 .orElseThrow(() -> new SecurityException("Authentication required"));
     }
 
+    /** Hard kill switch — admin disabled means the whole feature is gone. */
+    private void requireAdminEnabled() {
+        if (!wikiFeatureService.isAdminEnabled()) {
+            throw new NoSuchElementException("Wiki feature is disabled");
+        }
+    }
+
+    /** Public status endpoint so the workspace hub can hide/show its card. */
+    @GetMapping("/feature-status")
+    public Map<String, Object> featureStatus() {
+        boolean admin = wikiFeatureService.isAdminEnabled();
+        UUID userId = userService.getCurrentUser().map(User::getId).orElse(null);
+        boolean user = userId != null && wikiFeatureService.isEnabledForUser(userId);
+        return Map.of(
+                "adminEnabled", admin,
+                "userEnabled", user,
+                "effective", admin && user
+        );
+    }
+
     @GetMapping("/pages")
     public List<WikiPage> listPages(
             @RequestParam(required = false) String kind,
             @RequestParam(defaultValue = "100") int limit) {
+        requireAdminEnabled();
         UUID userId = currentUserId();
         if (kind != null && !kind.isBlank()) {
             return pageRepo.findByUserIdAndKindOrderByUpdatedAtDesc(userId, kind);
@@ -61,6 +86,7 @@ public class WikiController {
 
     @GetMapping("/pages/{id}")
     public WikiPage readPage(@PathVariable UUID id) {
+        requireAdminEnabled();
         UUID userId = currentUserId();
         WikiPage p = pageRepo.findById(id)
                 .orElseThrow(() -> new NoSuchElementException("Page not found"));
@@ -72,6 +98,7 @@ public class WikiController {
 
     @PutMapping("/pages/{id}")
     public WikiPageView updatePage(@PathVariable UUID id, @RequestBody UpdatePageRequest body) {
+        requireAdminEnabled();
         UUID userId = currentUserId();
         WikiPage existing = pageRepo.findById(id)
                 .orElseThrow(() -> new NoSuchElementException("Page not found"));
@@ -86,12 +113,14 @@ public class WikiController {
 
     @PostMapping("/pages/{id}/undo")
     public WikiPageView undo(@PathVariable UUID id) {
+        requireAdminEnabled();
         UUID userId = currentUserId();
         return wikiService.undo(new WikiScope(userId, null), id);
     }
 
     @GetMapping("/pages/{id}/history")
     public List<WikiPageHistory> history(@PathVariable UUID id) {
+        requireAdminEnabled();
         UUID userId = currentUserId();
         WikiPage p = pageRepo.findById(id)
                 .orElseThrow(() -> new NoSuchElementException("Page not found"));
@@ -104,12 +133,14 @@ public class WikiController {
             @RequestParam("q") String query,
             @RequestParam(required = false) String kind,
             @RequestParam(defaultValue = "6") int k) {
+        requireAdminEnabled();
         UUID userId = currentUserId();
         return wikiService.search(new WikiScope(userId, null), query, kind, k);
     }
 
     @GetMapping("/log")
     public List<WikiLogEntry> log(@RequestParam(defaultValue = "20") int limit) {
+        requireAdminEnabled();
         UUID userId = currentUserId();
         return logRepo.findByUserIdOrderByTsDesc(userId, PageRequest.of(0, limit));
     }

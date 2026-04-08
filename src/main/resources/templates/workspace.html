@@ -124,7 +124,7 @@
                 </div>
             </a>
 
-            <a href="/workspace/wiki" class="admin-nav-card">
+            <a href="/workspace/wiki" class="admin-nav-card" id="wikiNavCard" style="display: none;">
                 <div class="card-icon">
                     <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
                         <path d="M2 3h6a4 4 0 0 1 4 4v14a3 3 0 0 0-3-3H2z"></path>
@@ -197,6 +197,22 @@
     <script th:src="@{/js/admin-toast.js}"></script>
     <script>
         // Load workspace stats
+        // Show/hide the Wiki card based on admin feature gate
+        fetch('/api/wiki/feature-status', { credentials: 'same-origin' })
+            .then(r => r.ok ? r.json() : { adminEnabled: false })
+            .then(s => {
+                if (s.adminEnabled) {
+                    var card = document.getElementById('wikiNavCard');
+                    if (card) card.style.display = '';
+                    var stat = document.getElementById('wikiCount');
+                    if (stat && stat.parentElement) stat.parentElement.style.display = '';
+                } else {
+                    var stat = document.getElementById('wikiCount');
+                    if (stat && stat.parentElement) stat.parentElement.style.display = 'none';
+                }
+            })
+            .catch(function(){});
+
         Promise.allSettled([
             fetch('/api/channels').then(r => r.ok ? r.json() : []),
             fetch('/api/wiki/pages?limit=1000').then(r => r.ok ? r.json() : []),

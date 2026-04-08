@@ -63,6 +63,7 @@ public class ChatService {
     private final WebContentService webContentService;
     private final com.example.cfchat.tools.wiki.WikiTools wikiTools;
     private final com.example.cfchat.service.wiki.WikiContextLoader wikiContextLoader;
+    private final com.example.cfchat.service.wiki.WikiFeatureService wikiFeatureService;
 
     private static final Pattern YT_RAG_PATTERN = Pattern.compile("#\\s*(https?://(?:www\\.)?(?:youtube\\.com/watch\\?v=|youtu\\.be/)[\\w-]{11}\\S*)");
     private static final Pattern WEB_RAG_PATTERN = Pattern.compile("#\\s*(https?://\\S+)");
@@ -95,6 +96,7 @@ public class ChatService {
             @Autowired(required = false) WebContentService webContentService,
             @Autowired(required = false) com.example.cfchat.tools.wiki.WikiTools wikiTools,
             @Autowired(required = false) com.example.cfchat.service.wiki.WikiContextLoader wikiContextLoader,
+            @Autowired(required = false) com.example.cfchat.service.wiki.WikiFeatureService wikiFeatureService,
             RagPromptBuilder ragPromptBuilder) {
         this.primaryChatClient = primaryChatClient;
         // Use OpenAI model as primary for streaming
@@ -116,6 +118,7 @@ public class ChatService {
         this.webContentService = webContentService;
         this.wikiTools = wikiTools;
         this.wikiContextLoader = wikiContextLoader;
+        this.wikiFeatureService = wikiFeatureService;
 
         log.info("ChatService initialized - primaryChatClient: {}, ollamaChatClient: {}, primaryChatModel: {}, mcpTools: {}, documentEmbedding: {}, externalBindings: {}",
                 primaryChatClient != null, ollamaChatClient != null,
@@ -191,8 +194,10 @@ public class ChatService {
         var promptSpec = chatClient.prompt().messages(messages);
 
         // Register WikiTools (cheap, always available) + ToolContext for tenancy.
-        // Requires an authenticated user — WikiScope rejects a null userId.
-        if (wikiTools != null && userId != null) {
+        // Requires an authenticated user (WikiScope rejects null userId) AND
+        // the wiki feature must be enabled at both admin and user levels.
+        if (wikiTools != null && userId != null
+                && wikiFeatureService != null && wikiFeatureService.isEnabledForUser(userId)) {
             java.util.Map<String, Object> wikiCtx = new java.util.HashMap<>();
             wikiCtx.put("userId", userId);
             if (conversation.getId() != null) {
@@ -347,7 +352,8 @@ public class ChatService {
         }
 
         // Use ChatClient streaming if we have any tools to register (MCP or WikiTools).
-        boolean wikiToolsEnabled = wikiTools != null && finalUserId != null;
+        boolean wikiToolsEnabled = wikiTools != null && finalUserId != null
+                && wikiFeatureService != null && wikiFeatureService.isEnabledForUser(finalUserId);
         if (toolProviders.length > 0 || wikiToolsEnabled) {
             ChatClient chatClient = getChatClient(provider, model);
             if (chatClient == null) {
@@ -702,8 +708,10 @@ public class ChatService {
             }
         }
 
-        // Inject wiki index block (lightweight summary of user's wiki pages)
-        if (wikiContextLoader != null && userId != null) {
+        // Inject wiki index block (lightweight summary of user's wiki pages).
+        // Gated by both the admin kill switch and the user's personal opt-out.
+        if (wikiContextLoader != null && userId != null
+                && wikiFeatureService != null && wikiFeatureService.isEnabledForUser(userId)) {
             try {
                 String wikiBlock = wikiContextLoader.loadIndexBlock(userId);
                 if (wikiBlock != null && !wikiBlock.isBlank()) {

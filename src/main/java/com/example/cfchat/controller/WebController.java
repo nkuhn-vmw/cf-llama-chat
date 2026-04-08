@@ -26,6 +26,7 @@ public class WebController {
     private final UserService userService;
     private final OrganizationService organizationService;
     private final ObjectMapper objectMapper;
+    private final com.example.cfchat.service.wiki.WikiFeatureService wikiFeatureService;
 
     private String buildAppDataJson(UUID conversationId, User currentUser) {
         try {
@@ -147,6 +148,9 @@ public class WebController {
         Optional<User> currentUser = userService.getCurrentUser();
         if (currentUser.isEmpty()) {
             return "redirect:/login.html";
+        }
+        if (!wikiFeatureService.isAdminEnabled()) {
+            return "redirect:/workspace";
         }
         model.addAttribute("currentUser", currentUser.get());
         return "workspace/wiki";
