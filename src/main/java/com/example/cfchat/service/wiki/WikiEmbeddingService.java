@@ -9,6 +9,9 @@ import org.springframework.ai.vectorstore.SearchRequest;
 import org.springframework.ai.vectorstore.VectorStore;
 import org.springframework.ai.vectorstore.filter.Filter;
 import org.springframework.ai.vectorstore.filter.FilterExpressionBuilder;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
 
@@ -16,6 +19,8 @@ import java.util.*;
 
 @Service
 public class WikiEmbeddingService {
+
+    private static final Logger log = LoggerFactory.getLogger(WikiEmbeddingService.class);
 
     private final VectorStore vectorStore;
 
@@ -29,11 +34,15 @@ public class WikiEmbeddingService {
     @Value("${app.documents.chunk-overlap:100}")
     private int chunkOverlap;
 
-    public WikiEmbeddingService(VectorStore vectorStore) {
+    public WikiEmbeddingService(@Autowired(required = false) VectorStore vectorStore) {
         this.vectorStore = vectorStore;
     }
 
     public void indexPage(WikiPage page) {
+        if (vectorStore == null) {
+            log.warn("VectorStore not available — cannot index wiki page {}", page.getId());
+            return;
+        }
         // Remove any existing embeddings for this page first
         deletePageEmbeddings(page.getId());
 
@@ -51,12 +60,20 @@ public class WikiEmbeddingService {
     }
 
     public void deletePageEmbeddings(UUID pageId) {
+        if (vectorStore == null) {
+            log.warn("VectorStore not available — cannot delete embeddings for wiki page {}", pageId);
+            return;
+        }
         FilterExpressionBuilder b = new FilterExpressionBuilder();
         Filter.Expression expr = b.eq("pageId", pageId.toString()).build();
         vectorStore.delete(expr);
     }
 
     public List<WikiSearchHit> search(UUID userId, String query, String kindFilter, int k) {
+        if (vectorStore == null) {
+            log.warn("VectorStore not available — cannot search wiki embeddings");
+            return List.of();
+        }
         FilterExpressionBuilder b = new FilterExpressionBuilder();
         Filter.Expression expr;
         if (kindFilter != null && !kindFilter.isBlank()) {
