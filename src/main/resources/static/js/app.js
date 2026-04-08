@@ -1,5 +1,72 @@
 // CF Llama Chat - Main Application JavaScript
 
+function getCsrfTokenForWiki() {
+    const meta = document.querySelector('meta[name="_csrf"]');
+    return meta ? meta.getAttribute('content') : '';
+}
+
+function wikiOpLabel(op) {
+    switch (op.op) {
+        case 'WRITE':      return 'Saved ' + (op.kind || '') + ': ' + (op.title || op.slug || '');
+        case 'LINK':       return 'Linked: ' + (op.slug || '');
+        case 'INVALIDATE': return 'Invalidated: ' + (op.slug || '');
+        case 'UNDO':       return 'Undone: ' + (op.slug || '');
+        default:           return op.summary || op.op || 'wiki op';
+    }
+}
+
+function appendWikiOpChip(op, messageEl) {
+    const current = messageEl ||
+                    document.querySelector('.message-assistant.streaming') ||
+                    document.querySelector('.message-assistant:last-child');
+    if (!current) return;
+
+    let footer = current.querySelector('.wiki-ops-footer');
+    if (!footer) {
+        footer = document.createElement('div');
+        footer.className = 'wiki-ops-footer';
+        const content = current.querySelector('.message-content') || current;
+        content.appendChild(footer);
+    }
+
+    const chip = document.createElement('span');
+    chip.className = 'wiki-chip';
+    if (op.pageId) chip.dataset.pageId = op.pageId;
+
+    const label = document.createElement('span');
+    label.textContent = wikiOpLabel(op);
+    chip.appendChild(label);
+
+    if (op.pageId) {
+        const view = document.createElement('a');
+        view.href = '/workspace/wiki#page=' + op.pageId;
+        view.textContent = 'view';
+        chip.appendChild(view);
+    }
+
+    if (op.pageId && (op.op === 'WRITE' || op.op === 'LINK' || op.op === 'INVALIDATE')) {
+        const undo = document.createElement('a');
+        undo.href = '#';
+        undo.textContent = 'undo';
+        undo.dataset.action = 'undo';
+        undo.addEventListener('click', async (e) => {
+            e.preventDefault();
+            try {
+                await fetch('/api/wiki/pages/' + op.pageId + '/undo', {
+                    method: 'POST',
+                    headers: { 'X-CSRF-TOKEN': getCsrfTokenForWiki() },
+                    credentials: 'same-origin'
+                });
+                label.textContent = 'Undone';
+                undo.remove();
+            } catch (err) { console.error(err); }
+        });
+        chip.appendChild(undo);
+    }
+
+    footer.appendChild(chip);
+}
+
 class ChatApp {
     constructor() {
         const appDataEl = document.getElementById('app-data');
@@ -850,6 +917,7 @@ class ChatApp {
             const reader = response.body.getReader();
             const decoder = new TextDecoder();
             let buffer = '';  // Buffer for incomplete SSE events
+            let currentEvent = 'message';  // Track SSE event name
 
             while (true) {
                 const { value, done } = await reader.read();
@@ -862,10 +930,31 @@ class ChatApp {
                 buffer = lines.pop() || '';
 
                 for (const line of lines) {
+                    if (line.startsWith('event:')) {
+                        currentEvent = line.slice(6).trim() || 'message';
+                        continue;
+                    }
+                    if (line === '') {
+                        // SSE event delimiter — reset event name for next event
+                        currentEvent = 'message';
+                        continue;
+                    }
                     if (line.startsWith('data:')) {
                         try {
                             const jsonStr = line.slice(5).trim();
                             if (!jsonStr) continue;
+
+                            // Wiki operation events: render an inline chip in the assistant bubble.
+                            if (currentEvent === 'wiki_op') {
+                                try {
+                                    const op = JSON.parse(jsonStr);
+                                    appendWikiOpChip(op, messageEl);
+                                } catch (e) {
+                                    console.warn('bad wiki_op payload', e);
+                                }
+                                continue;
+                            }
+
                             const data = JSON.parse(jsonStr);
 
                             if (!this.conversationId && data.conversationId && !data.temporary) {
