@@ -224,6 +224,17 @@
         // Notifications
         els.desktopNotifications.checked = prefs.desktopNotifications === true;
         els.soundNotifications.checked = prefs.soundNotifications === true;
+
+        // Wiki opt-in (default true). Only show the row when admin has enabled the feature.
+        var wikiToggle = document.getElementById('wikiEnabledToggle');
+        var wikiRow = document.getElementById('wikiOptInRow');
+        if (wikiToggle && wikiRow) {
+            wikiToggle.checked = prefs.wikiEnabled !== false;
+            fetch('/api/wiki/feature-status', { credentials: 'same-origin' })
+                .then(function (r) { return r.ok ? r.json() : { adminEnabled: false }; })
+                .then(function (s) { wikiRow.style.display = s.adminEnabled ? '' : 'none'; })
+                .catch(function () {});
+        }
     }
 
     // ── Event Binding ─────────────────────────────────────────────────────
@@ -341,6 +352,36 @@
         }
 
         els.confirmDeleteAccount.addEventListener('click', handleDeleteAccount);
+
+        // Wiki opt-in toggle
+        var wikiToggle = document.getElementById('wikiEnabledToggle');
+        if (wikiToggle) {
+            wikiToggle.addEventListener('change', function () {
+                var enabled = this.checked;
+                fetch('/api/user/preferences/wiki-enabled', {
+                    method: 'PUT',
+                    credentials: 'same-origin',
+                    headers: {
+                        'Content-Type': 'application/json',
+                        'X-XSRF-TOKEN': getCookie('XSRF-TOKEN')
+                    },
+                    body: JSON.stringify({ enabled: enabled })
+                }).then(function (r) {
+                    if (!r.ok) throw new Error('save failed');
+                    preferences.wikiEnabled = enabled;
+                    if (typeof toast !== 'undefined' && toast.success) {
+                        toast.success(enabled ? 'Wiki enabled' : 'Wiki disabled');
+                    }
+                }).catch(function (err) {
+                    console.error('wiki opt-in save failed', err);
+                    if (typeof toast !== 'undefined' && toast.error) toast.error('Failed to save');
+                });
+            });
+        }
+        function getCookie(name) {
+            var m = document.cookie.match('(^|;)\\s*' + name + '\\s*=\\s*([^;]+)');
+            return m ? decodeURIComponent(m.pop()) : '';
+        }
 
         // Modal dismiss buttons
         document.querySelectorAll('[data-dismiss]').forEach(function (btn) {

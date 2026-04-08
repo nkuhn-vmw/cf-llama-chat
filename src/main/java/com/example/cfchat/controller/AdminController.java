@@ -48,6 +48,7 @@ public class AdminController {
     private final SystemSettingService systemSettingService;
     private final WebhookService webhookService;
     private final ActiveUserTracker activeUserTracker;
+    private final com.example.cfchat.service.wiki.WikiFeatureService wikiFeatureService;
 
     @Value("${spring.profiles.active:default}")
     private String activeProfile;
@@ -67,7 +68,9 @@ public class AdminController {
             @Autowired(required = false) UserDocumentRepository userDocumentRepository,
             SystemSettingService systemSettingService,
             @Autowired(required = false) WebhookService webhookService,
-            @Autowired(required = false) ActiveUserTracker activeUserTracker) {
+            @Autowired(required = false) ActiveUserTracker activeUserTracker,
+            @Autowired(required = false) com.example.cfchat.service.wiki.WikiFeatureService wikiFeatureService) {
+        this.wikiFeatureService = wikiFeatureService;
         this.userService = userService;
         this.conversationService = conversationService;
         this.conversationRepository = conversationRepository;
@@ -720,6 +723,12 @@ public class AdminController {
 
         systemSettingService.setSetting(key, value != null ? value : "");
         log.info("Admin {} updated setting {} = {}", currentUser.get().getUsername(), key, value);
+
+        // Invalidate any feature caches that key off this setting so the change
+        // takes effect on the next request rather than waiting for a TTL.
+        if ("wiki.enabled".equals(key) && wikiFeatureService != null) {
+            wikiFeatureService.invalidateAdminCache();
+        }
 
         return ResponseEntity.ok(Map.of("success", true, "key", key, "value", value != null ? value : ""));
     }

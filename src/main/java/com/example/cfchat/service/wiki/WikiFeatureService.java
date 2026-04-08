@@ -5,9 +5,12 @@ import com.example.cfchat.repository.UserRepository;
 import com.example.cfchat.service.SystemSettingService;
 import com.fasterxml.jackson.core.type.TypeReference;
 import com.fasterxml.jackson.databind.ObjectMapper;
+import com.github.benmanes.caffeine.cache.Cache;
+import com.github.benmanes.caffeine.cache.Caffeine;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
 
+import java.time.Duration;
 import java.util.Map;
 import java.util.UUID;
 
@@ -38,6 +41,17 @@ public class WikiFeatureService {
     private final UserRepository userRepository;
     private final ObjectMapper objectMapper;
 
+    /**
+     * 60 s cache on the admin gate. Chat requests hit this hot path on every
+     * turn, so we trade a bounded staleness window for one DB roundtrip per
+     * minute. Single-key cache so updates from the admin UI propagate quickly
+     * and {@link #invalidateAdminCache()} can drop it on writes if needed.
+     */
+    private final Cache<String, Boolean> adminGateCache = Caffeine.newBuilder()
+            .expireAfterWrite(Duration.ofSeconds(60))
+            .maximumSize(1)
+            .build();
+
     public WikiFeatureService(SystemSettingService systemSettingService,
                               UserRepository userRepository,
                               ObjectMapper objectMapper) {
@@ -46,9 +60,16 @@ public class WikiFeatureService {
         this.objectMapper = objectMapper;
     }
 
-    /** Org-wide kill switch. Defaults to enabled. */
+    /** Org-wide kill switch. Defaults to enabled. Cached for 60 s. */
     public boolean isAdminEnabled() {
-        return systemSettingService.getBooleanSetting(ADMIN_KEY, true);
+        Boolean cached = adminGateCache.get(ADMIN_KEY,
+                k -> systemSettingService.getBooleanSetting(ADMIN_KEY, true));
+        return cached == null || cached;
+    }
+
+    /** Drop the admin-gate cache so a settings write takes effect immediately. */
+    public void invalidateAdminCache() {
+        adminGateCache.invalidateAll();
     }
 
     /** Per-user opt-out. Defaults to enabled. Returns true if the prefs blob lacks the key. */
