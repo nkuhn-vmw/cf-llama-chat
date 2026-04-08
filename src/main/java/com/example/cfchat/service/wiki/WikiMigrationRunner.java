@@ -62,14 +62,25 @@ public class WikiMigrationRunner {
                 "INSERT INTO app_migration (id, completed_at) VALUES (?, CURRENT_TIMESTAMP)", FLAG);
     }
 
-    private int migrateNotes() {
-        List<Map<String, Object>> rows;
+    private boolean tableExists(String table) {
         try {
-            rows = jdbc.queryForList("SELECT id, user_id, title, content, conversation_id FROM user_notes");
+            Integer c = jdbc.queryForObject(
+                    "SELECT COUNT(*) FROM information_schema.tables WHERE table_name = ?",
+                    Integer.class, table);
+            return c != null && c > 0;
         } catch (Exception e) {
+            log.warn("information_schema probe failed for {}: {}", table, e.getMessage());
+            return false;
+        }
+    }
+
+    private int migrateNotes() {
+        if (!tableExists("user_notes")) {
             log.info("user_notes table not present; skipping notes migration");
             return 0;
         }
+        List<Map<String, Object>> rows = jdbc.queryForList(
+                "SELECT id, user_id, title, content, conversation_id FROM user_notes");
 
         Set<String> seenSlugs = new HashSet<>();
         int count = 0;
@@ -99,13 +110,12 @@ public class WikiMigrationRunner {
     }
 
     private int migrateMemories() {
-        List<Map<String, Object>> rows;
-        try {
-            rows = jdbc.queryForList("SELECT id, user_id, content, category FROM user_memories");
-        } catch (Exception e) {
+        if (!tableExists("user_memories")) {
             log.info("user_memories table not present; skipping memories migration");
             return 0;
         }
+        List<Map<String, Object>> rows = jdbc.queryForList(
+                "SELECT id, user_id, content, category FROM user_memories");
 
         Set<String> seenSlugs = new HashSet<>();
         int count = 0;
