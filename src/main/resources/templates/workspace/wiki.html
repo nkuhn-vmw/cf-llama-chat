@@ -1,0 +1,72 @@
+<!DOCTYPE html>
+<html lang="en" xmlns:th="http://www.thymeleaf.org">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Wiki - My Workspace</title>
+    <link rel="stylesheet" th:href="@{/css/style.css}">
+    <link rel="stylesheet" th:href="@{/css/admin.css}">
+</head>
+<body>
+    <div class="admin-container">
+        <header class="admin-header">
+            <h1>Wiki</h1>
+            <a href="/workspace" class="back-link">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                    <line x1="19" y1="12" x2="5" y2="12"></line>
+                    <polyline points="12 19 5 12 12 5"></polyline>
+                </svg>
+                Back to Workspace
+            </a>
+        </header>
+
+        <div class="tools-info">
+            Pages here are written by the assistant as it learns durable facts, preferences and decisions
+            from your conversations. Search, browse, and edit them anytime.
+        </div>
+
+        <div class="wiki-layout">
+            <aside class="wiki-rail" id="wiki-tree-rail">
+                <div class="wiki-search">
+                    <input type="text" id="wiki-search-input" placeholder="Search wiki..."/>
+                </div>
+                <div id="wiki-tree">Loading...</div>
+            </aside>
+
+            <main class="wiki-main">
+                <div id="wiki-empty" class="wiki-empty">
+                    <h2>Your Wiki</h2>
+                    <p>Pages will appear here as the assistant saves durable facts from your conversations. Click any page in the sidebar to read it.</p>
+                </div>
+                <article id="wiki-page" class="wiki-page" hidden>
+                    <header class="wiki-page-header">
+                        <span class="wiki-kind-badge" id="wiki-page-kind"></span>
+                        <h1 id="wiki-page-title"></h1>
+                        <div class="wiki-page-meta">
+                            <span id="wiki-page-slug"></span> &middot;
+                            <span id="wiki-page-updated"></span> &middot;
+                            <span id="wiki-page-origin"></span>
+                        </div>
+                    </header>
+                    <div id="wiki-page-body" class="wiki-page-body markdown-body"></div>
+                    <section class="wiki-history">
+                        <h3>Revisions</h3>
+                        <ol id="wiki-history-list"></ol>
+                    </section>
+                </article>
+            </main>
+
+            <aside class="wiki-rail wiki-rail-right">
+                <h3>Recent activity</h3>
+                <ul id="wiki-log-list"></ul>
+            </aside>
+        </div>
+    </div>
+
+    <div class="toast-container" id="toastContainer"></div>
+    <script th:src="@{/vendor/marked.min.js}"></script>
+    <script th:src="@{/vendor/purify.min.js}"></script>
+    <script th:src="@{/js/admin-theme.js}"></script>
+    <script th:src="@{/js/workspace-wiki.js}"></script>
+</body>
+</html>

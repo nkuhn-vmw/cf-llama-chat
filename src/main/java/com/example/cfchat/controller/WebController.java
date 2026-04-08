@@ -142,6 +142,16 @@ public class WebController {
         return "workspace/channels";
     }
 
+    @GetMapping("/workspace/wiki")
+    public String workspaceWiki(Model model) {
+        Optional<User> currentUser = userService.getCurrentUser();
+        if (currentUser.isEmpty()) {
+            return "redirect:/login.html";
+        }
+        model.addAttribute("currentUser", currentUser.get());
+        return "workspace/wiki";
+    }
+
     @GetMapping("/workspace/notes")
     public String workspaceNotes(Model model) {
         Optional<User> currentUser = userService.getCurrentUser();
