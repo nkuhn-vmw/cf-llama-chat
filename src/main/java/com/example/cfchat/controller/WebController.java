@@ -152,26 +152,6 @@ public class WebController {
         return "workspace/wiki";
     }
 
-    @GetMapping("/workspace/notes")
-    public String workspaceNotes(Model model) {
-        Optional<User> currentUser = userService.getCurrentUser();
-        if (currentUser.isEmpty()) {
-            return "redirect:/login.html";
-        }
-        model.addAttribute("currentUser", currentUser.get());
-        return "workspace/notes";
-    }
-
-    @GetMapping("/workspace/memory")
-    public String workspaceMemory(Model model) {
-        Optional<User> currentUser = userService.getCurrentUser();
-        if (currentUser.isEmpty()) {
-            return "redirect:/login.html";
-        }
-        model.addAttribute("currentUser", currentUser.get());
-        return "workspace/memory";
-    }
-
     @GetMapping("/workspace/prompts")
     public String workspacePrompts(Model model) {
         Optional<User> currentUser = userService.getCurrentUser();
