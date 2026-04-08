@@ -48,7 +48,6 @@ public class WikiPage {
     private String bodyMd;
 
     @JdbcTypeCode(SqlTypes.JSON)
-    @Column(columnDefinition = "varchar(4000)")
     private Map<String, Object> frontmatter;
 
     @Column(name = "source_conversation_id")
