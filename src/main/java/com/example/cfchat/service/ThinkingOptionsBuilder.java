@@ -44,30 +44,21 @@ public class ThinkingOptionsBuilder {
     }
 
     /**
-     * Build provider-specific {@link ChatOptions} for the given model and level,
-     * or {@code null} if no native option applies (caller should fall back to a
-     * system-prompt nudge from {@link #systemPromptSuffix(String, String)}).
+     * Build provider-specific {@link ChatOptions} for the given model and level.
+     *
+     * <p><b>Currently always returns {@code null}</b> — the Tanzu GenAI tile's
+     * OpenAI-compat proxy rejects the {@code reasoning_effort} field with a
+     * 422 Unprocessable Entity, even though Spring AI's
+     * {@link OpenAiChatOptions#getReasoningEffort()} would otherwise be the
+     * right knob for the gpt-oss family. Until the tile passes that field
+     * through, we route all thinking-level control through
+     * {@link #systemPromptSuffix(String, String)} instead. The kept
+     * {@code OpenAiChatOptions} import documents the intended future path.
      */
     public ChatOptions buildOptions(String model, String level) {
-        if (model == null) return null;
-        String norm = normalize(level);
-        String m = model.toLowerCase();
-
-        // gpt-oss is a reasoning model — use the OpenAI-compat reasoning_effort field.
-        if (m.contains("gpt-oss")) {
-            String effort = switch (norm) {
-                case "none" -> "minimal";
-                case "low" -> "low";
-                case "high" -> "high";
-                default -> "medium";
-            };
-            return OpenAiChatOptions.builder()
-                    .model(model)
-                    .reasoningEffort(effort)
-                    .build();
-        }
-        // Other models don't have a native level we can pass via OpenAiChatOptions;
-        // the caller will use systemPromptSuffix() instead.
+        // GenAI tile proxy returns 422 on reasoning_effort; fall back to prompt-only.
+        // See genai-tile-reasoning-effort-422.md in project memory.
+        @SuppressWarnings("unused") Class<?> futureUse = OpenAiChatOptions.class;
         return null;
     }
 
@@ -89,10 +80,7 @@ public class ThinkingOptionsBuilder {
             return "";
         }
 
-        // gpt-oss is handled by buildOptions; no system suffix needed.
-        if (m.contains("gpt-oss")) return "";
-
-        // Generic fallback for plain Ollama models.
+        // Generic fallback (gpt-oss, llama, ministral, nemotron, etc.).
         return switch (norm) {
             case "none" -> "Respond directly. Do not show any reasoning steps or thinking out loud.";
             case "low" -> "Reason briefly before answering. Keep any reasoning to one or two sentences.";
