@@ -7,6 +7,7 @@ import lombok.Builder;
 import lombok.Data;
 import lombok.NoArgsConstructor;
 import org.hibernate.annotations.JdbcTypeCode;
+import org.hibernate.annotations.OptimisticLock;
 import org.hibernate.type.SqlTypes;
 
 import java.time.Instant;
@@ -67,11 +68,18 @@ public class WikiPage {
     @Column(name = "last_read_at")
     private Instant lastReadAt;
 
+    // Embedding status/error are updated asynchronously after the initial
+    // save (we need the generated ID before we can index the content).
+    // Exclude them from @Version optimistic locking so the second save
+    // doesn't bump the page version — otherwise every new page ends up
+    // at v=2 with zero history rows, which then breaks undo().
     @Column(name = "embedding_status", nullable = false, length = 16)
     @Pattern(regexp = "PENDING|READY|FAILED")
+    @OptimisticLock(excluded = true)
     private String embeddingStatus;
 
     @Column(name = "embedding_error", length = 1024)
+    @OptimisticLock(excluded = true)
     private String embeddingError;
 
     @Column(name = "created_at", nullable = false, updatable = false)

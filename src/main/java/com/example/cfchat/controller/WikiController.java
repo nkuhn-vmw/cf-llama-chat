@@ -154,4 +154,17 @@ public class WikiController {
     public ResponseEntity<Map<String, String>> notFound(NoSuchElementException e) {
         return ResponseEntity.status(404).body(Map.of("error", e.getMessage()));
     }
+
+    @ExceptionHandler(IllegalStateException.class)
+    public ResponseEntity<Map<String, String>> illegalState(IllegalStateException e) {
+        // E.g. undo on a page with no history, or any other wiki precondition failure.
+        // 409 Conflict is the right status — the request was well-formed but the
+        // target resource isn't in a state that allows the operation.
+        return ResponseEntity.status(409).body(Map.of("error", e.getMessage()));
+    }
+
+    @ExceptionHandler(IllegalArgumentException.class)
+    public ResponseEntity<Map<String, String>> badRequest(IllegalArgumentException e) {
+        return ResponseEntity.status(400).body(Map.of("error", e.getMessage()));
+    }
 }

@@ -156,7 +156,28 @@ public class WikiService {
         WikiPage page = requireOwned(scope, pageRepo.findById(pageId)
             .orElseThrow(() -> new NoSuchElementException("No wiki page: " + pageId)));
         WikiPageHistory prior = historyRepo.findFirstByPageIdOrderByVersionDesc(pageId)
-            .orElseThrow(() -> new IllegalStateException("No history for " + pageId));
+            .orElse(null);
+
+        // If there's no prior version, treat undo as "delete the page entirely".
+        // This matches the chip UX: after a single wiki_write, clicking undo
+        // should make the page go away, not error out.
+        if (prior == null) {
+            String slug = page.getSlug();
+            String title = page.getTitle();
+            String kind = page.getKind();
+            try {
+                embeddingService.deletePageEmbeddings(page.getId());
+            } catch (Exception e) {
+                // Non-fatal — the row delete below is the source of truth.
+            }
+            pageRepo.delete(page);
+            logOp(scope, "UNDO", pageId, "Deleted " + slug + " (no prior version)");
+            contextLoader.invalidate(scope.userId());
+            publisher.publishEvent(new WikiOpEvent(this, scope.userId(), scope.conversationId(),
+                new WikiOpPayload("UNDO", pageId, slug, title, kind, "Removed " + slug)));
+            return new WikiPageView(pageId, scope.userId(), slug, title, kind, "AGENT_WRITE",
+                "", 0, null, null, "DELETED");
+        }
 
         // Snapshot the current state first so undo is itself undoable
         snapshotToHistory(page, editedByFromScope(scope), "undo");
