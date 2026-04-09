@@ -61,6 +61,10 @@ public class ChatService {
     private final YouTubeTranscriptService youTubeTranscriptService;
     private final RagPromptBuilder ragPromptBuilder;
     private final WebContentService webContentService;
+    private final com.example.cfchat.tools.wiki.WikiTools wikiTools;
+    private final com.example.cfchat.service.wiki.WikiContextLoader wikiContextLoader;
+    private final com.example.cfchat.service.wiki.WikiFeatureService wikiFeatureService;
+    private final ThinkingOptionsBuilder thinkingOptionsBuilder;
 
     private static final Pattern YT_RAG_PATTERN = Pattern.compile("#\\s*(https?://(?:www\\.)?(?:youtube\\.com/watch\\?v=|youtu\\.be/)[\\w-]{11}\\S*)");
     private static final Pattern WEB_RAG_PATTERN = Pattern.compile("#\\s*(https?://\\S+)");
@@ -91,6 +95,10 @@ public class ChatService {
             @Autowired(required = false) ExternalBindingService externalBindingService,
             @Autowired(required = false) YouTubeTranscriptService youTubeTranscriptService,
             @Autowired(required = false) WebContentService webContentService,
+            @Autowired(required = false) com.example.cfchat.tools.wiki.WikiTools wikiTools,
+            @Autowired(required = false) com.example.cfchat.service.wiki.WikiContextLoader wikiContextLoader,
+            @Autowired(required = false) com.example.cfchat.service.wiki.WikiFeatureService wikiFeatureService,
+            ThinkingOptionsBuilder thinkingOptionsBuilder,
             RagPromptBuilder ragPromptBuilder) {
         this.primaryChatClient = primaryChatClient;
         // Use OpenAI model as primary for streaming
@@ -110,6 +118,10 @@ public class ChatService {
         this.youTubeTranscriptService = youTubeTranscriptService;
         this.ragPromptBuilder = ragPromptBuilder;
         this.webContentService = webContentService;
+        this.wikiTools = wikiTools;
+        this.wikiContextLoader = wikiContextLoader;
+        this.wikiFeatureService = wikiFeatureService;
+        this.thinkingOptionsBuilder = thinkingOptionsBuilder;
 
         log.info("ChatService initialized - primaryChatClient: {}, ollamaChatClient: {}, primaryChatModel: {}, mcpTools: {}, documentEmbedding: {}, externalBindings: {}",
                 primaryChatClient != null, ollamaChatClient != null,
@@ -171,7 +183,8 @@ public class ChatService {
         // Build prompt with conversation history (with optional skill and document context)
         List<org.springframework.ai.chat.messages.Message> messages = buildMessageHistory(
             conversation, request.getMessage(), request.getSkillId(), userId,
-            request.isUseDocumentContext(), request.getRagRetrievalMode());
+            request.isUseDocumentContext(), request.getRagRetrievalMode(),
+            model, request.getThinkingLevel());
 
         // Get AI response - pass model name for GenAI multi-model support
         ChatClient chatClient = getChatClient(provider, model);
@@ -181,8 +194,26 @@ public class ChatService {
 
         long startTime = System.currentTimeMillis();
 
-        // Build the chat request with optional MCP tools
+        // Build the chat request with optional MCP tools and thinking-level options.
         var promptSpec = chatClient.prompt().messages(messages);
+        org.springframework.ai.chat.prompt.ChatOptions thinkOpts =
+                thinkingOptionsBuilder.buildOptions(model, request.getThinkingLevel());
+        if (thinkOpts != null) {
+            promptSpec = promptSpec.options(thinkOpts);
+        }
+
+        // Register WikiTools (cheap, always available) + ToolContext for tenancy.
+        // Requires an authenticated user (WikiScope rejects null userId) AND
+        // the wiki feature must be enabled at both admin and user levels.
+        if (wikiTools != null && userId != null
+                && wikiFeatureService != null && wikiFeatureService.isEnabledForUser(userId)) {
+            java.util.Map<String, Object> wikiCtx = new java.util.HashMap<>();
+            wikiCtx.put("userId", userId);
+            if (conversation.getId() != null) {
+                wikiCtx.put("conversationId", conversation.getId());
+            }
+            promptSpec = promptSpec.tools(wikiTools).toolContext(wikiCtx);
+        }
 
         // Add MCP tools if available and enabled
         if (request.isUseTools() && mcpToolCallbackCacheService != null) {
@@ -308,8 +339,11 @@ public class ChatService {
         // Build prompt with conversation history (with optional skill and document context)
         List<org.springframework.ai.chat.messages.Message> messages = buildMessageHistory(
             conversation, request.getMessage(), request.getSkillId(), userId,
-            request.isUseDocumentContext(), request.getRagRetrievalMode());
-        Prompt prompt = new Prompt(messages);
+            request.isUseDocumentContext(), request.getRagRetrievalMode(),
+            model, request.getThinkingLevel());
+        org.springframework.ai.chat.prompt.ChatOptions thinkOpts =
+                thinkingOptionsBuilder.buildOptions(model, request.getThinkingLevel());
+        Prompt prompt = thinkOpts != null ? new Prompt(messages, thinkOpts) : new Prompt(messages);
 
         // Stream AI response
         StringBuilder fullResponse = new StringBuilder();
@@ -329,19 +363,33 @@ public class ChatService {
             log.debug("MCP tools disabled by user preference for streaming request");
         }
 
-        // If we have tools and user enabled them, use ChatClient for streaming (supports tool callbacks)
-        // Otherwise, use ChatModel directly for better compatibility
-        if (toolProviders.length > 0) {
+        // Use ChatClient streaming if we have any tools to register (MCP or WikiTools).
+        boolean wikiToolsEnabled = wikiTools != null && finalUserId != null
+                && wikiFeatureService != null && wikiFeatureService.isEnabledForUser(finalUserId);
+        if (toolProviders.length > 0 || wikiToolsEnabled) {
             ChatClient chatClient = getChatClient(provider, model);
             if (chatClient == null) {
                 return Flux.error(new IllegalStateException("No chat client available for provider: " + provider));
             }
 
-            log.debug("Using ChatClient streaming with {} MCP tool providers", toolProviders.length);
+            log.debug("Using ChatClient streaming with {} MCP tool providers, wikiTools={}",
+                    toolProviders.length, wikiToolsEnabled);
 
-            responseFlux = chatClient.prompt()
-                    .messages(messages)
-                    .toolCallbacks(toolProviders)
+            var streamSpec = chatClient.prompt().messages(messages);
+            if (thinkOpts != null) {
+                streamSpec = streamSpec.options(thinkOpts);
+            }
+            if (toolProviders.length > 0) {
+                streamSpec = streamSpec.toolCallbacks(toolProviders);
+            }
+            if (wikiToolsEnabled) {
+                java.util.Map<String, Object> wikiCtx = new java.util.HashMap<>();
+                wikiCtx.put("userId", finalUserId);
+                wikiCtx.put("conversationId", finalConversationId);
+                streamSpec = streamSpec.tools(wikiTools).toolContext(wikiCtx);
+            }
+
+            responseFlux = streamSpec
                     .stream()
                     .content()
                     .map(content -> {
@@ -641,22 +689,29 @@ public class ChatService {
 
     private List<org.springframework.ai.chat.messages.Message> buildMessageHistory(
             Conversation conversation, String currentMessage) {
-        return buildMessageHistory(conversation, currentMessage, null, null, false, null);
+        return buildMessageHistory(conversation, currentMessage, null, null, false, null, null, null);
     }
 
     private List<org.springframework.ai.chat.messages.Message> buildMessageHistory(
             Conversation conversation, String currentMessage, UUID skillId) {
-        return buildMessageHistory(conversation, currentMessage, skillId, null, false, null);
+        return buildMessageHistory(conversation, currentMessage, skillId, null, false, null, null, null);
     }
 
     private List<org.springframework.ai.chat.messages.Message> buildMessageHistory(
             Conversation conversation, String currentMessage, UUID skillId, UUID userId, boolean useDocumentContext) {
-        return buildMessageHistory(conversation, currentMessage, skillId, userId, useDocumentContext, null);
+        return buildMessageHistory(conversation, currentMessage, skillId, userId, useDocumentContext, null, null, null);
     }
 
     private List<org.springframework.ai.chat.messages.Message> buildMessageHistory(
             Conversation conversation, String currentMessage, UUID skillId, UUID userId,
             boolean useDocumentContext, String ragRetrievalMode) {
+        return buildMessageHistory(conversation, currentMessage, skillId, userId, useDocumentContext, ragRetrievalMode, null, null);
+    }
+
+    private List<org.springframework.ai.chat.messages.Message> buildMessageHistory(
+            Conversation conversation, String currentMessage, UUID skillId, UUID userId,
+            boolean useDocumentContext, String ragRetrievalMode,
+            String modelName, String thinkingLevel) {
         List<org.springframework.ai.chat.messages.Message> messages = new ArrayList<>();
 
         // Build system prompt (base + optional skill augmentation + optional RAG instructions)
@@ -672,6 +727,20 @@ public class ChatService {
                 }
             } catch (Exception e) {
                 log.warn("Failed to apply skill {}: {}", skillId, e.getMessage());
+            }
+        }
+
+        // Inject wiki index block (lightweight summary of user's wiki pages).
+        // Gated by both the admin kill switch and the user's personal opt-out.
+        if (wikiContextLoader != null && userId != null
+                && wikiFeatureService != null && wikiFeatureService.isEnabledForUser(userId)) {
+            try {
+                String wikiBlock = wikiContextLoader.loadIndexBlock(userId);
+                if (wikiBlock != null && !wikiBlock.isBlank()) {
+                    systemPromptBuilder.append("\n\n").append(wikiBlock);
+                }
+            } catch (Exception e) {
+                log.warn("Failed to load wiki index block for user {}: {}", userId, e.getMessage());
             }
         }
 
@@ -691,6 +760,16 @@ public class ChatService {
                 systemPromptBuilder.append("\n---------------------\n");
                 systemPromptBuilder.append("Use the above context to answer the user's question. ");
                 systemPromptBuilder.append("If the context doesn't contain relevant information, say so and answer based on your general knowledge.");
+            }
+        }
+
+        // Apply per-model thinking-level suffix (e.g. /no_think for Qwen3,
+        // verbal nudge for plain Ollama models). gpt-oss is handled via
+        // OpenAiChatOptions.reasoningEffort, not here.
+        if (thinkingOptionsBuilder != null && modelName != null) {
+            String suffix = thinkingOptionsBuilder.systemPromptSuffix(modelName, thinkingLevel);
+            if (suffix != null && !suffix.isEmpty()) {
+                systemPromptBuilder.append("\n\n").append(suffix);
             }
         }
 

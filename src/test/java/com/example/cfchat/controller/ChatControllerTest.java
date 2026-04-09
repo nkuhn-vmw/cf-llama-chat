@@ -56,6 +56,12 @@ class ChatControllerTest {
     @MockBean
     private com.example.cfchat.service.RateLimitService rateLimitService;
 
+    @MockBean
+    private com.example.cfchat.mcp.McpToolCallbackCacheService mcpToolCallbackCacheService;
+
+    @MockBean
+    private org.springframework.context.event.ApplicationEventMulticaster applicationEventMulticaster;
+
     @Test
     @WithMockUser(username = "testuser")
     void chat_validRequest_returnsResponse() throws Exception {

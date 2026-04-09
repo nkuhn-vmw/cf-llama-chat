@@ -119,6 +119,16 @@ app:
     chunk-size: ${DOCUMENT_CHUNK_SIZE:350}  # Keep under 512 tokens for nomic embedding model
     chunk-overlap: ${DOCUMENT_CHUNK_OVERLAP:100}
     rag-top-k: ${RAG_TOP_K:5}
+  wiki:
+    index:
+      max-entries: 40
+      cache-ttl-seconds: 300
+    embedding:
+      retry:
+        interval-ms: 300000
+    search:
+      default-k: 6
+      max-k: 20
 
 # LDAP Authentication (optional)
 auth:

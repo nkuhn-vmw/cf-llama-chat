@@ -107,59 +107,35 @@
             </div>
         </div>
 
-        <!-- Notes -->
+        <!-- Wiki -->
         <div class="help-section">
             <h2>
                 <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                    <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"></path>
-                    <polyline points="14 2 14 8 20 8"></polyline>
-                    <line x1="16" y1="13" x2="8" y2="13"></line>
-                    <line x1="16" y1="17" x2="8" y2="17"></line>
+                    <path d="M2 3h6a4 4 0 0 1 4 4v14a3 3 0 0 0-3-3H2z"></path>
+                    <path d="M22 3h-6a4 4 0 0 0-4 4v14a3 3 0 0 1 3-3h7z"></path>
                 </svg>
-                Notes
+                Wiki
             </h2>
             <h3>What it does</h3>
-            <p>Notes let you create and organize personal text entries with Markdown support. They're scoped to your account so only you can see them.</p>
-            <h3>How to use it</h3>
+            <p>The Wiki is your agent-curated knowledge base. As you chat, the assistant can save durable facts, preferences, decisions, and concepts about you and your work to your private wiki — and read them back into future conversations so its answers stay consistent with what it has learned.</p>
+            <h3>Page kinds</h3>
             <ul>
-                <li>Click <strong>New Note</strong> to start writing.</li>
-                <li>Give your note a title and write content in the editor. Markdown syntax is supported.</li>
-                <li>Click <strong>Show Preview</strong> to see how your Markdown will render.</li>
-                <li>Click <strong>Save Note</strong> to persist your changes.</li>
-                <li>Select an existing note from the sidebar to edit or delete it.</li>
-            </ul>
-            <div class="help-tip">
-                <strong>Tip:</strong> Notes are personal and private to your account. Use them to save research, meeting notes, or reference material you want to keep handy.
-            </div>
-        </div>
-
-        <!-- Memory -->
-        <div class="help-section">
-            <h2>
-                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                    <path d="M12 2a7 7 0 0 1 7 7c0 2.38-1.19 4.47-3 5.74V17a2 2 0 0 1-2 2H10a2 2 0 0 1-2-2v-2.26C6.19 13.47 5 11.38 5 9a7 7 0 0 1 7-7z"></path>
-                    <line x1="10" y1="21" x2="14" y2="21"></line>
-                </svg>
-                Memory
-            </h2>
-            <h3>What it does</h3>
-            <p>Memory entries are pieces of information the AI remembers about you across conversations. They help the AI provide more personalized and context-aware responses.</p>
-            <h3>Categories</h3>
-            <ul>
-                <li><strong>Fact</strong> &mdash; Things that are true about you or your work (e.g., "I use PostgreSQL for my database").</li>
-                <li><strong>Preference</strong> &mdash; Your personal preferences (e.g., "I prefer concise answers").</li>
-                <li><strong>Instruction</strong> &mdash; Standing instructions for the AI (e.g., "Always include code examples").</li>
-                <li><strong>General</strong> &mdash; Anything else worth remembering.</li>
+                <li><strong>FACT</strong> &mdash; Stable truths (e.g., &ldquo;I use PostgreSQL with pgvector&rdquo;).</li>
+                <li><strong>PREFERENCE</strong> &mdash; Your personal preferences (e.g., &ldquo;I prefer concise answers&rdquo;).</li>
+                <li><strong>DECISION</strong> &mdash; Choices you&rsquo;ve made and the reasoning behind them.</li>
+                <li><strong>CONCEPT</strong> &mdash; Definitions and project-specific terminology.</li>
+                <li><strong>ENTITY</strong> &mdash; People, projects, systems you reference often.</li>
             </ul>
             <h3>How to use it</h3>
             <ul>
-                <li>Write a memory entry, select a category, and click <strong>Add Memory</strong>.</li>
-                <li>Use the search bar to find specific memories by keyword.</li>
-                <li>Use the filter buttons to narrow by category.</li>
-                <li>Click <strong>Delete</strong> on any memory to remove it.</li>
+                <li>Just chat normally. When you tell the assistant something durable, it may save it &mdash; you&rsquo;ll see a small chip in the message bubble like &ldquo;Saved PREFERENCE: …&rdquo; with <strong>view</strong> and <strong>undo</strong> links.</li>
+                <li>Click <strong>view</strong> on any chip to jump to that page in the workspace.</li>
+                <li>Click <strong>undo</strong> immediately if you don&rsquo;t want it saved &mdash; the page reverts to its previous version (or is removed entirely if it was a brand-new write).</li>
+                <li>Visit <strong>Workspace &rarr; Wiki</strong> to browse all your pages, search them, view revision history, and edit anything by hand.</li>
+                <li>Don&rsquo;t want the assistant writing to your wiki at all? Toggle <strong>LLM Wiki</strong> off in your user <a href="/settings">Settings</a>. Existing pages stay readable; the assistant just won&rsquo;t auto-save anything new or use the index in its system prompt.</li>
             </ul>
             <div class="help-tip">
-                <strong>Tip:</strong> The AI automatically includes your memories as context in conversations. Be specific with your entries for the best results.
+                <strong>Tip:</strong> The assistant only saves things it judges durable and useful &mdash; not everything you say. If it skips something you wanted saved, ask it explicitly: &ldquo;please save that to the wiki.&rdquo;
             </div>
         </div>
 

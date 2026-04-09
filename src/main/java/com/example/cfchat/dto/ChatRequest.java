@@ -56,4 +56,12 @@ public class ChatRequest {
      */
     private String ragRetrievalMode;
 
+    /**
+     * Thinking / reasoning level for this turn.
+     * One of: none | low | medium | high. Defaults to "medium" when null.
+     * Mapped per-model in ChatService (gpt-oss reasoning_effort, qwen3
+     * /no_think directive, or system-prompt nudge for plain models).
+     */
+    private String thinkingLevel;
+
 }

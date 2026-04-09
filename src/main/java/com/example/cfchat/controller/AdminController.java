@@ -48,6 +48,7 @@ public class AdminController {
     private final SystemSettingService systemSettingService;
     private final WebhookService webhookService;
     private final ActiveUserTracker activeUserTracker;
+    private final com.example.cfchat.service.wiki.WikiFeatureService wikiFeatureService;
 
     @Value("${spring.profiles.active:default}")
     private String activeProfile;
@@ -67,7 +68,9 @@ public class AdminController {
             @Autowired(required = false) UserDocumentRepository userDocumentRepository,
             SystemSettingService systemSettingService,
             @Autowired(required = false) WebhookService webhookService,
-            @Autowired(required = false) ActiveUserTracker activeUserTracker) {
+            @Autowired(required = false) ActiveUserTracker activeUserTracker,
+            @Autowired(required = false) com.example.cfchat.service.wiki.WikiFeatureService wikiFeatureService) {
+        this.wikiFeatureService = wikiFeatureService;
         this.userService = userService;
         this.conversationService = conversationService;
         this.conversationRepository = conversationRepository;
@@ -619,7 +622,7 @@ public class AdminController {
         int enabledFeatures = 0;
         String[] featureKeys = {
             "feature.rag.enabled", "feature.tools.enabled", "feature.channels.enabled",
-            "feature.notes.enabled", "feature.memory.enabled",
+            "wiki.enabled",
             "feature.temporary_chats.enabled"
         };
         for (String key : featureKeys) {
@@ -670,8 +673,7 @@ public class AdminController {
         defaults.put("feature.rag.enabled", "true");
         defaults.put("feature.tools.enabled", "true");
         defaults.put("feature.channels.enabled", "true");
-        defaults.put("feature.notes.enabled", "true");
-        defaults.put("feature.memory.enabled", "true");
+        defaults.put("wiki.enabled", "true");
         defaults.put("feature.temporary_chats.enabled", "true");
         defaults.put("maintenance.enabled", "false");
         defaults.put("maintenance.message", "");
@@ -708,7 +710,7 @@ public class AdminController {
             "session.timeout", "email.verification.required", "default.model", "allowed.models",
             "max.tokens", "default.temperature", "moderation.enabled", "moderation.level",
             "feature.rag.enabled", "feature.tools.enabled", "feature.channels.enabled",
-            "feature.notes.enabled", "feature.memory.enabled",
+            "wiki.enabled",
             "feature.temporary_chats.enabled", "maintenance.enabled", "maintenance.message",
             "banner.text", "banner.type", "prevent_chat_deletion"
         );
@@ -719,6 +721,12 @@ public class AdminController {
 
         systemSettingService.setSetting(key, value != null ? value : "");
         log.info("Admin {} updated setting {} = {}", currentUser.get().getUsername(), key, value);
+
+        // Invalidate any feature caches that key off this setting so the change
+        // takes effect on the next request rather than waiting for a TTL.
+        if ("wiki.enabled".equals(key) && wikiFeatureService != null) {
+            wikiFeatureService.invalidateAdminCache();
+        }
 
         return ResponseEntity.ok(Map.of("success", true, "key", key, "value", value != null ? value : ""));
     }

@@ -91,12 +91,8 @@
                 <div class="stat-label">Channels</div>
             </div>
             <div class="stat-card">
-                <div class="stat-value" id="noteCount">--</div>
-                <div class="stat-label">Notes</div>
-            </div>
-            <div class="stat-card">
-                <div class="stat-value" id="memoryCount">--</div>
-                <div class="stat-label">Memories</div>
+                <div class="stat-value" id="wikiCount">--</div>
+                <div class="stat-label">Wiki Pages</div>
             </div>
             <div class="stat-card">
                 <div class="stat-value" id="promptCount">--</div>
@@ -128,33 +124,17 @@
                 </div>
             </a>
 
-            <a href="/workspace/notes" class="admin-nav-card">
+            <a href="/workspace/wiki" class="admin-nav-card" id="wikiNavCard" style="display: none;">
                 <div class="card-icon">
                     <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                        <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"></path>
-                        <polyline points="14 2 14 8 20 8"></polyline>
-                        <line x1="16" y1="13" x2="8" y2="13"></line>
-                        <line x1="16" y1="17" x2="8" y2="17"></line>
+                        <path d="M2 3h6a4 4 0 0 1 4 4v14a3 3 0 0 0-3-3H2z"></path>
+                        <path d="M22 3h-6a4 4 0 0 0-4 4v14a3 3 0 0 1 3-3h7z"></path>
                     </svg>
                 </div>
-                <h3>Notes</h3>
-                <p>Create and organize personal notes with markdown support. Keep track of important information.</p>
+                <h3>Wiki</h3>
+                <p>Your agent-curated knowledge base — facts, preferences, decisions, and concepts learned from your conversations.</p>
                 <div class="card-stat">
-                    <strong id="noteCountStat">--</strong> notes saved
-                </div>
-            </a>
-
-            <a href="/workspace/memory" class="admin-nav-card">
-                <div class="card-icon">
-                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                        <path d="M12 2a7 7 0 0 1 7 7c0 2.38-1.19 4.47-3 5.74V17a2 2 0 0 1-2 2H10a2 2 0 0 1-2-2v-2.26C6.19 13.47 5 11.38 5 9a7 7 0 0 1 7-7z"></path>
-                        <line x1="10" y1="21" x2="14" y2="21"></line>
-                    </svg>
-                </div>
-                <h3>Memory</h3>
-                <p>Manage AI memory entries. Add facts, preferences, and instructions that the AI remembers across conversations.</p>
-                <div class="card-stat">
-                    <strong id="memoryCountStat">--</strong> memories stored
+                    <strong id="wikiCountStat">--</strong> pages
                 </div>
             </a>
 
@@ -208,7 +188,7 @@
                     </svg>
                 </div>
                 <h3>Help & Guides</h3>
-                <p>Learn how to use workspace features. Guides for channels, notes, memory, prompts, tools, and documents.</p>
+                <p>Learn how to use workspace features. Guides for channels, wiki, prompts, tools, and documents.</p>
             </a>
         </nav>
     </div>
@@ -217,38 +197,49 @@
     <script th:src="@{/js/admin-toast.js}"></script>
     <script>
         // Load workspace stats
+        // Show/hide the Wiki card based on admin feature gate
+        fetch('/api/wiki/feature-status', { credentials: 'same-origin' })
+            .then(r => r.ok ? r.json() : { adminEnabled: false })
+            .then(s => {
+                if (s.adminEnabled) {
+                    var card = document.getElementById('wikiNavCard');
+                    if (card) card.style.display = '';
+                    var stat = document.getElementById('wikiCount');
+                    if (stat && stat.parentElement) stat.parentElement.style.display = '';
+                } else {
+                    var stat = document.getElementById('wikiCount');
+                    if (stat && stat.parentElement) stat.parentElement.style.display = 'none';
+                }
+            })
+            .catch(function(){});
+
         Promise.allSettled([
             fetch('/api/channels').then(r => r.ok ? r.json() : []),
-            fetch('/api/notes').then(r => r.ok ? r.json() : []),
-            fetch('/api/memory').then(r => r.ok ? r.json() : []),
+            fetch('/api/wiki/pages?limit=1000').then(r => r.ok ? r.json() : []),
             fetch('/api/prompts').then(r => r.ok ? r.json() : []),
             fetch('/api/documents').then(r => r.ok ? r.json() : []),
             fetch('/api/chat/available-tools').then(r => r.ok ? r.json() : [])
         ]).then(function(results) {
             var channels = results[0].status === 'fulfilled' ? results[0].value : [];
-            var notes = results[1].status === 'fulfilled' ? results[1].value : [];
-            var memories = results[2].status === 'fulfilled' ? results[2].value : [];
-            var prompts = results[3].status === 'fulfilled' ? results[3].value : [];
-            var docs = results[4].status === 'fulfilled' ? results[4].value : [];
-            var tools = results[5].status === 'fulfilled' ? results[5].value : [];
+            var wiki    = results[1].status === 'fulfilled' ? results[1].value : [];
+            var prompts = results[2].status === 'fulfilled' ? results[2].value : [];
+            var docs    = results[3].status === 'fulfilled' ? results[3].value : [];
+            var tools   = results[4].status === 'fulfilled' ? results[4].value : [];
 
             var channelLen = Array.isArray(channels) ? channels.length : 0;
-            var noteLen = Array.isArray(notes) ? notes.length : 0;
-            var memoryLen = Array.isArray(memories) ? memories.length : 0;
-            var promptLen = Array.isArray(prompts) ? prompts.length : 0;
-            var docLen = Array.isArray(docs) ? docs.length : 0;
-            var toolLen = Array.isArray(tools) ? tools.length : 0;
+            var wikiLen    = Array.isArray(wiki) ? wiki.length : 0;
+            var promptLen  = Array.isArray(prompts) ? prompts.length : 0;
+            var docLen     = Array.isArray(docs) ? docs.length : 0;
+            var toolLen    = Array.isArray(tools) ? tools.length : 0;
 
             document.getElementById('channelCount').textContent = channelLen;
-            document.getElementById('noteCount').textContent = noteLen;
-            document.getElementById('memoryCount').textContent = memoryLen;
+            document.getElementById('wikiCount').textContent = wikiLen;
             document.getElementById('promptCount').textContent = promptLen;
             document.getElementById('documentCount').textContent = docLen;
             document.getElementById('toolCount').textContent = toolLen;
 
             document.getElementById('channelCountStat').textContent = channelLen;
-            document.getElementById('noteCountStat').textContent = noteLen;
-            document.getElementById('memoryCountStat').textContent = memoryLen;
+            document.getElementById('wikiCountStat').textContent = wikiLen;
             document.getElementById('promptCountStat').textContent = promptLen;
             document.getElementById('documentCountStat').textContent = docLen;
             document.getElementById('toolCountStat').textContent = toolLen;

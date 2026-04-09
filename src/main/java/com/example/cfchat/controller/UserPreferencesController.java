@@ -160,6 +160,28 @@ public class UserPreferencesController {
     }
 
     /**
+     * Toggle the user's wiki opt-out. Defaults to enabled (true).
+     */
+    @PutMapping("/wiki-enabled")
+    public ResponseEntity<Map<String, Object>> setWikiEnabled(@RequestBody Map<String, Object> body) {
+        Optional<User> currentUser = userService.getCurrentUser();
+        if (currentUser.isEmpty()) {
+            return ResponseEntity.status(401).build();
+        }
+        Object v = body.get("enabled");
+        if (v == null) {
+            return ResponseEntity.badRequest().body(Map.of("error", "Field 'enabled' is required"));
+        }
+        boolean enabled = (v instanceof Boolean b) ? b : Boolean.parseBoolean(String.valueOf(v));
+        User user = currentUser.get();
+        Map<String, Object> prefs = parsePreferences(user.getPreferences());
+        prefs.put("wikiEnabled", enabled);
+        savePreferences(user, prefs);
+        log.info("User {} set wiki opt-in to {}", user.getUsername(), enabled);
+        return ResponseEntity.ok(Map.of("success", true, "wikiEnabled", enabled));
+    }
+
+    /**
      * Get available background presets.
      */
     @GetMapping("/backgrounds")

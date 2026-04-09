@@ -1,5 +1,170 @@
 // CF Llama Chat - Main Application JavaScript
 
+function getCsrfTokenForWiki() {
+    const meta = document.querySelector('meta[name="_csrf"]');
+    return meta ? meta.getAttribute('content') : '';
+}
+
+function wikiOpLabel(op) {
+    switch (op.op) {
+        case 'WRITE':      return 'Saved ' + (op.kind || '') + ': ' + (op.title || op.slug || '');
+        case 'LINK':       return 'Linked: ' + (op.slug || '');
+        case 'INVALIDATE': return 'Invalidated: ' + (op.slug || '');
+        case 'UNDO':       return 'Undone: ' + (op.slug || '');
+        default:           return op.summary || op.op || 'wiki op';
+    }
+}
+
+/**
+ * Ensure a collapsible "Details" panel exists in the given assistant message
+ * bubble. Returns refs to the thinking and wiki-ops sections so callers can
+ * append into them. The panel is collapsed by default; clicking the summary
+ * toggles it open. Both sections start hidden until they have content.
+ */
+function ensureDetailsPanel(messageEl) {
+    if (!messageEl) return null;
+    let panel = messageEl.querySelector('.details-panel');
+    if (panel) {
+        return {
+            panel,
+            summary: panel.querySelector('.details-summary'),
+            countLabel: panel.querySelector('.details-count'),
+            thinkingBox: panel.querySelector('.details-thinking'),
+            thinkingBody: panel.querySelector('.details-thinking-body'),
+            wikiBox: panel.querySelector('.details-wiki'),
+            wikiList: panel.querySelector('.details-wiki-list')
+        };
+    }
+    panel = document.createElement('details');
+    panel.className = 'details-panel';
+    // collapsed by default
+
+    const summary = document.createElement('summary');
+    summary.className = 'details-summary';
+    const caret = document.createElement('span');
+    caret.className = 'details-caret';
+    caret.textContent = '▸';
+    const label = document.createElement('span');
+    label.className = 'details-label';
+    label.textContent = 'Details';
+    const countLabel = document.createElement('span');
+    countLabel.className = 'details-count';
+    summary.appendChild(caret);
+    summary.appendChild(label);
+    summary.appendChild(countLabel);
+    // Native <details> handles toggle. Sync the caret rotation.
+    panel.addEventListener('toggle', () => {
+        caret.textContent = panel.open ? '▾' : '▸';
+    });
+    panel.appendChild(summary);
+
+    const thinkingBox = document.createElement('div');
+    thinkingBox.className = 'details-thinking';
+    thinkingBox.hidden = true;
+    const thinkingHdr = document.createElement('div');
+    thinkingHdr.className = 'details-section-hdr';
+    thinkingHdr.textContent = 'Thinking';
+    thinkingBox.appendChild(thinkingHdr);
+    const thinkingBody = document.createElement('pre');
+    thinkingBody.className = 'details-thinking-body';
+    thinkingBox.appendChild(thinkingBody);
+    panel.appendChild(thinkingBox);
+
+    const wikiBox = document.createElement('div');
+    wikiBox.className = 'details-wiki';
+    wikiBox.hidden = true;
+    const wikiHdr = document.createElement('div');
+    wikiHdr.className = 'details-section-hdr';
+    wikiHdr.textContent = 'Wiki Operations';
+    wikiBox.appendChild(wikiHdr);
+    const wikiList = document.createElement('div');
+    wikiList.className = 'details-wiki-list';
+    wikiBox.appendChild(wikiList);
+    panel.appendChild(wikiBox);
+
+    const content = messageEl.querySelector('.message-content') || messageEl;
+    // Insert details panel before the metrics line if present, otherwise append
+    const metaEl = content.querySelector('.message-meta');
+    if (metaEl) {
+        content.insertBefore(panel, metaEl);
+    } else {
+        content.appendChild(panel);
+    }
+    return { panel, summary, countLabel, thinkingBox, thinkingBody, wikiBox, wikiList };
+}
+
+function updateDetailsCount(refs) {
+    if (!refs) return;
+    let parts = [];
+    const wikiCount = refs.wikiList.children.length;
+    const hasThinking = !refs.thinkingBox.hidden && refs.thinkingBody.textContent.trim().length > 0;
+    if (hasThinking) parts.push('thinking');
+    if (wikiCount > 0) parts.push(wikiCount + ' wiki op' + (wikiCount === 1 ? '' : 's'));
+    refs.countLabel.textContent = parts.length ? '(' + parts.join(' · ') + ')' : '';
+}
+
+function appendThinkingChunk(messageEl, chunk) {
+    const refs = ensureDetailsPanel(messageEl);
+    if (!refs) return;
+    refs.thinkingBox.hidden = false;
+    refs.thinkingBody.textContent += chunk;
+    updateDetailsCount(refs);
+}
+
+function appendWikiOpChip(op, messageEl) {
+    if (!op || typeof op !== 'object' || !op.op) {
+        console.warn('appendWikiOpChip: malformed payload', op);
+        return;
+    }
+    const current = messageEl ||
+                    document.querySelector('.message-assistant.streaming') ||
+                    document.querySelector('.message-assistant:last-child');
+    if (!current) return;
+
+    const refs = ensureDetailsPanel(current);
+    if (!refs) return;
+    refs.wikiBox.hidden = false;
+    const footer = refs.wikiList;
+
+    const chip = document.createElement('span');
+    chip.className = 'wiki-chip';
+    if (op.pageId) chip.dataset.pageId = op.pageId;
+
+    const label = document.createElement('span');
+    label.textContent = wikiOpLabel(op);
+    chip.appendChild(label);
+
+    if (op.pageId) {
+        const view = document.createElement('a');
+        view.href = '/workspace/wiki#page=' + op.pageId;
+        view.textContent = 'view';
+        chip.appendChild(view);
+    }
+
+    if (op.pageId && (op.op === 'WRITE' || op.op === 'LINK' || op.op === 'INVALIDATE')) {
+        const undo = document.createElement('a');
+        undo.href = '#';
+        undo.textContent = 'undo';
+        undo.dataset.action = 'undo';
+        undo.addEventListener('click', async (e) => {
+            e.preventDefault();
+            try {
+                await fetch('/api/wiki/pages/' + op.pageId + '/undo', {
+                    method: 'POST',
+                    headers: { 'X-CSRF-TOKEN': getCsrfTokenForWiki() },
+                    credentials: 'same-origin'
+                });
+                label.textContent = 'Undone';
+                undo.remove();
+            } catch (err) { console.error(err); }
+        });
+        chip.appendChild(undo);
+    }
+
+    footer.appendChild(chip);
+    updateDetailsCount(refs);
+}
+
 class ChatApp {
     constructor() {
         const appDataEl = document.getElementById('app-data');
@@ -14,6 +179,7 @@ class ChatApp {
         this.documentsAvailable = false;
         this.ragRetrievalMode = localStorage.getItem('ragRetrievalMode') || 'snippet';
         this.useTools = true;
+        this.thinkingLevel = localStorage.getItem('thinkingLevel') || 'medium';
         this.toolsAvailable = false;
         this.tools = [];
         this.toolPreferences = {};
@@ -244,6 +410,59 @@ class ChatApp {
                 localStorage.setItem('useTools', this.useTools);
                 console.debug('Tools toggle changed:', this.useTools);
             });
+        }
+
+        // Thinking-level segmented control
+        const thinkingBtns = document.querySelectorAll('.thinking-btn');
+        if (thinkingBtns.length) {
+            // Restore from localStorage
+            thinkingBtns.forEach(btn => {
+                const isActive = btn.dataset.level === this.thinkingLevel;
+                btn.classList.toggle('active', isActive);
+                btn.setAttribute('aria-checked', isActive ? 'true' : 'false');
+            });
+            thinkingBtns.forEach(btn => {
+                btn.addEventListener('click', () => {
+                    const level = btn.dataset.level;
+                    this.thinkingLevel = level;
+                    localStorage.setItem('thinkingLevel', level);
+                    thinkingBtns.forEach(b => {
+                        const a = b.dataset.level === level;
+                        b.classList.toggle('active', a);
+                        b.setAttribute('aria-checked', a ? 'true' : 'false');
+                    });
+                    // Best-effort persist to server preferences
+                    fetch('/api/user/preferences', {
+                        method: 'PUT',
+                        credentials: 'same-origin',
+                        headers: {
+                            'Content-Type': 'application/json',
+                            'X-XSRF-TOKEN': (function(){
+                                const m = document.cookie.match('(^|;)\\s*XSRF-TOKEN\\s*=\\s*([^;]+)');
+                                return m ? decodeURIComponent(m.pop()) : '';
+                            })()
+                        },
+                        body: JSON.stringify({ thinkingLevel: level })
+                    }).catch(() => {});
+                });
+            });
+            // Async hydrate from server preferences (overrides localStorage if set)
+            fetch('/api/user/preferences', { credentials: 'same-origin' })
+                .then(r => r.ok ? r.json() : null)
+                .then(prefs => {
+                    if (prefs && prefs.thinkingLevel
+                            && ['none','low','medium','high'].includes(prefs.thinkingLevel)
+                            && prefs.thinkingLevel !== this.thinkingLevel) {
+                        this.thinkingLevel = prefs.thinkingLevel;
+                        localStorage.setItem('thinkingLevel', prefs.thinkingLevel);
+                        thinkingBtns.forEach(b => {
+                            const a = b.dataset.level === prefs.thinkingLevel;
+                            b.classList.toggle('active', a);
+                            b.setAttribute('aria-checked', a ? 'true' : 'false');
+                        });
+                    }
+                })
+                .catch(() => {});
         }
 
         // Message action buttons
@@ -757,7 +976,8 @@ class ChatApp {
                 useDocumentContext: useDocContext,
                 useTools: toolsEnabled && this.toolsAvailable,
                 temporary: this.temporaryChat,
-                ragRetrievalMode: useDocContext ? this.ragRetrievalMode : null
+                ragRetrievalMode: useDocContext ? this.ragRetrievalMode : null,
+                thinkingLevel: this.thinkingLevel || 'medium'
             };
 
             console.debug('Chat request - useTools:', request.useTools, '(toggle:', toolsEnabled, ', available:', this.toolsAvailable, '), temporary:', request.temporary, ', ragMode:', request.ragRetrievalMode);
@@ -825,10 +1045,66 @@ class ChatApp {
 
             // Create assistant message element
             const messageEl = this.createMessageElement('assistant', '');
+            messageEl.classList.add('streaming');
             this.messages.appendChild(messageEl);
             const textEl = messageEl.querySelector('.message-text');
             let fullContent = '';
             let streamComplete = false;
+
+            // Stateful <think>...</think> parser. Reasoning models emit a
+            // think block before the answer; we route those into the details
+            // panel and show "Thinking..." in the typing indicator instead of
+            // dumping raw reasoning into the bubble.
+            let thinkState = 'outside';        // 'outside' | 'inside' | 'lookahead'
+            let thinkLookahead = '';           // small buffer for split tags
+            const THINK_OPEN = '<think>';
+            const THINK_CLOSE = '</think>';
+            const routeChunk = (chunk) => {
+                if (!chunk) return;
+                let buf = thinkLookahead + chunk;
+                thinkLookahead = '';
+                while (buf.length > 0) {
+                    if (thinkState === 'outside') {
+                        const idx = buf.indexOf(THINK_OPEN);
+                        if (idx === -1) {
+                            // No open tag in this chunk; might be a partial open at the end.
+                            // Hold the last few chars in lookahead if they could be the start of <think>.
+                            const tailLen = Math.min(buf.length, THINK_OPEN.length - 1);
+                            const tail = buf.slice(buf.length - tailLen);
+                            if (THINK_OPEN.startsWith(tail) && tail.length > 0) {
+                                fullContent += buf.slice(0, buf.length - tailLen);
+                                thinkLookahead = tail;
+                            } else {
+                                fullContent += buf;
+                            }
+                            buf = '';
+                        } else {
+                            fullContent += buf.slice(0, idx);
+                            buf = buf.slice(idx + THINK_OPEN.length);
+                            thinkState = 'inside';
+                            messageEl.classList.add('is-thinking');
+                        }
+                    } else { // inside
+                        const idx = buf.indexOf(THINK_CLOSE);
+                        if (idx === -1) {
+                            const tailLen = Math.min(buf.length, THINK_CLOSE.length - 1);
+                            const tail = buf.slice(buf.length - tailLen);
+                            if (THINK_CLOSE.startsWith(tail) && tail.length > 0) {
+                                appendThinkingChunk(messageEl, buf.slice(0, buf.length - tailLen));
+                                thinkLookahead = tail;
+                            } else {
+                                appendThinkingChunk(messageEl, buf);
+                            }
+                            buf = '';
+                        } else {
+                            appendThinkingChunk(messageEl, buf.slice(0, idx));
+                            buf = buf.slice(idx + THINK_CLOSE.length);
+                            thinkState = 'outside';
+                            messageEl.classList.remove('is-thinking');
+                        }
+                    }
+                }
+            };
 
             // Streaming debounce: re-render content at most every 100ms
             let streamRenderTimer = null;
@@ -850,6 +1126,7 @@ class ChatApp {
             const reader = response.body.getReader();
             const decoder = new TextDecoder();
             let buffer = '';  // Buffer for incomplete SSE events
+            let currentEvent = 'message';  // Track SSE event name
 
             while (true) {
                 const { value, done } = await reader.read();
@@ -862,10 +1139,31 @@ class ChatApp {
                 buffer = lines.pop() || '';
 
                 for (const line of lines) {
+                    if (line.startsWith('event:')) {
+                        currentEvent = line.slice(6).trim() || 'message';
+                        continue;
+                    }
+                    if (line === '') {
+                        // SSE event delimiter — reset event name for next event
+                        currentEvent = 'message';
+                        continue;
+                    }
                     if (line.startsWith('data:')) {
                         try {
                             const jsonStr = line.slice(5).trim();
                             if (!jsonStr) continue;
+
+                            // Wiki operation events: render an inline chip in the assistant bubble.
+                            if (currentEvent === 'wiki_op') {
+                                try {
+                                    const op = JSON.parse(jsonStr);
+                                    appendWikiOpChip(op, messageEl);
+                                } catch (e) {
+                                    console.warn('bad wiki_op payload', e);
+                                }
+                                continue;
+                            }
+
                             const data = JSON.parse(jsonStr);
 
                             if (!this.conversationId && data.conversationId && !data.temporary) {
@@ -884,9 +1182,13 @@ class ChatApp {
                                 streamComplete = true;
                                 // Clear any pending debounced render
                                 if (streamRenderTimer) { clearTimeout(streamRenderTimer); streamRenderTimer = null; }
-                                // Final message with full HTML content from backend
+                                // Final message with full HTML content from backend.
+                                // Strip any <think>...</think> blocks: those have already
+                                // been routed to the details panel during streaming and
+                                // should not appear in the visible bubble.
                                 if (data.htmlContent) {
-                                    let finalHtml = this.sanitizeHtml(data.htmlContent);
+                                    let cleaned = data.htmlContent.replace(/<think>[\s\S]*?<\/think>/gi, '').trim();
+                                    let finalHtml = this.sanitizeHtml(cleaned);
                                     if (data.citations && data.citations.length > 0) {
                                         finalHtml = this.renderCitations(finalHtml, data.citations);
                                     }
@@ -935,8 +1237,7 @@ class ChatApp {
                                     this.refreshConversationsList();
                                 }
                             } else if (data.content) {
-                                fullContent += data.content;
-                                // Use debounced rendering during streaming (100ms)
+                                routeChunk(data.content);
                                 debouncedStreamRender();
                             }
                         } catch (e) {
@@ -960,7 +1261,8 @@ class ChatApp {
                             const data = JSON.parse(jsonStr);
                             if (data.complete && data.htmlContent) {
                                 streamComplete = true;
-                                let finalHtml = this.sanitizeHtml(data.htmlContent);
+                                let cleaned = data.htmlContent.replace(/<think>[\s\S]*?<\/think>/gi, '').trim();
+                                let finalHtml = this.sanitizeHtml(cleaned);
                                 if (data.citations && data.citations.length > 0) {
                                     finalHtml = this.renderCitations(finalHtml, data.citations);
                                 }
@@ -969,7 +1271,7 @@ class ChatApp {
                                 this.renderMath(textEl);
                                 this.renderArtifacts(textEl);
                             } else if (data.content) {
-                                fullContent += data.content;
+                                routeChunk(data.content);
                             }
                         }
                     } catch (e) {
@@ -989,6 +1291,12 @@ class ChatApp {
                 this.scrollToBottom();
             }
         } finally {
+            // Remove the streaming class so the typing/thinking indicator stops animating
+            const streamingMsg = this.messages?.querySelector('.message.assistant.streaming');
+            if (streamingMsg) {
+                streamingMsg.classList.remove('streaming');
+                streamingMsg.classList.remove('is-thinking');
+            }
             this.hideCancelButton();
             this.abortController = null;
         }

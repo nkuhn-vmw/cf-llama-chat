@@ -751,25 +751,12 @@
 
             <div class="setting-row">
                 <div class="setting-info">
-                    <div class="setting-label">Notes</div>
-                    <div class="setting-desc">Enable the personal notes feature for users.</div>
+                    <div class="setting-label">LLM Wiki</div>
+                    <div class="setting-desc">Enable the agent-curated wiki. When off, the assistant cannot read or write wiki pages, the workspace page is hidden, and REST endpoints return 404. Individual users can opt out separately in their preferences.</div>
                 </div>
                 <div class="setting-control">
                     <label class="toggle-switch">
-                        <input type="checkbox" data-key="feature.notes.enabled">
-                        <span class="toggle-slider"></span>
-                    </label>
-                </div>
-            </div>
-
-            <div class="setting-row">
-                <div class="setting-info">
-                    <div class="setting-label">Memory System</div>
-                    <div class="setting-desc">Enable AI memory to retain context across conversations.</div>
-                </div>
-                <div class="setting-control">
-                    <label class="toggle-switch">
-                        <input type="checkbox" data-key="feature.memory.enabled">
+                        <input type="checkbox" data-key="wiki.enabled">
                         <span class="toggle-slider"></span>
                     </label>
                 </div>

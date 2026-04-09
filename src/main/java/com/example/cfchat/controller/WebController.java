@@ -26,6 +26,7 @@ public class WebController {
     private final UserService userService;
     private final OrganizationService organizationService;
     private final ObjectMapper objectMapper;
+    private final com.example.cfchat.service.wiki.WikiFeatureService wikiFeatureService;
 
     private String buildAppDataJson(UUID conversationId, User currentUser) {
         try {
@@ -142,24 +143,17 @@ public class WebController {
         return "workspace/channels";
     }
 
-    @GetMapping("/workspace/notes")
-    public String workspaceNotes(Model model) {
+    @GetMapping("/workspace/wiki")
+    public String workspaceWiki(Model model) {
         Optional<User> currentUser = userService.getCurrentUser();
         if (currentUser.isEmpty()) {
             return "redirect:/login.html";
         }
-        model.addAttribute("currentUser", currentUser.get());
-        return "workspace/notes";
-    }
-
-    @GetMapping("/workspace/memory")
-    public String workspaceMemory(Model model) {
-        Optional<User> currentUser = userService.getCurrentUser();
-        if (currentUser.isEmpty()) {
-            return "redirect:/login.html";
+        if (!wikiFeatureService.isAdminEnabled()) {
+            return "redirect:/workspace";
         }
         model.addAttribute("currentUser", currentUser.get());
-        return "workspace/memory";
+        return "workspace/wiki";
     }
 
     @GetMapping("/workspace/prompts")
