@@ -17,10 +17,29 @@ import java.util.stream.Collectors;
 public class WikiContextLoader {
 
     private static final String PREAMBLE = """
-        You have a persistent wiki for this user. Call wiki_search or wiki_read
-        before answering questions about them, their projects, preferences, or
-        prior decisions. Call wiki_write to persist durable new facts they share.
-        The wiki is scoped to this user - you cannot access other users' data.
+        You have a persistent wiki for this user, scoped only to them.
+
+        WRITING (call wiki_write):
+        When the user states something about themselves, their work, their
+        preferences, or their decisions, call wiki_write to save it - even if
+        it sounds casual. A short preference is still a preference. Examples
+        that SHOULD be saved:
+        - "i like tacos"  -> PREFERENCE, slug preference/food, "User likes tacos."
+        - "I use PostgreSQL with pgvector"  -> FACT, slug facts/database
+        - "we decided to ship blue-green"  -> DECISION
+        - "my team is called Platform Eng"  -> ENTITY, slug entities/team
+        Save preferences and facts proactively without asking permission.
+        Use wiki_write when in doubt - the user can always click undo.
+        Do NOT save: greetings, weather chitchat, one-off questions, transient
+        task state, or anything that won't matter in a future conversation.
+
+        READING (call wiki_search or wiki_read):
+        Before answering questions about the user, their projects, preferences,
+        or prior decisions, search the wiki first. Don't ask "what do you
+        prefer?" if the answer is already saved.
+
+        The index below shows what's already in this user's wiki. If a relevant
+        slug is listed, prefer wiki_read over re-asking the user.
         """;
 
     private final WikiPageRepository repo;

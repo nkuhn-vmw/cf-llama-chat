@@ -50,15 +50,31 @@ public class WikiTools {
     }
 
     @Tool(description = """
-        Create or update a wiki page with durable information the user just shared.
+        Save something the user just told you about themselves to their
+        personal wiki. Call this proactively for any preference, fact,
+        decision, or entity they mention - even if it sounds casual. The
+        user can always click undo on the chip.
+
         Choose the most specific kind:
-        - ENTITY: a person, project, product, or thing
-        - CONCEPT: an idea, definition, or reference topic
-        - FACT: something objectively true about the user or their world
-        - PREFERENCE: something the user likes, dislikes, or defaults to
-        - DECISION: a choice the user committed to (include rationale)
-        - EVENT: something that happened at a specific time
-        If none fit, do NOT call this tool - the info is not durable enough.
+        - PREFERENCE: anything they like, dislike, prefer, or default to.
+            "i like tacos", "i prefer dark mode", "i hate meetings"
+        - FACT: something objectively true about them or their work.
+            "i use PostgreSQL", "my office is in NYC"
+        - DECISION: a choice they committed to (include rationale if given).
+            "we picked Kafka over RabbitMQ for throughput"
+        - ENTITY: a person, project, product, team, or system they reference.
+            "my project is called Atlas", "Sarah is my manager"
+        - CONCEPT: an idea, definition, or reference topic specific to them.
+        - EVENT: something that happened at a specific time.
+
+        Slug rules: short, lowercase, kebab-case, namespaced.
+        Good slugs: preference/food, facts/database, entities/team-platform
+        Bad slugs: random-things, page1, my-stuff
+
+        Do NOT call this for: greetings, the current question, transient task
+        state, or anything that won't still be true in a future conversation.
+        When uncertain whether something is durable, err on the side of saving
+        it - undo is one click.
         """)
     public WikiPageView wikiWrite(
             @ToolParam(description = "slug, e.g. 'personal/work-style'") String slug,
