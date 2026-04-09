@@ -16,6 +16,10 @@ function wikiOpLabel(op) {
 }
 
 function appendWikiOpChip(op, messageEl) {
+    if (!op || typeof op !== 'object' || !op.op) {
+        console.warn('appendWikiOpChip: malformed payload', op);
+        return;
+    }
     const current = messageEl ||
                     document.querySelector('.message-assistant.streaming') ||
                     document.querySelector('.message-assistant:last-child');

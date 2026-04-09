@@ -2,12 +2,16 @@ package com.example.cfchat.service.wiki;
 
 import com.example.cfchat.model.User;
 import com.example.cfchat.repository.UserRepository;
+import com.example.cfchat.service.CacheInvalidationService;
+import com.example.cfchat.service.EventService;
 import com.example.cfchat.service.SystemSettingService;
 import com.fasterxml.jackson.core.type.TypeReference;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.github.benmanes.caffeine.cache.Cache;
 import com.github.benmanes.caffeine.cache.Caffeine;
+import jakarta.annotation.PostConstruct;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
 
 import java.time.Duration;
@@ -41,6 +45,9 @@ public class WikiFeatureService {
     private final UserRepository userRepository;
     private final ObjectMapper objectMapper;
 
+    @Autowired(required = false)
+    private EventService eventService;
+
     /**
      * 60 s cache on the admin gate. Chat requests hit this hot path on every
      * turn, so we trade a bounded staleness window for one DB roundtrip per
@@ -70,6 +77,24 @@ public class WikiFeatureService {
     /** Drop the admin-gate cache so a settings write takes effect immediately. */
     public void invalidateAdminCache() {
         adminGateCache.invalidateAll();
+    }
+
+    /**
+     * Subscribe to the cluster-wide settings invalidation channel so that any
+     * write to wiki.enabled — whether from AdminController, an admin script,
+     * or another instance of the app — invalidates the cache here. Without
+     * this, the explicit AdminController hook only covers one call site and
+     * leaves multi-instance deployments serving stale state for up to 60 s.
+     */
+    @PostConstruct
+    void subscribeToSettingsChanges() {
+        if (eventService == null) return;
+        eventService.subscribe(CacheInvalidationService.CHANNEL_SETTINGS, (channel, message) -> {
+            if (ADMIN_KEY.equals(message)) {
+                log.info("wiki.enabled changed cluster-wide; invalidating admin gate cache");
+                invalidateAdminCache();
+            }
+        });
     }
 
     /** Per-user opt-out. Defaults to enabled. Returns true if the prefs blob lacks the key. */

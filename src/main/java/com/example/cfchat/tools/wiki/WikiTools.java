@@ -23,6 +23,15 @@ public class WikiTools {
         this.service = service;
     }
 
+    private static String requireSlug(String slug, String paramName) {
+        if (slug == null || slug.isBlank()) {
+            throw new IllegalArgumentException(
+                    paramName + " is required and must be a non-empty slug "
+                            + "like 'preference/food' or 'facts/database'");
+        }
+        return slug.trim();
+    }
+
     @Tool(description = """
         Search the user's wiki for pages relevant to a query. Use this BEFORE
         answering questions about the user, their projects, preferences, or
@@ -46,7 +55,7 @@ public class WikiTools {
     public WikiPageView wikiRead(
             @ToolParam(description = "page slug, e.g. 'personal/work-style'") String slug,
             ToolContext toolContext) {
-        return service.read(WikiScope.from(toolContext), slug);
+        return service.read(WikiScope.from(toolContext), requireSlug(slug, "slug"));
     }
 
     @Tool(description = """
@@ -82,11 +91,18 @@ public class WikiTools {
             @ToolParam(description = "one of ENTITY|CONCEPT|FACT|PREFERENCE|DECISION|EVENT") String kind,
             @ToolParam(description = "full markdown body") String bodyMd,
             ToolContext toolContext) {
+        String validatedSlug = requireSlug(slug, "slug");
+        if (title == null || title.isBlank()) {
+            throw new IllegalArgumentException("title is required");
+        }
+        if (bodyMd == null || bodyMd.isBlank()) {
+            throw new IllegalArgumentException("bodyMd is required");
+        }
         WikiKind parsed = WikiKind.parse(kind);
         if (!WikiKind.agentVisible().contains(parsed)) {
             throw new IllegalArgumentException("Kind " + kind + " is not agent-writable");
         }
-        return service.upsert(WikiScope.from(toolContext), slug, title, parsed.name(),
+        return service.upsert(WikiScope.from(toolContext), validatedSlug, title.trim(), parsed.name(),
                               bodyMd, "AGENT_WRITE");
     }
 
@@ -99,7 +115,13 @@ public class WikiTools {
             @ToolParam(description = "target page slug") String toSlug,
             @ToolParam(description = "mentions|see_also|supersedes|refines|contradicts") String relation,
             ToolContext toolContext) {
-        service.link(WikiScope.from(toolContext), fromSlug, toSlug, relation);
+        String from = requireSlug(fromSlug, "fromSlug");
+        String to = requireSlug(toSlug, "toSlug");
+        if (relation == null || relation.isBlank()) {
+            throw new IllegalArgumentException(
+                    "relation is required: mentions|see_also|supersedes|refines|contradicts");
+        }
+        service.link(WikiScope.from(toolContext), from, to, relation.trim());
     }
 
     @Tool(description = """
@@ -111,7 +133,8 @@ public class WikiTools {
             @ToolParam(description = "page slug to invalidate") String slug,
             @ToolParam(description = "short reason") String reason,
             ToolContext toolContext) {
-        service.invalidate(WikiScope.from(toolContext), slug, reason);
+        service.invalidate(WikiScope.from(toolContext), requireSlug(slug, "slug"),
+                reason == null ? "" : reason.trim());
     }
 
     @Tool(description = """

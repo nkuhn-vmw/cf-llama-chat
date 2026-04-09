@@ -1,7 +1,9 @@
 package com.example.cfchat.service.wiki;
 
+import com.example.cfchat.event.WikiOpEvent;
 import com.example.cfchat.repository.wiki.WikiPageIndexRow;
 import com.example.cfchat.repository.wiki.WikiPageRepository;
+import org.springframework.context.event.EventListener;
 import com.github.benmanes.caffeine.cache.Cache;
 import com.github.benmanes.caffeine.cache.Caffeine;
 import org.springframework.beans.factory.annotation.Value;
@@ -63,6 +65,20 @@ public class WikiContextLoader {
     }
 
     public void invalidate(UUID userId) { cache.invalidate(userId); }
+
+    /**
+     * Drop the cached index block whenever the agent (or a user) mutates the
+     * wiki, so the next chat turn sees its own writes immediately instead of
+     * waiting up to 5 minutes for the TTL. Without this hook, the model can
+     * write a fact and then in the very next turn answer "I don't see that
+     * in your wiki" because the cached index it's reading from is stale.
+     */
+    @EventListener
+    public void onWikiOp(WikiOpEvent evt) {
+        if (evt.getUserId() != null) {
+            cache.invalidate(evt.getUserId());
+        }
+    }
 
     private String build(UUID userId) {
         List<WikiPageIndexRow> rows = repo.findTopForIndex(userId, Pageable.ofSize(maxEntries));
