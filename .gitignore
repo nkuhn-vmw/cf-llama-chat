@@ -49,3 +49,6 @@ gradle/
 *.db
 *.mv.db
 *.trace.db
+
+# Private feedback / review docs — not for public GitHub
+docs/genai-tile-feedback/
