@@ -394,6 +394,13 @@
                         <div class="input-footer">
                             <span class="powered-by">Press Enter to send, Shift+Enter for new line</span>
                             <div class="input-toggles">
+                                <div class="thinking-selector" role="radiogroup" aria-label="Thinking level">
+                                    <span class="thinking-label">Thinking:</span>
+                                    <button type="button" class="thinking-btn" data-level="none" role="radio" aria-checked="false" title="Skip reasoning entirely. Fastest. Best for simple lookups.">None</button>
+                                    <button type="button" class="thinking-btn" data-level="low" role="radio" aria-checked="false" title="Reason briefly before answering.">Low</button>
+                                    <button type="button" class="thinking-btn active" data-level="medium" role="radio" aria-checked="true" title="Default reasoning depth.">Med</button>
+                                    <button type="button" class="thinking-btn" data-level="high" role="radio" aria-checked="false" title="Step-by-step reasoning. Slowest, best for hard problems.">High</button>
+                                </div>
                                 <label class="stream-toggle">
                                     <input type="checkbox" id="streamToggle" checked>
                                     <span>Stream</span>
