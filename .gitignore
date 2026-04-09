@@ -52,3 +52,6 @@ gradle/
 
 # Private feedback / review docs — not for public GitHub
 docs/genai-tile-feedback/
+
+# Session-local Claude Code scratch file — not for public GitHub
+CLAUDE.md
