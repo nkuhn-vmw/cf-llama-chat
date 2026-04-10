@@ -4,6 +4,7 @@ import com.example.cfchat.auth.UserService;
 import com.example.cfchat.model.ExternalBinding;
 import com.example.cfchat.model.User;
 import com.example.cfchat.service.ExternalBindingService;
+import com.example.cfchat.service.OutboundUrlPolicy;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
@@ -17,12 +18,15 @@ public class AdminExternalBindingController {
 
     private final ExternalBindingService externalBindingService;
     private final UserService userService;
+    private final OutboundUrlPolicy outboundUrlPolicy;
 
     public AdminExternalBindingController(
             ExternalBindingService externalBindingService,
-            UserService userService) {
+            UserService userService,
+            OutboundUrlPolicy outboundUrlPolicy) {
         this.externalBindingService = externalBindingService;
         this.userService = userService;
+        this.outboundUrlPolicy = outboundUrlPolicy;
     }
 
     private boolean isAdmin() {
@@ -78,6 +82,14 @@ public class AdminExternalBindingController {
         }
         if (apiKey == null || apiKey.isBlank()) {
             return ResponseEntity.badRequest().body(Map.of("error", "API Key is required"));
+        }
+        try {
+            outboundUrlPolicy.assertAllowed(apiBase, "API base URL");
+            if (configUrl != null && !configUrl.isBlank()) {
+                outboundUrlPolicy.assertAllowed(configUrl, "Config URL");
+            }
+        } catch (IllegalArgumentException e) {
+            return ResponseEntity.badRequest().body(Map.of("error", e.getMessage()));
         }
 
         if (externalBindingService.existsByName(name)) {
@@ -137,12 +149,24 @@ public class AdminExternalBindingController {
         }
 
         if (apiBase != null && !apiBase.isBlank()) {
+            try {
+                outboundUrlPolicy.assertAllowed(apiBase, "API base URL");
+            } catch (IllegalArgumentException e) {
+                return ResponseEntity.badRequest().body(Map.of("error", e.getMessage()));
+            }
             existing.setApiBase(apiBase);
         }
         if (apiKey != null && !apiKey.isBlank()) {
             existing.setApiKey(apiKey);
         }
         if (configUrl != null) {
+            if (!configUrl.isBlank()) {
+                try {
+                    outboundUrlPolicy.assertAllowed(configUrl, "Config URL");
+                } catch (IllegalArgumentException e) {
+                    return ResponseEntity.badRequest().body(Map.of("error", e.getMessage()));
+                }
+            }
             existing.setConfigUrl(configUrl.isBlank() ? null : configUrl);
         }
         if (description != null) {

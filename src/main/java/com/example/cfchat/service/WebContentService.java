@@ -12,15 +12,27 @@ import java.time.Instant;
 @Slf4j
 public class WebContentService {
 
+    private final OutboundUrlPolicy outboundUrlPolicy;
+
     @Value("${rag.web.max-content-length:50000}")
     private int maxContentLength;
 
     @Value("${rag.web.timeout-ms:10000}")
     private int timeoutMs;
 
+    public WebContentService(OutboundUrlPolicy outboundUrlPolicy) {
+        this.outboundUrlPolicy = outboundUrlPolicy;
+    }
+
     public record WebPageContent(String url, String title, String text, Instant fetchedAt) {}
 
     public WebPageContent fetch(String url) {
+        OutboundUrlPolicy.ValidationResult validation = outboundUrlPolicy.validate(url);
+        if (!validation.allowed()) {
+            log.warn("Blocked outbound fetch for {}: {}", url, validation.reason());
+            return new WebPageContent(url, "Error", "Failed to fetch: " + validation.reason(), Instant.now());
+        }
+
         try {
             Document doc = Jsoup.connect(url)
                     .timeout(timeoutMs)
@@ -45,6 +57,6 @@ public class WebContentService {
     }
 
     public boolean isValidUrl(String url) {
-        return url != null && (url.startsWith("http://") || url.startsWith("https://"));
+        return outboundUrlPolicy.isAllowed(url);
     }
 }

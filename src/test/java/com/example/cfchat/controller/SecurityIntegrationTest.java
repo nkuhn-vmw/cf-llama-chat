@@ -75,6 +75,9 @@ class SecurityIntegrationTest {
     @MockBean
     private com.example.cfchat.service.SystemSettingService systemSettingService;
 
+    @MockBean
+    private OutboundUrlPolicy outboundUrlPolicy;
+
     // ===== Unauthenticated access to admin endpoints =====
 
     @Test
