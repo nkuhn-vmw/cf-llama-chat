@@ -65,6 +65,8 @@ public class ChatService {
     private final com.example.cfchat.service.wiki.WikiContextLoader wikiContextLoader;
     private final com.example.cfchat.service.wiki.WikiFeatureService wikiFeatureService;
     private final ThinkingOptionsBuilder thinkingOptionsBuilder;
+    private final ContentModerationService contentModerationService;
+    private final PromptInjectionDetector promptInjectionDetector;
 
     private static final Pattern YT_RAG_PATTERN = Pattern.compile("#\\s*(https?://(?:www\\.)?(?:youtube\\.com/watch\\?v=|youtu\\.be/)[\\w-]{11}\\S*)");
     private static final Pattern WEB_RAG_PATTERN = Pattern.compile("#\\s*(https?://\\S+)");
@@ -98,6 +100,8 @@ public class ChatService {
             @Autowired(required = false) com.example.cfchat.tools.wiki.WikiTools wikiTools,
             @Autowired(required = false) com.example.cfchat.service.wiki.WikiContextLoader wikiContextLoader,
             @Autowired(required = false) com.example.cfchat.service.wiki.WikiFeatureService wikiFeatureService,
+            @Autowired(required = false) ContentModerationService contentModerationService,
+            @Autowired(required = false) PromptInjectionDetector promptInjectionDetector,
             ThinkingOptionsBuilder thinkingOptionsBuilder,
             RagPromptBuilder ragPromptBuilder) {
         this.primaryChatClient = primaryChatClient;
@@ -121,6 +125,8 @@ public class ChatService {
         this.wikiTools = wikiTools;
         this.wikiContextLoader = wikiContextLoader;
         this.wikiFeatureService = wikiFeatureService;
+        this.contentModerationService = contentModerationService;
+        this.promptInjectionDetector = promptInjectionDetector;
         this.thinkingOptionsBuilder = thinkingOptionsBuilder;
 
         log.info("ChatService initialized - primaryChatClient: {}, ollamaChatClient: {}, primaryChatModel: {}, mcpTools: {}, documentEmbedding: {}, externalBindings: {}",
@@ -138,6 +144,7 @@ public class ChatService {
         String provider = request.getProvider() != null ? request.getProvider() : chatConfig.getDefaultProvider();
         String model = request.getModel();
         boolean isTemporary = request.isTemporary();
+        SafetyOutcome safetyOutcome = evaluateSafety(request.getMessage());
 
         // Validate and resolve model name
         if (model != null && !model.isBlank()) {
@@ -178,6 +185,10 @@ public class ChatService {
         // Save user message (skip for temporary chats)
         if (!isTemporary) {
             conversationService.addMessage(conversationId, Message.MessageRole.USER, request.getMessage(), null);
+        }
+
+        if (!safetyOutcome.warnings().isEmpty()) {
+            log.warn("Chat safety warnings for conversation {}: {}", conversationId, String.join("; ", safetyOutcome.warnings()));
         }
 
         // Build prompt with conversation history (with optional skill and document context)
@@ -288,6 +299,7 @@ public class ChatService {
         String provider = request.getProvider() != null ? request.getProvider() : chatConfig.getDefaultProvider();
         String model = request.getModel();
         boolean isTemporary = request.isTemporary();
+        SafetyOutcome safetyOutcome = evaluateSafety(request.getMessage());
 
         // Validate and resolve model name
         if (model != null && !model.isBlank()) {
@@ -334,6 +346,10 @@ public class ChatService {
         // Save user message (skip for temporary chats)
         if (!isTemporary) {
             conversationService.addMessage(conversationId, Message.MessageRole.USER, request.getMessage(), null);
+        }
+
+        if (!safetyOutcome.warnings().isEmpty()) {
+            log.warn("Streaming chat safety warnings for conversation {}: {}", conversationId, String.join("; ", safetyOutcome.warnings()));
         }
 
         // Build prompt with conversation history (with optional skill and document context)
@@ -685,6 +701,36 @@ public class ChatService {
 
         // Use primary model for openai, genai (default), or any other provider
         return primaryChatModel;
+    }
+
+    private record SafetyOutcome(List<String> warnings) {}
+
+    private SafetyOutcome evaluateSafety(String message) {
+        List<String> warnings = new ArrayList<>();
+
+        if (contentModerationService != null && contentModerationService.isEnabled()) {
+            ContentModerationService.ModerationResult moderation = contentModerationService.check(message);
+            if (moderation.flagged()) {
+                String detail = moderation.reason() != null ? moderation.reason() : "Content moderation matched";
+                if ("block".equalsIgnoreCase(moderation.action())) {
+                    throw new IllegalArgumentException("Message blocked by moderation policy: " + detail);
+                }
+                warnings.add("Moderation warning: " + detail);
+            }
+        }
+
+        if (promptInjectionDetector != null && promptInjectionDetector.isEnabled()) {
+            PromptInjectionDetector.InjectionResult injection = promptInjectionDetector.check(message);
+            if (injection.detected()) {
+                String detail = injection.pattern() != null ? injection.pattern() : "Prompt injection pattern detected";
+                if ("block".equalsIgnoreCase(injection.action())) {
+                    throw new IllegalArgumentException("Message blocked by prompt-injection protection");
+                }
+                warnings.add("Prompt injection warning: " + detail);
+            }
+        }
+
+        return new SafetyOutcome(List.copyOf(warnings));
     }
 
     private List<org.springframework.ai.chat.messages.Message> buildMessageHistory(

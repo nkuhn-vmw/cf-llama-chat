@@ -9,10 +9,13 @@ import static org.assertj.core.api.Assertions.assertThat;
 class WebContentServiceTest {
 
     private WebContentService webContentService;
+    private OutboundUrlPolicy outboundUrlPolicy;
 
     @BeforeEach
     void setUp() {
-        webContentService = new WebContentService();
+        outboundUrlPolicy = new OutboundUrlPolicy();
+        ReflectionTestUtils.setField(outboundUrlPolicy, "blockPrivateHosts", true);
+        webContentService = new WebContentService(outboundUrlPolicy);
         ReflectionTestUtils.setField(webContentService, "maxContentLength", 50000);
         ReflectionTestUtils.setField(webContentService, "timeoutMs", 10000);
     }
@@ -46,6 +49,14 @@ class WebContentServiceTest {
     }
 
     @Test
+    void fetch_privateHost_returnsBlockedError() {
+        WebContentService.WebPageContent result = webContentService.fetch("http://127.0.0.1/internal");
+
+        assertThat(result.title()).isEqualTo("Error");
+        assertThat(result.text()).contains("Private or special-use network addresses are not allowed");
+    }
+
+    @Test
     void fetch_contentTruncation_respectsMaxLength() {
         ReflectionTestUtils.setField(webContentService, "maxContentLength", 10);
 
@@ -63,6 +74,11 @@ class WebContentServiceTest {
     @Test
     void isValidUrl_httpsUrl_returnsTrue() {
         assertThat(webContentService.isValidUrl("https://example.com")).isTrue();
+    }
+
+    @Test
+    void isValidUrl_localhost_returnsFalse() {
+        assertThat(webContentService.isValidUrl("http://localhost:8080")).isFalse();
     }
 
     @Test

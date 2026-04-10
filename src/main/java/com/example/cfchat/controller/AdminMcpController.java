@@ -8,6 +8,7 @@ import com.example.cfchat.model.McpTransportType;
 import com.example.cfchat.model.Tool;
 import com.example.cfchat.model.User;
 import com.example.cfchat.service.McpService;
+import com.example.cfchat.service.OutboundUrlPolicy;
 import com.example.cfchat.service.ToolService;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -27,6 +28,7 @@ public class AdminMcpController {
     private final McpService mcpService;
     private final ToolService toolService;
     private final McpToolCallbackCacheService mcpToolCallbackCacheService;
+    private final OutboundUrlPolicy outboundUrlPolicy;
 
     @GetMapping("/admin/mcp")
     public String mcpPage(Model model) {
@@ -142,6 +144,10 @@ public class AdminMcpController {
                     && (url == null || url.isBlank())) {
                 return ResponseEntity.badRequest().body(Map.of("error", "URL is required for " + transportType + " transport"));
             }
+            if ((transportType == McpTransportType.SSE || transportType == McpTransportType.STREAMABLE_HTTP)
+                    && url != null && !url.isBlank()) {
+                outboundUrlPolicy.assertAllowed(url, "MCP server URL");
+            }
 
             if (transportType == McpTransportType.STDIO && (command == null || command.isBlank())) {
                 return ResponseEntity.badRequest().body(Map.of("error", "Command is required for STDIO transport"));
@@ -201,6 +207,16 @@ public class AdminMcpController {
             String transportTypeStr = (String) body.get("transportType");
             if (transportTypeStr != null) {
                 updates.setTransportType(McpTransportType.valueOf(transportTypeStr));
+            }
+            McpTransportType effectiveTransportType = updates.getTransportType() != null
+                    ? updates.getTransportType()
+                    : mcpService.getServerById(id).map(McpServer::getTransportType).orElse(null);
+            String effectiveUrl = updates.getUrl() != null
+                    ? updates.getUrl()
+                    : mcpService.getServerById(id).map(McpServer::getUrl).orElse(null);
+            if ((effectiveTransportType == McpTransportType.SSE || effectiveTransportType == McpTransportType.STREAMABLE_HTTP)
+                    && effectiveUrl != null && !effectiveUrl.isBlank()) {
+                outboundUrlPolicy.assertAllowed(effectiveUrl, "MCP server URL");
             }
 
             Boolean requiresAuth = (Boolean) body.get("requiresAuth");

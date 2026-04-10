@@ -14,6 +14,7 @@ import com.example.cfchat.repository.UserDocumentRepository;
 import com.example.cfchat.service.ChatService;
 import com.example.cfchat.service.ConversationService;
 import com.example.cfchat.service.DatabaseStatsService;
+import com.example.cfchat.service.OutboundUrlPolicy;
 import com.example.cfchat.service.ActiveUserTracker;
 import com.example.cfchat.service.SystemSettingService;
 import com.example.cfchat.service.UserAccessService;
@@ -48,6 +49,7 @@ public class AdminController {
     private final SystemSettingService systemSettingService;
     private final WebhookService webhookService;
     private final ActiveUserTracker activeUserTracker;
+    private final OutboundUrlPolicy outboundUrlPolicy;
     private final com.example.cfchat.service.wiki.WikiFeatureService wikiFeatureService;
 
     @Value("${spring.profiles.active:default}")
@@ -69,6 +71,7 @@ public class AdminController {
             SystemSettingService systemSettingService,
             @Autowired(required = false) WebhookService webhookService,
             @Autowired(required = false) ActiveUserTracker activeUserTracker,
+            OutboundUrlPolicy outboundUrlPolicy,
             @Autowired(required = false) com.example.cfchat.service.wiki.WikiFeatureService wikiFeatureService) {
         this.wikiFeatureService = wikiFeatureService;
         this.userService = userService;
@@ -86,6 +89,7 @@ public class AdminController {
         this.systemSettingService = systemSettingService;
         this.webhookService = webhookService;
         this.activeUserTracker = activeUserTracker;
+        this.outboundUrlPolicy = outboundUrlPolicy;
     }
 
     @GetMapping("/admin")
@@ -781,6 +785,11 @@ public class AdminController {
         }
         if (webhookService == null) {
             return ResponseEntity.badRequest().body(Map.of("error", "Webhook service not available"));
+        }
+        try {
+            outboundUrlPolicy.assertAllowed((String) body.get("url"), "Webhook URL");
+        } catch (IllegalArgumentException e) {
+            return ResponseEntity.badRequest().body(Map.of("error", e.getMessage()));
         }
         Webhook webhook = Webhook.builder()
                 .name((String) body.get("name"))

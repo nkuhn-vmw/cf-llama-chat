@@ -111,6 +111,7 @@ app:
     require-invitation: ${APP_REQUIRE_INVITATION:false}
   # Document embedding configuration
   embedding:
+    allow-destructive-migration: ${ALLOW_DESTRUCTIVE_EMBEDDING_MIGRATION:false}
     model: ${EMBEDDING_MODEL:text-embedding-3-small}
     dimensions: ${EMBEDDING_DIMENSIONS:512}
   documents:
@@ -169,6 +170,10 @@ rag:
     candidate-multiplier: ${RAG_CANDIDATE_MULTIPLIER:4}
   query-rewrite:
     enabled: ${RAG_QUERY_REWRITE:false}
+
+security:
+  outbound:
+    block-private-hosts: ${SECURITY_OUTBOUND_BLOCK_PRIVATE_HOSTS:true}
 
 # Rate limiting
 rate-limit:

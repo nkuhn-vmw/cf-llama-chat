@@ -66,6 +66,9 @@ public class DocumentEmbeddingService {
     @Value("${app.documents.chunk-overlap:100}")
     private int chunkOverlap;
 
+    @Value("${app.embedding.allow-destructive-migration:false}")
+    private boolean allowDestructiveMigration;
+
     private TokenTextSplitter textSplitter;
 
     public DocumentEmbeddingService(
@@ -121,7 +124,12 @@ public class DocumentEmbeddingService {
         }
 
         // Migrate vector dimensions from 512 to 768 for nomic model compatibility
-        // Only truncate if the ALTER TABLE actually succeeds (dimensions need changing)
+        // Only truncate if explicitly allowed and the ALTER TABLE actually succeeds.
+        if (!allowDestructiveMigration) {
+            log.info("Skipping destructive embedding dimension migration; app.embedding.allow-destructive-migration=false");
+            return;
+        }
+
         try {
             jdbcTemplate.execute("ALTER TABLE document_embeddings ALTER COLUMN embedding TYPE vector(768)");
             // ALTER succeeded, so dimensions were different - existing embeddings are incompatible
