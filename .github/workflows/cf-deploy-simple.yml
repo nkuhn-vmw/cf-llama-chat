@@ -97,6 +97,8 @@ jobs:
       - name: Deploy to Nonprod
         env:
           DEPLOY_VERSION: ${{ needs.prepare.outputs.version }}
+          APP_ROUTE: ${{ secrets.APP_ROUTE_NONPROD }}
+          CF_DOMAIN: ${{ secrets.CF_DOMAIN_NONPROD }}
         run: |
           set -e
 
@@ -112,14 +114,20 @@ jobs:
           echo "Stopping existing app if present..."
           cf stop "${{ env.APP_NAME }}" || echo "App not running or doesn't exist"
 
-          # Push the app (will restart it)
+          # Push with --no-route to avoid cross-space route conflicts,
+          # then explicitly map the route from secrets.
           echo "Pushing app..."
           cf push "${{ env.APP_NAME }}" \
             -p "${JAR_FILE}" \
             -m 1G \
             -b java_buildpack_offline \
             --no-manifest \
+            --no-route \
             --no-start
+
+          # Map the route (idempotent — succeeds if already mapped)
+          echo "Mapping route ${APP_ROUTE}.${CF_DOMAIN}..."
+          cf map-route "${{ env.APP_NAME }}" "${CF_DOMAIN}" --hostname "${APP_ROUTE}" || echo "Route mapping failed or already exists"
 
           # Set environment variables
           cf set-env "${{ env.APP_NAME }}" SPRING_PROFILES_ACTIVE "cloud"
@@ -186,6 +194,8 @@ jobs:
       - name: Deploy to Production
         env:
           DEPLOY_VERSION: ${{ needs.prepare.outputs.version }}
+          APP_ROUTE: ${{ secrets.APP_ROUTE_PROD }}
+          CF_DOMAIN: ${{ secrets.CF_DOMAIN_PROD }}
         run: |
           set -e
 
@@ -201,14 +211,20 @@ jobs:
           echo "Stopping existing app if present..."
           cf stop "${{ env.APP_NAME }}" || echo "App not running or doesn't exist"
 
-          # Push the app (will restart it)
+          # Push with --no-route to avoid cross-space route conflicts,
+          # then explicitly map the route from secrets.
           echo "Pushing app..."
           cf push "${{ env.APP_NAME }}" \
             -p "${JAR_FILE}" \
             -m 1G \
             -b java_buildpack_offline \
             --no-manifest \
+            --no-route \
             --no-start
+
+          # Map the route (idempotent — succeeds if already mapped)
+          echo "Mapping route ${APP_ROUTE}.${CF_DOMAIN}..."
+          cf map-route "${{ env.APP_NAME }}" "${CF_DOMAIN}" --hostname "${APP_ROUTE}" || echo "Route mapping failed or already exists"
 
           # Set environment variables
           cf set-env "${{ env.APP_NAME }}" SPRING_PROFILES_ACTIVE "cloud"
