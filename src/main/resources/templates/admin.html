@@ -325,18 +325,6 @@
 
     <script th:src="@{/js/admin-theme.js}"></script>
     <script th:src="@{/js/admin-toast.js}"></script>
-    <script>
-        fetch('/api/admin/active-users')
-            .then(function(res) {
-                if (!res.ok) throw new Error('Failed to load active users');
-                return res.json();
-            })
-            .then(function(data) {
-                document.getElementById('activeUsersCount').textContent = data.count != null ? data.count : data;
-            })
-            .catch(function() {
-                document.getElementById('activeUsersCount').textContent = '--';
-            });
-    </script>
+    <script th:src="@{/js/admin-dashboard.js}"></script>
 </body>
 </html>

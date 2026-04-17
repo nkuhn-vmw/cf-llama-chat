@@ -277,9 +277,20 @@ cf restage enterprise-chat-prod
 | | |
 |---|---|
 | **Username** | `admin` |
-| **Password** | `Tanzu123` |
+| **Password** | set via `APP_ADMIN_DEFAULT_PASSWORD`, or auto-generated on first boot |
 
-> ⚠️ **Change the default password after first login.** Override via `app.admin.default-password` / `APP_ADMIN_DEFAULT_PASSWORD`. Also override `APP_AUTH_SECRET` (the invitation-code secret baked into the shipped manifests) via `cf set-env` before first start in any real environment.
+> ⚠️ The shipped manifests intentionally do **not** pin an admin password or
+> auth secret. On first start with none set, the app generates a random admin
+> password and prints it once to `cf logs`. Capture it and rotate:
+>
+> ```bash
+> cf set-env <app> APP_ADMIN_DEFAULT_PASSWORD <strong-value>
+> cf set-env <app> APP_AUTH_SECRET         <strong-value>   # only if APP_REQUIRE_INVITATION=true
+> cf restage <app>
+> ```
+>
+> On the `cloud` profile the app refuses to start if `APP_ADMIN_DEFAULT_PASSWORD`
+> or `APP_AUTH_SECRET` are set to known-weak values (`Tanzu123`, `changeme`).
 
 ### Service Bindings
 
@@ -325,7 +336,7 @@ cf restage enterprise-chat-prod
 | Variable | Description | Default |
 |----------|-------------|---------|
 | `SPRING_PROFILES_ACTIVE` | Active profile | `default` |
-| `APP_ADMIN_DEFAULT_PASSWORD` | First-boot admin password | `Tanzu123` |
+| `APP_ADMIN_DEFAULT_PASSWORD` | First-boot admin password (random if unset) | _(unset)_ |
 | `APP_AUTH_SECRET` | Invitation code required for registration | *(empty)* |
 | `APP_REQUIRE_INVITATION` | Require invitation code | `false` |
 | `CHAT_PROVIDER` | Default chat provider | `openai` |

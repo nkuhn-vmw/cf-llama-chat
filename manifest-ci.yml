@@ -11,7 +11,8 @@ applications:
     env:
       JBP_CONFIG_OPEN_JDK_JRE: '{ jre: { version: 21.+ } }'
       SPRING_PROFILES_ACTIVE: cloud
-      APP_AUTH_SECRET: changeme
+      # APP_AUTH_SECRET / APP_ADMIN_DEFAULT_PASSWORD must be set via `cf set-env`
+      # before the first blue-green cycle. They are intentionally NOT baked in.
     services:
       - cf-llama-chat-db
       - tanzu-nomic-embed-text-v2-moe

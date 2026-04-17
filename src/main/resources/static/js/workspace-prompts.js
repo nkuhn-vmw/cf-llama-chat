@@ -1,0 +1,184 @@
+// workspace/prompts page — CRUD over /api/prompts, safe DOM construction
+(function () {
+    var editingPromptId = null;
+
+    function showToast(msg, type) {
+        if (window.showAdminToast) window.showAdminToast(msg, type || 'info');
+    }
+
+    function createEl(tag, className, textContent) {
+        var el = document.createElement(tag);
+        if (className) el.className = className;
+        if (textContent) el.textContent = textContent;
+        return el;
+    }
+
+    function extractVariables(content) {
+        var matches = (content || '').match(/\{\{(\w+)\}\}/g);
+        if (!matches) return [];
+        return matches.map(function (m) { return m.replace(/[{}]/g, ''); });
+    }
+
+    function renderPrompts(prompts) {
+        var list = document.getElementById('promptList');
+        list.textContent = '';
+        document.getElementById('totalPrompts').textContent = prompts.length;
+        document.getElementById('sharedPrompts').textContent =
+            prompts.filter(function (p) { return p.shared; }).length;
+
+        if (prompts.length === 0) {
+            list.appendChild(createEl('p', '', 'No prompts yet. Create one above.'));
+            list.firstChild.style.color = 'var(--text-muted)';
+            return;
+        }
+
+        prompts.forEach(function (p) {
+            var card = createEl('div', 'prompt-card');
+            card.dataset.id = p.id;
+
+            var header = createEl('div', 'prompt-card-header');
+            var titleGroup = document.createElement('div');
+            titleGroup.appendChild(createEl('div', 'prompt-card-title', p.title || p.name || ''));
+            if (p.command) titleGroup.appendChild(createEl('div', 'prompt-card-command', p.command));
+            header.appendChild(titleGroup);
+            if (p.shared) header.appendChild(createEl('span', 'shared-badge', 'Shared'));
+            card.appendChild(header);
+
+            card.appendChild(createEl('div', 'prompt-card-content', p.content || p.promptText || ''));
+
+            var vars = extractVariables(p.content || p.promptText || '');
+            if (vars.length > 0) {
+                var varsDiv = document.createElement('div');
+                varsDiv.style.marginTop = '8px';
+                vars.forEach(function (v) {
+                    varsDiv.appendChild(createEl('span', 'variable-tag', '{{' + v + '}}'));
+                });
+                card.appendChild(varsDiv);
+            }
+
+            if (p.description) {
+                var descEl = createEl('div', '', p.description);
+                descEl.style.fontSize = '0.8rem';
+                descEl.style.color = 'var(--text-muted)';
+                descEl.style.marginTop = '4px';
+                card.appendChild(descEl);
+            }
+
+            var footer = createEl('div', 'prompt-card-footer');
+            var dateSpan = createEl('span', '', p.createdAt ? new Date(p.createdAt).toLocaleDateString() : '');
+            dateSpan.style.fontSize = '0.78rem';
+            dateSpan.style.color = 'var(--text-muted)';
+            footer.appendChild(dateSpan);
+
+            var actions = createEl('div', 'prompt-card-actions');
+            var editBtn = createEl('button', 'action-btn edit-prompt-btn', 'Edit');
+            editBtn.dataset.id = p.id;
+            var deleteBtn = createEl('button', 'action-btn danger delete-prompt-btn', 'Delete');
+            deleteBtn.dataset.id = p.id;
+            actions.appendChild(editBtn);
+            actions.appendChild(deleteBtn);
+            footer.appendChild(actions);
+            card.appendChild(footer);
+
+            list.appendChild(card);
+        });
+    }
+
+    async function loadPrompts() {
+        try {
+            var resp = await fetch('/api/prompts');
+            if (!resp.ok) throw new Error();
+            renderPrompts(await resp.json());
+        } catch (e) {
+            console.error('Failed to load prompts:', e);
+        }
+    }
+
+    function resetForm() {
+        editingPromptId = null;
+        document.getElementById('formTitle').textContent = 'Create Prompt';
+        document.getElementById('promptTitleInput').value = '';
+        document.getElementById('promptCommandInput').value = '';
+        document.getElementById('promptContentInput').value = '';
+        document.getElementById('promptDescInput').value = '';
+        document.getElementById('promptSharedToggle').checked = false;
+        document.getElementById('savePromptBtn').textContent = 'Create Prompt';
+        document.getElementById('cancelEditBtn').style.display = 'none';
+    }
+
+    async function savePrompt() {
+        var title = document.getElementById('promptTitleInput').value.trim();
+        var command = document.getElementById('promptCommandInput').value.trim();
+        var content = document.getElementById('promptContentInput').value.trim();
+        var description = document.getElementById('promptDescInput').value.trim();
+        var isShared = document.getElementById('promptSharedToggle').checked;
+
+        if (!title || !content) {
+            showToast('Title and content are required', 'error');
+            return;
+        }
+
+        var data = { title: title, command: command, content: content, description: description, shared: isShared };
+        try {
+            var url = editingPromptId ? '/api/prompts/' + editingPromptId : '/api/prompts';
+            var method = editingPromptId ? 'PUT' : 'POST';
+            var resp = await fetch(url, {
+                method: method,
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify(data)
+            });
+            if (!resp.ok) throw new Error();
+            showToast(editingPromptId ? 'Prompt updated' : 'Prompt created', 'success');
+            resetForm();
+            loadPrompts();
+        } catch (e) {
+            showToast('Failed to save prompt', 'error');
+        }
+    }
+
+    async function editPrompt(id) {
+        try {
+            var resp = await fetch('/api/prompts');
+            if (!resp.ok) throw new Error();
+            var prompts = await resp.json();
+            var prompt = prompts.find(function (p) { return p.id === id; });
+            if (!prompt) return;
+
+            editingPromptId = id;
+            document.getElementById('formTitle').textContent = 'Edit Prompt';
+            document.getElementById('promptTitleInput').value = prompt.title || prompt.name || '';
+            document.getElementById('promptCommandInput').value = prompt.command || '';
+            document.getElementById('promptContentInput').value = prompt.content || prompt.promptText || '';
+            document.getElementById('promptDescInput').value = prompt.description || '';
+            document.getElementById('promptSharedToggle').checked = prompt.shared || false;
+            document.getElementById('savePromptBtn').textContent = 'Update Prompt';
+            document.getElementById('cancelEditBtn').style.display = '';
+            document.getElementById('promptFormBox').scrollIntoView({ behavior: 'smooth' });
+        } catch (e) {
+            showToast('Failed to load prompt', 'error');
+        }
+    }
+
+    async function deletePrompt(id) {
+        if (!confirm('Delete this prompt?')) return;
+        try {
+            await fetch('/api/prompts/' + id, { method: 'DELETE' });
+            showToast('Prompt deleted', 'success');
+            if (editingPromptId === id) resetForm();
+            loadPrompts();
+        } catch (e) {
+            showToast('Failed to delete prompt', 'error');
+        }
+    }
+
+    document.getElementById('savePromptBtn').addEventListener('click', savePrompt);
+    document.getElementById('cancelEditBtn').addEventListener('click', resetForm);
+    document.getElementById('promptList').addEventListener('click', function (e) {
+        var editBtn = e.target.closest('.edit-prompt-btn');
+        var deleteBtn = e.target.closest('.delete-prompt-btn');
+        if (editBtn) editPrompt(editBtn.dataset.id);
+        else if (deleteBtn) deletePrompt(deleteBtn.dataset.id);
+    });
+
+    loadPrompts();
+})();

@@ -195,55 +195,6 @@
 
     <script th:src="@{/js/admin-theme.js}"></script>
     <script th:src="@{/js/admin-toast.js}"></script>
-    <script>
-        // Load workspace stats
-        // Show/hide the Wiki card based on admin feature gate
-        fetch('/api/wiki/feature-status', { credentials: 'same-origin' })
-            .then(r => r.ok ? r.json() : { adminEnabled: false })
-            .then(s => {
-                if (s.adminEnabled) {
-                    var card = document.getElementById('wikiNavCard');
-                    if (card) card.style.display = '';
-                    var stat = document.getElementById('wikiCount');
-                    if (stat && stat.parentElement) stat.parentElement.style.display = '';
-                } else {
-                    var stat = document.getElementById('wikiCount');
-                    if (stat && stat.parentElement) stat.parentElement.style.display = 'none';
-                }
-            })
-            .catch(function(){});
-
-        Promise.allSettled([
-            fetch('/api/channels').then(r => r.ok ? r.json() : []),
-            fetch('/api/wiki/pages?limit=1000').then(r => r.ok ? r.json() : []),
-            fetch('/api/prompts').then(r => r.ok ? r.json() : []),
-            fetch('/api/documents').then(r => r.ok ? r.json() : []),
-            fetch('/api/chat/available-tools').then(r => r.ok ? r.json() : [])
-        ]).then(function(results) {
-            var channels = results[0].status === 'fulfilled' ? results[0].value : [];
-            var wiki    = results[1].status === 'fulfilled' ? results[1].value : [];
-            var prompts = results[2].status === 'fulfilled' ? results[2].value : [];
-            var docs    = results[3].status === 'fulfilled' ? results[3].value : [];
-            var tools   = results[4].status === 'fulfilled' ? results[4].value : [];
-
-            var channelLen = Array.isArray(channels) ? channels.length : 0;
-            var wikiLen    = Array.isArray(wiki) ? wiki.length : 0;
-            var promptLen  = Array.isArray(prompts) ? prompts.length : 0;
-            var docLen     = Array.isArray(docs) ? docs.length : 0;
-            var toolLen    = Array.isArray(tools) ? tools.length : 0;
-
-            document.getElementById('channelCount').textContent = channelLen;
-            document.getElementById('wikiCount').textContent = wikiLen;
-            document.getElementById('promptCount').textContent = promptLen;
-            document.getElementById('documentCount').textContent = docLen;
-            document.getElementById('toolCount').textContent = toolLen;
-
-            document.getElementById('channelCountStat').textContent = channelLen;
-            document.getElementById('wikiCountStat').textContent = wikiLen;
-            document.getElementById('promptCountStat').textContent = promptLen;
-            document.getElementById('documentCountStat').textContent = docLen;
-            document.getElementById('toolCountStat').textContent = toolLen;
-        });
-    </script>
+    <script th:src="@{/js/workspace.js}"></script>
 </body>
 </html>

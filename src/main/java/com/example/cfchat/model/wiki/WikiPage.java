@@ -73,14 +73,22 @@ public class WikiPage {
     // Exclude them from @Version optimistic locking so the second save
     // doesn't bump the page version — otherwise every new page ends up
     // at v=2 with zero history rows, which then breaks undo().
+    // CLAIMED is the in-flight state used by WikiEmbeddingRetryJob to
+    // coordinate across multiple app instances.
     @Column(name = "embedding_status", nullable = false, length = 16)
-    @Pattern(regexp = "PENDING|READY|FAILED")
+    @Pattern(regexp = "PENDING|READY|FAILED|CLAIMED")
     @OptimisticLock(excluded = true)
     private String embeddingStatus;
 
     @Column(name = "embedding_error", length = 1024)
     @OptimisticLock(excluded = true)
     private String embeddingError;
+
+    // Set when a retry worker claims a row. Stale CLAIMED rows (worker crashed
+    // mid-index) are reclaimed after app.wiki.embedding.claim-stale-ms.
+    @Column(name = "embedding_claimed_at")
+    @OptimisticLock(excluded = true)
+    private Instant embeddingClaimedAt;
 
     @Column(name = "created_at", nullable = false, updatable = false)
     private Instant createdAt;

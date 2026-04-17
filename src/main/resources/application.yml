@@ -99,7 +99,9 @@ app:
   model-access-control:
     enabled: ${MODEL_ACCESS_CONTROL_ENABLED:false}
   admin:
-    default-password: ${APP_ADMIN_DEFAULT_PASSWORD:Tanzu123}
+    # No literal default — if unset, UserService generates a random password
+    # on first boot and logs it. Set APP_ADMIN_DEFAULT_PASSWORD to pin a value.
+    default-password: ${APP_ADMIN_DEFAULT_PASSWORD:}
   chat:
     default-provider: ${CHAT_PROVIDER:openai}
     system-prompt: |

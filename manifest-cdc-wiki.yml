@@ -8,7 +8,7 @@ applications:
     env:
       JBP_CONFIG_OPEN_JDK_JRE: '{ jre: { version: 21.+ } }'
       SPRING_PROFILES_ACTIVE: cloud
-      APP_AUTH_SECRET: changeme-cdc-wiki
+      # APP_AUTH_SECRET / APP_ADMIN_DEFAULT_PASSWORD via `cf set-env`.
     services:
       - wiki-chat-db
       - wiki-chat-genai

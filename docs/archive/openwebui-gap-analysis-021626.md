@@ -1,4 +1,10 @@
-# CF Llama Chat — Full Technical Implementation Specification
+# [ARCHIVED] CF Llama Chat — Full Technical Implementation Specification
+
+> **Archived 2026-04-17.** This is a frozen snapshot of a Feb-2026 gap-analysis
+> against Open WebUI. Many items (chat persistence, SCIM, rate limiting,
+> prompt presets, etc.) are now implemented; many are not. The live roadmap
+> lives in `README.md` under the "Roadmap" section — treat that as source of
+> truth. Kept here for historical reference only.
 
 ## Feature Roadmap: Gap Closure with Open WebUI
 

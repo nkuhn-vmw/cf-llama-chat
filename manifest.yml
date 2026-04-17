@@ -9,7 +9,10 @@ applications:
     env:
       JBP_CONFIG_OPEN_JDK_JRE: '{ jre: { version: 21.+ } }'
       SPRING_PROFILES_ACTIVE: cloud
-      APP_AUTH_SECRET: changeme
+      # APP_AUTH_SECRET must be set via `cf set-env` before first start if
+      # invitation-only registration is required (APP_REQUIRE_INVITATION=true).
+      # APP_ADMIN_DEFAULT_PASSWORD should likewise be set on first deploy —
+      # otherwise a random password is generated and printed to the app log.
     services:
       - enterprise-chat-db
       - enterprise-chat-genai

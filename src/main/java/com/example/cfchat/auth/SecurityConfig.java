@@ -90,8 +90,14 @@ public class SecurityConfig {
                     .policy(org.springframework.security.web.header.writers.ReferrerPolicyHeaderWriter.ReferrerPolicy.STRICT_ORIGIN_WHEN_CROSS_ORIGIN));
                 headers.permissionsPolicy(permissions -> permissions
                     .policy("geolocation=(), microphone=(), camera=(), payment=()"));
+                // script-src: 'self' only — all page JS lives in /static/js/*.js,
+                // loaded via <script th:src="@{...}">. Inline <script> blocks
+                // MUST be migrated to external files; they will be blocked here.
+                // style-src still allows 'unsafe-inline' because many Thymeleaf
+                // templates still use inline style="..." attributes for bar-chart
+                // widths etc. (tracked for follow-up).
                 headers.contentSecurityPolicy(csp -> csp
-                    .policyDirectives("default-src 'self'; script-src 'self' 'unsafe-inline'; style-src 'self' 'unsafe-inline'; img-src 'self' data: https:; font-src 'self'; connect-src 'self'; frame-ancestors 'none'"));
+                    .policyDirectives("default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' data: https:; font-src 'self'; connect-src 'self'; frame-ancestors 'none'"));
             })
             .csrf(csrf -> csrf
                 .csrfTokenRepository(CookieCsrfTokenRepository.withHttpOnlyFalse())
