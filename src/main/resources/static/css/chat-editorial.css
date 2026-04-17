@@ -4,6 +4,36 @@
    touch any class names — app.js depends on them — we just re-dress them.
    ========================================================================== */
 
+/* --- Token remap (must be LAST in cascade so it wins over style.css's own
+   :root { --bg-primary: #0f0f0f; ... } block.) ------------------------------- */
+:root {
+    --bg-primary: var(--surface-0);
+    --bg-secondary: var(--surface-2);
+    --bg-tertiary: var(--surface-3);
+    --bg-hover: var(--surface-3);
+    --text-primary: var(--ink-0);
+    --text-secondary: var(--ink-1);
+    --text-muted: var(--ink-2);
+    --border-color: var(--line);
+    --accent-color: var(--brand);
+    --accent-hover: #6FB7FF;
+    --user-bg: var(--surface-2);
+    --assistant-bg: transparent;
+    --error-color: var(--danger);
+}
+
+/* Re-assert body typography + bg so style.css's own `body { font-family: -apple-system,... }`
+   and `body { background-color: var(--bg-primary); }` (pre-remap) get replaced. */
+body {
+    background: var(--surface-0);
+    color: var(--ink-0);
+    font-family: var(--font-sans);
+    letter-spacing: -0.005em;
+    -webkit-font-smoothing: antialiased;
+    -moz-osx-font-smoothing: grayscale;
+    font-optical-sizing: auto;
+}
+
 /* ---- The sidebar: carbon surface, mono labels, editorial type ---- */
 .sidebar {
     background: var(--surface-1);
