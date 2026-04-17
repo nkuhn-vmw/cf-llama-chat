@@ -57,21 +57,25 @@ jobs:
       - name: Generate incremental release version
         id: release_tag
         run: |
-          # Get the latest release tag and increment
-          LATEST_TAG=$(git tag --sort=-v:refname | grep -E '^v[0-9]+\.[0-9]+\.[0-9]+$' | head -1)
+          # Get the latest semver tag vMAJOR.MINOR.PATCH; bump MINOR within the
+          # current MAJOR. Previous implementation hardcoded MAJOR=1 and produced
+          # malformed tags (e.g. v1..0) once v2.x / v3.x tags existed.
+          set -euo pipefail
+          LATEST_TAG=$(git tag --sort=-v:refname | grep -E '^v[0-9]+\.[0-9]+\.[0-9]+$' | head -1 || true)
           if [ -n "$LATEST_TAG" ]; then
-            # Extract minor version and increment
-            MINOR=$(echo "$LATEST_TAG" | sed 's/v1\.\([0-9]*\)\..*/\1/')
+            VER=${LATEST_TAG#v}
+            MAJOR=$(echo "$VER" | cut -d. -f1)
+            MINOR=$(echo "$VER" | cut -d. -f2)
             NEXT_MINOR=$((MINOR + 1))
           else
-            # First incremental release starts at v1.20.0 (after 19 existing pre-releases)
+            MAJOR=1
             NEXT_MINOR=20
           fi
-          TAG="v1.${NEXT_MINOR}.0"
-          VERSION="1.${NEXT_MINOR}.0"
+          TAG="v${MAJOR}.${NEXT_MINOR}.0"
+          VERSION="${MAJOR}.${NEXT_MINOR}.0"
           echo "tag=$TAG" >> $GITHUB_OUTPUT
           echo "version=$VERSION" >> $GITHUB_OUTPUT
-          echo "Generated tag: $TAG (version: $VERSION)"
+          echo "Generated tag: $TAG (version: $VERSION) from latest=${LATEST_TAG:-none}"
 
       - name: Build release artifact
         run: mvn -B clean package -DskipTests -Drevision=${{ steps.release_tag.outputs.version }}
