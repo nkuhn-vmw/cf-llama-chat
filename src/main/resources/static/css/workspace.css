@@ -1,0 +1,328 @@
+/* ============================================================================
+   Workspace landing — "Good morning, Nick." editorial dashboard
+   Hooks the existing IDs (channelCount, wikiCount, ...) so workspace.js keeps
+   hydrating the numbers with no JS changes.
+   ========================================================================== */
+
+.ws-shell {
+    max-width: 1440px;
+    margin: 0 auto;
+    padding: 40px clamp(24px, 4vw, 64px) 96px;
+    min-height: 100vh;
+    display: flex;
+    flex-direction: column;
+    gap: 48px;
+}
+
+/* ---------- Topbar ---------- */
+.ws-topbar {
+    display: grid;
+    grid-template-columns: auto 1fr auto;
+    align-items: center;
+    gap: 24px;
+    padding-bottom: 24px;
+    border-bottom: 1px solid var(--line);
+}
+.ws-topbar .ws-mark {
+    width: 38px; height: 38px;
+    border-radius: 9px;
+    background: var(--brand);
+    color: var(--brand-ink);
+    display: grid; place-items: center;
+    font-family: var(--font-display);
+    font-style: italic;
+    font-size: 1.2rem;
+    font-weight: 600;
+    box-shadow: 0 0 0 1px rgba(74,165,255,0.4), 0 6px 20px var(--brand-soft);
+    text-decoration: none;
+}
+.ws-topbar .ws-breadcrumb {
+    font-family: var(--font-mono);
+    font-size: 0.72rem;
+    letter-spacing: var(--track-loose);
+    text-transform: uppercase;
+    color: var(--ink-2);
+}
+.ws-topbar .ws-breadcrumb strong { color: var(--ink-0); font-weight: 500; }
+.ws-topbar .ws-chips { display: flex; gap: 10px; flex-wrap: wrap; }
+
+/* ---------- Hero ---------- */
+.ws-hero {
+    display: grid;
+    grid-template-columns: 1.4fr 1fr;
+    gap: 56px;
+    align-items: end;
+}
+@media (max-width: 880px) {
+    .ws-hero { grid-template-columns: 1fr; gap: 32px; }
+}
+
+.ws-hero h1 {
+    font-family: var(--font-display);
+    font-weight: 400;
+    font-style: italic;
+    font-size: clamp(2.6rem, 5.2vw, 4.2rem);
+    line-height: 1.02;
+    letter-spacing: var(--track-tight);
+    margin: 0;
+    color: var(--ink-0);
+}
+.ws-hero h1 .upright { font-style: normal; }
+.ws-hero h1 .accent  { color: var(--brand); }
+.ws-hero h1 .period  { color: var(--brand); font-style: normal; }
+
+.ws-hero p.lede {
+    margin-top: 20px;
+    color: var(--ink-1);
+    font-size: 1rem;
+    line-height: 1.55;
+    max-width: 52ch;
+}
+
+.ws-hero .ws-quick {
+    display: flex;
+    gap: 10px;
+    margin-top: 28px;
+    flex-wrap: wrap;
+}
+
+/* The hero "time" column on the right: live clock + session info, big numerals */
+.ws-clock {
+    text-align: right;
+}
+.ws-clock .time {
+    font-family: var(--font-mono);
+    font-variant-numeric: tabular-nums;
+    font-size: clamp(2.4rem, 4vw, 3.4rem);
+    color: var(--ink-0);
+    letter-spacing: -0.02em;
+    line-height: 1;
+}
+.ws-clock .time .sec { color: var(--ink-3); }
+.ws-clock .meta {
+    margin-top: 12px;
+    font-family: var(--font-mono);
+    font-size: 0.72rem;
+    text-transform: uppercase;
+    letter-spacing: var(--track-loose);
+    color: var(--ink-2);
+}
+@media (max-width: 880px) {
+    .ws-clock { text-align: left; }
+}
+
+/* ---------- Metric rail ---------- */
+.ws-rail {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(170px, 1fr));
+    border: 1px solid var(--line);
+    border-radius: var(--r-lg);
+    background: var(--surface-1);
+    overflow: hidden;
+}
+.ws-rail .cell {
+    padding: 24px 28px;
+    border-right: 1px solid var(--line);
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+    min-height: 118px;
+    transition: background var(--dur-fast) var(--ease-out);
+}
+.ws-rail .cell:last-child { border-right: none; }
+.ws-rail .cell:hover { background: var(--surface-2); }
+.ws-rail .cell .label {
+    font-family: var(--font-mono);
+    font-size: 0.68rem;
+    text-transform: uppercase;
+    letter-spacing: var(--track-loose);
+    color: var(--ink-2);
+}
+.ws-rail .cell .value {
+    font-family: var(--font-mono);
+    font-size: 2rem;
+    color: var(--ink-0);
+    letter-spacing: -0.01em;
+    font-variant-numeric: tabular-nums;
+    line-height: 1;
+}
+.ws-rail .cell .sub {
+    font-family: var(--font-sans);
+    font-size: 0.8rem;
+    color: var(--ink-2);
+}
+@media (max-width: 880px) {
+    .ws-rail .cell { border-right: none; border-bottom: 1px solid var(--line); }
+    .ws-rail .cell:last-child { border-bottom: none; }
+}
+
+/* ---------- Section header ---------- */
+.ws-section-head {
+    display: flex;
+    align-items: baseline;
+    justify-content: space-between;
+    margin-bottom: 20px;
+}
+.ws-section-head h2 {
+    font-family: var(--font-display);
+    font-weight: 400;
+    font-style: italic;
+    font-size: 1.75rem;
+    letter-spacing: var(--track-tight);
+    color: var(--ink-0);
+    margin: 0;
+}
+.ws-section-head h2 .aside {
+    font-family: var(--font-sans);
+    font-style: normal;
+    font-size: 0.85rem;
+    font-weight: 400;
+    color: var(--ink-2);
+    letter-spacing: 0;
+    margin-left: 10px;
+}
+
+/* ---------- Nav cards ---------- */
+.ws-nav {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+    gap: 20px;
+}
+.ws-nav-card {
+    background: var(--surface-2);
+    border: 1px solid var(--line);
+    border-radius: var(--r-lg);
+    padding: 24px 26px 22px;
+    text-decoration: none;
+    color: var(--ink-0);
+    position: relative;
+    display: flex;
+    flex-direction: column;
+    gap: 16px;
+    transition: border-color var(--dur) var(--ease-out),
+                transform var(--dur) var(--ease-out),
+                background var(--dur) var(--ease-out);
+    overflow: hidden;
+}
+.ws-nav-card::after {
+    /* Index number in the top-right — decorative, editorial */
+    content: attr(data-index);
+    position: absolute;
+    top: 16px;
+    right: 22px;
+    font-family: var(--font-mono);
+    font-size: 0.7rem;
+    letter-spacing: var(--track-loose);
+    color: var(--ink-3);
+}
+.ws-nav-card:hover {
+    border-color: var(--line-accent);
+    transform: translateY(-2px);
+    background: var(--surface-3);
+}
+.ws-nav-card:hover .ws-nav-icon { background: var(--brand-soft); color: var(--brand); }
+
+.ws-nav-icon {
+    width: 40px; height: 40px;
+    display: grid; place-items: center;
+    border-radius: 10px;
+    background: var(--surface-3);
+    color: var(--ink-1);
+    transition: background var(--dur-fast) var(--ease-out),
+                color var(--dur-fast) var(--ease-out);
+}
+.ws-nav-icon svg { width: 20px; height: 20px; }
+
+.ws-nav-card h3 {
+    font-family: var(--font-display);
+    font-style: italic;
+    font-weight: 400;
+    font-size: 1.35rem;
+    letter-spacing: var(--track-tight);
+    color: var(--ink-0);
+    margin: 0;
+}
+.ws-nav-card p {
+    font-size: 0.9rem;
+    color: var(--ink-1);
+    line-height: 1.55;
+    margin: 0;
+}
+.ws-nav-card .foot {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding-top: 14px;
+    margin-top: auto;
+    border-top: 1px solid var(--line);
+    font-family: var(--font-mono);
+    font-size: 0.7rem;
+    text-transform: uppercase;
+    letter-spacing: var(--track-loose);
+    color: var(--ink-2);
+}
+.ws-nav-card .foot strong {
+    color: var(--ink-0);
+    font-weight: 500;
+    font-size: 0.95rem;
+    font-family: var(--font-mono);
+    text-transform: none;
+    letter-spacing: 0;
+}
+.ws-nav-card .foot .chev { color: var(--ink-3); transition: transform var(--dur-fast) var(--ease-out); }
+.ws-nav-card:hover .foot .chev { transform: translateX(3px); color: var(--brand); }
+
+/* Quick launch — the bottom wide band */
+.ws-launch {
+    background: var(--surface-1);
+    border: 1px solid var(--line);
+    border-radius: var(--r-lg);
+    padding: 28px 32px;
+    display: grid;
+    grid-template-columns: auto 1fr auto;
+    align-items: center;
+    gap: 28px;
+}
+@media (max-width: 880px) {
+    .ws-launch { grid-template-columns: 1fr; }
+}
+.ws-launch .eyebrow {
+    font-family: var(--font-mono);
+    font-size: 0.7rem;
+    letter-spacing: var(--track-loose);
+    text-transform: uppercase;
+    color: var(--ink-2);
+}
+.ws-launch h3 {
+    font-family: var(--font-display);
+    font-weight: 400;
+    font-style: italic;
+    font-size: 1.35rem;
+    color: var(--ink-0);
+    margin: 6px 0 0;
+    letter-spacing: var(--track-tight);
+}
+.ws-launch h3 .accent { color: var(--brand); }
+.ws-launch .presets {
+    display: flex;
+    gap: 8px;
+    flex-wrap: wrap;
+    justify-content: flex-end;
+}
+.ws-launch .preset {
+    background: var(--surface-2);
+    border: 1px solid var(--line);
+    padding: 7px 14px;
+    border-radius: var(--r-chip);
+    font-family: var(--font-mono);
+    font-size: 0.78rem;
+    color: var(--ink-1);
+    text-decoration: none;
+    transition: all var(--dur-fast) var(--ease-out);
+}
+.ws-launch .preset:hover { border-color: var(--line-accent); color: var(--ink-0); }
+.ws-launch .preset.active {
+    background: var(--brand-soft);
+    border-color: var(--line-accent);
+    color: var(--brand);
+}

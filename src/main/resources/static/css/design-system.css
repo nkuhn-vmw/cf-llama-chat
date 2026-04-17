@@ -1,0 +1,419 @@
+/* ============================================================================
+   CF Llama Chat — Editorial Ops-Console design system
+   ----------------------------------------------------------------------------
+   Loaded BEFORE style.css so the existing --bg-*, --text-*, --accent-* tokens
+   are redefined once, and every page inherits the new palette and typography
+   "for free". Introduces three new concerns on top of the legacy tokens:
+     1. A typographic scale built from three contrasting families
+        (italic serif display, neo-grotesque body, monospace data)
+     2. A carbon-to-midnight surface palette with thin borders and soft glows
+     3. Semantic state tokens (healthy / warn / error) as first-class colors
+   The legacy `--bg-primary` / `--text-primary` / `--accent-color` tokens still
+   resolve to sane values so every template that never gets refactored
+   continues to look consistent.
+   ========================================================================== */
+
+/* ---- Typefaces -----------------------------------------------------------
+   Loaded from Google Fonts. CSP needs:
+     style-src  ... https://fonts.googleapis.com
+     font-src   ... https://fonts.gstatic.com
+   Fraunces        — italic serif display. Characterful, variable, free.
+   Instrument Sans — humanist neo-grotesque. Less common than Inter.
+   JetBrains Mono  — monospace. Tabular numerals live here.
+*/
+@import url('https://fonts.googleapis.com/css2?family=Fraunces:ital,opsz,wght@0,9..144,400;0,9..144,600;1,9..144,400;1,9..144,600&family=Instrument+Sans:ital,wght@0,400;0,500;0,600;1,400&family=JetBrains+Mono:ital,wght@0,400;0,500;0,600;1,400&display=swap');
+
+:root {
+    /* ---- Surfaces (carbon → elevated) ---- */
+    --surface-0: #0A0D13;    /* page */
+    --surface-1: #0F131A;    /* raised region */
+    --surface-2: #151A23;    /* card */
+    --surface-3: #1C222C;    /* elevated card / hover */
+    --surface-inset: #080B10; /* log / terminal */
+
+    /* ---- Ink ---- */
+    --ink-0: #ECEEF2;        /* primary text */
+    --ink-1: #B4BAC6;        /* secondary */
+    --ink-2: #7A8294;        /* muted */
+    --ink-3: #4C5364;        /* very muted */
+    --ink-4: #2D3340;        /* tick marks / rules */
+
+    /* ---- Lines ---- */
+    --line: rgba(255, 255, 255, 0.065);
+    --line-strong: rgba(255, 255, 255, 0.12);
+    --line-accent: rgba(74, 165, 255, 0.28);
+
+    /* ---- Brand / primary ---- */
+    --brand: #4AA5FF;        /* cyan-blue */
+    --brand-soft: rgba(74, 165, 255, 0.14);
+    --brand-glow: rgba(74, 165, 255, 0.28);
+    --brand-ink: #0A0D13;    /* contrast on brand fills */
+
+    /* ---- Semantic states ---- */
+    --healthy: #7EE5A9;
+    --healthy-soft: rgba(126, 229, 169, 0.12);
+    --warn:    #F5B765;
+    --warn-soft: rgba(245, 183, 101, 0.14);
+    --danger:  #F07091;
+    --danger-soft: rgba(240, 112, 145, 0.14);
+
+    /* ---- Typography ---- */
+    --font-display: 'Fraunces', 'Iowan Old Style', Georgia, 'Times New Roman', serif;
+    --font-sans:    'Instrument Sans', -apple-system, BlinkMacSystemFont, 'Helvetica Neue', sans-serif;
+    --font-mono:    'JetBrains Mono', ui-monospace, 'SF Mono', Menlo, Consolas, monospace;
+
+    --track-loose: 0.14em;   /* uppercase labels */
+    --track-tight: -0.02em;  /* display headings */
+
+    /* Feature settings unlock tabular numerals + discretionary ligatures */
+    --feat-data: "tnum" 1, "cv01" 1, "ss01" 1;
+    --feat-display: "ss01" 1, "ss02" 1;
+
+    /* ---- Radius ---- */
+    --r-chip: 999px;
+    --r-sm: 6px;
+    --r-md: 10px;
+    --r-lg: 16px;
+    --r-xl: 20px;
+
+    /* ---- Elevation (used sparingly — this design is flat with thin lines) ---- */
+    --shadow-raise: 0 1px 0 rgba(255,255,255,0.03) inset, 0 8px 24px rgba(0,0,0,0.35);
+    --shadow-hover: 0 1px 0 rgba(255,255,255,0.06) inset, 0 12px 40px rgba(0,0,0,0.5);
+
+    /* ---- Motion ---- */
+    --ease-out: cubic-bezier(0.22, 1, 0.36, 1);
+    --dur-fast: 160ms;
+    --dur: 240ms;
+    --dur-slow: 520ms;
+
+    /* ---- Map LEGACY tokens onto the new palette so the rest of the app
+         immediately looks right without editing every old stylesheet ---- */
+    --bg-primary: var(--surface-0);
+    --bg-secondary: var(--surface-2);
+    --bg-tertiary: var(--surface-3);
+    --bg-hover: var(--surface-3);
+    --text-primary: var(--ink-0);
+    --text-secondary: var(--ink-1);
+    --text-muted: var(--ink-2);
+    --border-color: var(--line);
+    --accent-color: var(--brand);
+    --accent-hover: #6FB7FF;
+    --user-bg: var(--surface-2);
+    --assistant-bg: transparent;
+    --error-color: var(--danger);
+}
+
+/* The admin/settings pages set [data-theme="dark"|"light"] on <html>.
+   We keep light mode functional but focus on dark, which is the primary look. */
+[data-theme="light"] {
+    --surface-0: #F7F6F2;    /* warm paper */
+    --surface-1: #FFFFFF;
+    --surface-2: #FFFFFF;
+    --surface-3: #F0EEE8;
+    --surface-inset: #EDEAE2;
+    --ink-0: #14171C;
+    --ink-1: #434853;
+    --ink-2: #6D7484;
+    --ink-3: #8E95A4;
+    --ink-4: #D4D2CB;
+    --line: rgba(15, 19, 26, 0.08);
+    --line-strong: rgba(15, 19, 26, 0.14);
+    --brand: #1F6FD9;
+    --brand-soft: rgba(31, 111, 217, 0.1);
+    --brand-glow: rgba(31, 111, 217, 0.2);
+}
+
+/* ============================================================================
+   BASE
+   ========================================================================== */
+
+html {
+    /* Turn on tabular numerals for the entire app — any <code>, <table>,
+       or metric label inherits aligned numbers automatically. */
+    font-feature-settings: var(--feat-data);
+}
+
+body {
+    font-family: var(--font-sans);
+    background: var(--surface-0);
+    color: var(--ink-0);
+    -webkit-font-smoothing: antialiased;
+    -moz-osx-font-smoothing: grayscale;
+    font-optical-sizing: auto;
+    letter-spacing: -0.005em;
+}
+
+/* A subtle starfield — grain over a radial cyan halo — sets atmosphere
+   without stealing focus. Disabled on light theme. */
+body::before {
+    content: '';
+    position: fixed;
+    inset: 0;
+    background:
+        radial-gradient(ellipse 80vw 60vh at 75% -10%, rgba(74, 165, 255, 0.08), transparent 60%),
+        radial-gradient(ellipse 60vw 40vh at 10% 110%, rgba(126, 229, 169, 0.035), transparent 60%);
+    pointer-events: none;
+    z-index: 0;
+}
+[data-theme="light"] body::before { display: none; }
+body > * { position: relative; z-index: 1; }
+
+/* ============================================================================
+   TYPOGRAPHY UTILITIES
+   ========================================================================== */
+
+.ds-display {
+    font-family: var(--font-display);
+    font-weight: 400;
+    font-style: italic;           /* default the italic — that IS the voice */
+    font-size: clamp(2.2rem, 4.6vw, 3.4rem);
+    line-height: 1.05;
+    letter-spacing: var(--track-tight);
+    color: var(--ink-0);
+    font-feature-settings: var(--feat-display);
+}
+.ds-display .upright { font-style: normal; }   /* mix roman INTO italic */
+.ds-display .accent  { color: var(--brand); }
+
+.ds-eyebrow {
+    font-family: var(--font-mono);
+    font-size: 0.72rem;
+    text-transform: uppercase;
+    letter-spacing: var(--track-loose);
+    color: var(--ink-2);
+    font-weight: 500;
+}
+
+.ds-label {
+    font-family: var(--font-mono);
+    font-size: 0.68rem;
+    text-transform: uppercase;
+    letter-spacing: var(--track-loose);
+    color: var(--ink-2);
+    font-weight: 500;
+}
+
+.ds-metric {
+    font-family: var(--font-mono);
+    font-weight: 500;
+    font-size: clamp(1.6rem, 3vw, 2.4rem);
+    color: var(--ink-0);
+    letter-spacing: -0.01em;
+    font-variant-numeric: tabular-nums;
+    line-height: 1;
+}
+.ds-metric .unit {
+    color: var(--ink-2);
+    font-weight: 400;
+    font-size: 0.6em;
+    margin-left: 0.35ch;
+}
+
+.ds-mono { font-family: var(--font-mono); font-feature-settings: var(--feat-data); }
+.ds-italic { font-style: italic; font-family: var(--font-display); font-weight: 400; }
+
+/* ============================================================================
+   COMPONENTS
+   ========================================================================== */
+
+/* ---- Chip / pill (the little status badges from the reference) ---- */
+.ds-chip {
+    display: inline-flex;
+    align-items: center;
+    gap: 8px;
+    padding: 5px 11px;
+    border-radius: var(--r-chip);
+    border: 1px solid var(--line);
+    background: var(--surface-2);
+    font-family: var(--font-mono);
+    font-size: 0.72rem;
+    letter-spacing: 0.02em;
+    color: var(--ink-1);
+    white-space: nowrap;
+    transition: border-color var(--dur-fast) var(--ease-out),
+                color var(--dur-fast) var(--ease-out);
+}
+.ds-chip::before {
+    content: '';
+    width: 6px; height: 6px;
+    border-radius: 50%;
+    background: currentColor;
+    opacity: 0.8;
+}
+.ds-chip[data-state="healthy"]  { color: var(--healthy); border-color: rgba(126,229,169,0.25); }
+.ds-chip[data-state="running"]  { color: var(--warn);    border-color: rgba(245,183,101,0.3); }
+.ds-chip[data-state="error"]    { color: var(--danger);  border-color: rgba(240,112,145,0.3); }
+.ds-chip[data-state="brand"]    { color: var(--brand);   border-color: var(--line-accent); }
+.ds-chip[data-state="muted"]    { color: var(--ink-2);   border-color: var(--line); }
+.ds-chip[data-state="muted"]::before { opacity: 0.4; }
+.ds-chip.no-dot::before { display: none; }
+
+/* ---- Arrow link (inline "→ / ↗") ---- */
+.ds-arrow {
+    color: var(--ink-1);
+    text-decoration: none;
+    font-family: var(--font-sans);
+    font-size: 0.9rem;
+    transition: color var(--dur-fast) var(--ease-out);
+}
+.ds-arrow::after {
+    content: ' →';
+    transition: transform var(--dur-fast) var(--ease-out);
+    display: inline-block;
+}
+.ds-arrow.out::after { content: ' ↗'; }
+.ds-arrow:hover { color: var(--ink-0); }
+.ds-arrow:hover::after { transform: translate(2px, -1px); }
+
+/* ---- Buttons ---- */
+.ds-btn {
+    font-family: var(--font-sans);
+    font-weight: 500;
+    font-size: 0.92rem;
+    padding: 11px 20px;
+    border-radius: var(--r-md);
+    border: 1px solid var(--line-strong);
+    background: var(--surface-3);
+    color: var(--ink-0);
+    cursor: pointer;
+    transition: all var(--dur-fast) var(--ease-out);
+    letter-spacing: -0.005em;
+    display: inline-flex;
+    align-items: center;
+    gap: 10px;
+    text-decoration: none;
+    line-height: 1;
+}
+.ds-btn:hover {
+    border-color: var(--line-accent);
+    background: var(--surface-3);
+    transform: translateY(-1px);
+}
+.ds-btn.primary {
+    background: var(--brand);
+    color: var(--brand-ink);
+    border-color: transparent;
+    box-shadow: 0 0 0 1px rgba(74,165,255,0.5), 0 8px 24px var(--brand-soft);
+}
+.ds-btn.primary:hover { background: #6FB7FF; transform: translateY(-1px); }
+.ds-btn.ghost { background: transparent; border-color: var(--line); }
+.ds-btn.danger { color: var(--danger); border-color: rgba(240,112,145,0.3); background: transparent; }
+.ds-btn.danger:hover { background: var(--danger-soft); border-color: var(--danger); }
+
+/* ---- Card (the ubiquitous bordered panel) ---- */
+.ds-card {
+    background: var(--surface-2);
+    border: 1px solid var(--line);
+    border-radius: var(--r-lg);
+    padding: 28px;
+    position: relative;
+    transition: border-color var(--dur) var(--ease-out),
+                transform var(--dur) var(--ease-out);
+}
+.ds-card.inset { background: var(--surface-inset); }
+.ds-card.accent-rail { padding-left: 32px; }
+.ds-card.accent-rail::before {
+    /* The vertical accent rule on the left edge of the hero card */
+    content: '';
+    position: absolute;
+    left: 0; top: 16px; bottom: 16px;
+    width: 3px;
+    border-radius: 0 2px 2px 0;
+    background: linear-gradient(180deg, var(--brand), rgba(74,165,255,0.1));
+}
+.ds-card.accent-rail[data-state="warn"]::before {
+    background: linear-gradient(180deg, var(--warn), rgba(245,183,101,0.1));
+}
+.ds-card.accent-rail[data-state="healthy"]::before {
+    background: linear-gradient(180deg, var(--healthy), rgba(126,229,169,0.1));
+}
+
+/* ---- Inputs ---- */
+.ds-field {
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+}
+.ds-field label {
+    font-family: var(--font-mono);
+    font-size: 0.7rem;
+    text-transform: uppercase;
+    letter-spacing: var(--track-loose);
+    color: var(--ink-2);
+}
+.ds-input {
+    width: 100%;
+    background: var(--surface-1);
+    border: 1px solid var(--line);
+    border-bottom: 1px solid var(--line-strong);
+    border-radius: var(--r-md);
+    padding: 14px 16px;
+    font-family: var(--font-sans);
+    font-size: 1rem;
+    color: var(--ink-0);
+    transition: border-color var(--dur-fast) var(--ease-out),
+                background var(--dur-fast) var(--ease-out);
+    letter-spacing: -0.005em;
+}
+.ds-input::placeholder { color: var(--ink-3); }
+.ds-input:focus {
+    outline: none;
+    border-color: var(--brand);
+    background: var(--surface-2);
+    box-shadow: 0 0 0 3px var(--brand-soft);
+}
+
+/* ---- Progress bar ---- */
+.ds-progress {
+    height: 4px;
+    background: var(--surface-3);
+    border-radius: 2px;
+    overflow: hidden;
+    position: relative;
+}
+.ds-progress > span {
+    display: block;
+    height: 100%;
+    background: linear-gradient(90deg, var(--brand), #8AC5FF);
+    transition: width var(--dur-slow) var(--ease-out);
+}
+.ds-progress[data-state="warn"] > span { background: linear-gradient(90deg, var(--warn), #FFD699); }
+.ds-progress[data-state="healthy"] > span { background: linear-gradient(90deg, var(--healthy), #B3F2CE); }
+
+/* ---- Definition list (KEY · VALUE rows, used in metric rails) ---- */
+.ds-dl {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(120px, 1fr));
+    gap: 28px 36px;
+}
+.ds-dl .ds-dl-item { display: flex; flex-direction: column; gap: 8px; }
+.ds-dl dt { font-family: var(--font-mono); font-size: 0.68rem; text-transform: uppercase; letter-spacing: var(--track-loose); color: var(--ink-2); }
+.ds-dl dd { margin: 0; }
+
+/* ---- Page-load entrance (used selectively on heroes) ---- */
+@keyframes ds-rise {
+    from { opacity: 0; transform: translateY(10px); }
+    to   { opacity: 1; transform: translateY(0); }
+}
+.ds-rise { animation: ds-rise 0.9s var(--ease-out) both; }
+.ds-rise[data-delay="1"] { animation-delay: 80ms; }
+.ds-rise[data-delay="2"] { animation-delay: 160ms; }
+.ds-rise[data-delay="3"] { animation-delay: 240ms; }
+.ds-rise[data-delay="4"] { animation-delay: 320ms; }
+.ds-rise[data-delay="5"] { animation-delay: 400ms; }
+
+/* ---- Utilities ---- */
+.ds-row { display: flex; align-items: center; gap: 12px; flex-wrap: wrap; }
+.ds-row.between { justify-content: space-between; }
+.ds-col { display: flex; flex-direction: column; gap: 8px; }
+.ds-stack-sm > * + * { margin-top: 8px; }
+.ds-stack-md > * + * { margin-top: 16px; }
+.ds-stack-lg > * + * { margin-top: 32px; }
+.ds-hr { border: 0; border-top: 1px solid var(--line); margin: 24px 0; }
+
+@media (prefers-reduced-motion: reduce) {
+    *, *::before, *::after {
+        animation-duration: 0.01ms !important;
+        transition-duration: 0.01ms !important;
+    }
+}

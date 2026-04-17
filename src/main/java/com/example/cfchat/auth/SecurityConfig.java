@@ -95,9 +95,19 @@ public class SecurityConfig {
                 // MUST be migrated to external files; they will be blocked here.
                 // style-src still allows 'unsafe-inline' because many Thymeleaf
                 // templates still use inline style="..." attributes for bar-chart
-                // widths etc. (tracked for follow-up).
+                // widths etc. (tracked for follow-up). Google Fonts stylesheet
+                // is allow-listed so the editorial design system can load
+                // Fraunces / Instrument Sans / JetBrains Mono.
+                // font-src also allow-lists gstatic.com for the woff2 files.
                 headers.contentSecurityPolicy(csp -> csp
-                    .policyDirectives("default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' data: https:; font-src 'self'; connect-src 'self'; frame-ancestors 'none'"));
+                    .policyDirectives(
+                        "default-src 'self'; "
+                        + "script-src 'self'; "
+                        + "style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; "
+                        + "img-src 'self' data: https:; "
+                        + "font-src 'self' https://fonts.gstatic.com; "
+                        + "connect-src 'self'; "
+                        + "frame-ancestors 'none'"));
             })
             .csrf(csrf -> csrf
                 .csrfTokenRepository(CookieCsrfTokenRepository.withHttpOnlyFalse())

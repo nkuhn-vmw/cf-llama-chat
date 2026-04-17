@@ -55,3 +55,4 @@ docs/genai-tile-feedback/
 
 # Session-local Claude Code scratch file — not for public GitHub
 CLAUDE.md
+.playwright-mcp/

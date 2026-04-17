@@ -1,0 +1,298 @@
+/* ============================================================================
+   Chat shell — editorial overlay on top of the existing style.css
+   Loaded AFTER style.css so selectors need only match specificity. We don't
+   touch any class names — app.js depends on them — we just re-dress them.
+   ========================================================================== */
+
+/* ---- The sidebar: carbon surface, mono labels, editorial type ---- */
+.sidebar {
+    background: var(--surface-1);
+    border-right: 1px solid var(--line);
+    /* Remove any chunky drop shadow from the legacy design */
+    box-shadow: none;
+}
+.sidebar-header {
+    padding: 20px 20px 18px;
+    border-bottom: 1px solid var(--line);
+}
+.sidebar-header .logo,
+.sidebar-header .chat-header-title,
+.sidebar-header h1 {
+    font-family: var(--font-display);
+    font-style: italic;
+    font-weight: 400;
+    font-size: 1.25rem;
+    letter-spacing: var(--track-tight);
+    color: var(--ink-0);
+}
+.sidebar-header .logo-icon { color: var(--brand); }
+
+.new-chat-btn {
+    border: 1px solid var(--line-strong);
+    background: var(--surface-2);
+    color: var(--ink-0);
+    border-radius: var(--r-md);
+    font-family: var(--font-sans);
+    font-size: 0.9rem;
+    letter-spacing: -0.005em;
+    padding: 10px 14px;
+    transition: all var(--dur-fast) var(--ease-out);
+}
+.new-chat-btn:hover { border-color: var(--line-accent); background: var(--surface-3); }
+
+.sidebar-search input {
+    background: var(--surface-2);
+    border: 1px solid var(--line);
+    border-radius: var(--r-md);
+    font-family: var(--font-mono);
+    font-size: 0.82rem;
+    color: var(--ink-0);
+}
+.sidebar-search input::placeholder { color: var(--ink-3); }
+.sidebar-search input:focus { border-color: var(--brand); box-shadow: 0 0 0 3px var(--brand-soft); outline: none; }
+
+.sidebar-tabs {
+    display: flex;
+    gap: 2px;
+    padding: 10px 16px;
+    border-bottom: 1px solid var(--line);
+}
+.sidebar-tab {
+    background: transparent;
+    border: none;
+    color: var(--ink-2);
+    font-family: var(--font-mono);
+    font-size: 0.7rem;
+    text-transform: uppercase;
+    letter-spacing: var(--track-loose);
+    padding: 8px 10px;
+    border-radius: var(--r-sm);
+    cursor: pointer;
+    transition: color var(--dur-fast) var(--ease-out);
+}
+.sidebar-tab:hover { color: var(--ink-0); }
+.sidebar-tab.active { color: var(--brand); background: var(--brand-soft); }
+
+.conversation-item {
+    background: transparent;
+    border: 1px solid transparent;
+    border-radius: var(--r-md);
+    padding: 10px 12px;
+    margin: 2px 8px;
+    transition: all var(--dur-fast) var(--ease-out);
+}
+.conversation-item:hover {
+    background: var(--surface-2);
+    border-color: var(--line);
+}
+.conversation-item.active {
+    background: var(--brand-soft);
+    border-color: var(--line-accent);
+}
+.conversation-title {
+    font-family: var(--font-sans);
+    font-size: 0.88rem;
+    color: var(--ink-0);
+    letter-spacing: -0.005em;
+}
+.conversation-meta {
+    font-family: var(--font-mono);
+    font-size: 0.68rem;
+    color: var(--ink-3);
+    letter-spacing: var(--track-loose);
+    text-transform: uppercase;
+}
+.conversation-item .pin-indicator { color: var(--warn); }
+
+.sidebar-footer {
+    border-top: 1px solid var(--line);
+    padding: 16px;
+}
+
+/* ---- Chat header ---- */
+.chat-header {
+    background: var(--surface-0);
+    border-bottom: 1px solid var(--line);
+    padding: 14px 24px;
+}
+.chat-header-title,
+.chat-header h1 {
+    font-family: var(--font-display);
+    font-style: italic;
+    font-weight: 400;
+    font-size: 1.15rem;
+    letter-spacing: var(--track-tight);
+    color: var(--ink-0);
+}
+/* Tag the eyebrow around the model selector / controls — small, mono */
+.chat-header .model-selector,
+.chat-header button {
+    font-family: var(--font-sans);
+}
+
+/* ---- Welcome / empty state: promote it to a hero ---- */
+.welcome-screen {
+    gap: 24px;
+}
+.welcome-screen h2 {
+    font-family: var(--font-display);
+    font-style: italic;
+    font-weight: 400;
+    font-size: clamp(2rem, 4vw, 2.8rem);
+    letter-spacing: var(--track-tight);
+    color: var(--ink-0);
+    margin: 0;
+}
+.welcome-screen h2::before {
+    content: '— ';
+    color: var(--brand);
+    font-style: normal;
+}
+.welcome-screen p {
+    font-family: var(--font-sans);
+    color: var(--ink-1);
+    font-size: 1rem;
+    max-width: 52ch;
+    line-height: 1.55;
+}
+.welcome-icon { color: var(--brand); opacity: 0.9; }
+
+/* Quick-action buttons beneath the welcome */
+.quick-actions {
+    gap: 8px;
+}
+.quick-actions button,
+.quick-actions .quick-action {
+    background: var(--surface-2);
+    border: 1px solid var(--line);
+    border-radius: var(--r-md);
+    font-family: var(--font-sans);
+    color: var(--ink-0);
+    padding: 14px 18px;
+    text-align: left;
+    transition: all var(--dur-fast) var(--ease-out);
+}
+.quick-actions button:hover {
+    border-color: var(--line-accent);
+    background: var(--surface-3);
+    transform: translateY(-1px);
+}
+
+/* ---- Messages — typography contrast ---- */
+.message {
+    font-family: var(--font-sans);
+    font-size: 1rem;
+    line-height: 1.6;
+}
+.message .role,
+.message .message-role,
+.message .author,
+.message .username,
+.message-header {
+    font-family: var(--font-display);
+    font-style: italic;
+    font-weight: 400;
+    font-size: 0.95rem;
+    letter-spacing: var(--track-tight);
+    color: var(--ink-1);
+}
+.message.user {
+    background: var(--surface-2);
+    border: 1px solid var(--line);
+    border-radius: var(--r-md);
+}
+.message.assistant {
+    background: transparent;
+}
+.message code, .message pre code {
+    font-family: var(--font-mono);
+    font-feature-settings: var(--feat-data);
+}
+
+/* ---- Input area — floating card with brand glow on focus ---- */
+.input-area,
+.chat-input-container,
+.chat-input {
+    background: var(--surface-1);
+    border-top: 1px solid var(--line);
+}
+.chat-input textarea,
+.chat-input input[type="text"],
+#messageInput {
+    background: var(--surface-2) !important;
+    border: 1px solid var(--line-strong) !important;
+    border-radius: var(--r-lg) !important;
+    font-family: var(--font-sans) !important;
+    font-size: 1rem !important;
+    color: var(--ink-0) !important;
+    letter-spacing: -0.005em !important;
+    padding: 14px 16px !important;
+    transition: border-color var(--dur-fast) var(--ease-out),
+                box-shadow var(--dur-fast) var(--ease-out) !important;
+}
+#messageInput:focus {
+    border-color: var(--brand) !important;
+    box-shadow: 0 0 0 3px var(--brand-soft) !important;
+    outline: none !important;
+}
+
+.send-btn {
+    background: var(--brand) !important;
+    color: var(--brand-ink) !important;
+    border: none !important;
+    border-radius: var(--r-md) !important;
+    box-shadow: 0 0 0 1px rgba(74,165,255,0.4), 0 6px 18px var(--brand-soft) !important;
+    transition: all var(--dur-fast) var(--ease-out) !important;
+}
+.send-btn:hover:not(:disabled) { background: #6FB7FF !important; transform: translateY(-1px); }
+.send-btn:disabled { background: var(--surface-3) !important; color: var(--ink-3) !important; box-shadow: none !important; }
+.send-btn.cancel-mode { background: var(--danger) !important; color: #0A0D13 !important; }
+
+/* Thinking-level toggle — tiny editorial pills */
+.thinking-btn,
+.thinking-level {
+    background: transparent;
+    border: 1px solid var(--line);
+    border-radius: var(--r-chip);
+    font-family: var(--font-mono);
+    font-size: 0.72rem;
+    letter-spacing: var(--track-loose);
+    text-transform: uppercase;
+    color: var(--ink-2);
+    padding: 5px 11px;
+    transition: all var(--dur-fast) var(--ease-out);
+    cursor: pointer;
+}
+.thinking-btn:hover { color: var(--ink-0); border-color: var(--line-accent); }
+.thinking-btn.active { color: var(--brand); border-color: var(--line-accent); background: var(--brand-soft); }
+
+/* ---- Delete / danger buttons in conversation row ---- */
+.delete-btn:hover { color: var(--danger); background: var(--danger-soft); }
+.clear-history-btn {
+    background: transparent;
+    border: 1px solid var(--line);
+    color: var(--ink-2);
+    font-family: var(--font-mono);
+    font-size: 0.72rem;
+    text-transform: uppercase;
+    letter-spacing: var(--track-loose);
+    border-radius: var(--r-md);
+}
+.clear-history-btn:hover { color: var(--danger); border-color: rgba(240,112,145,0.3); }
+
+/* ---- Tiny signature strip at the very top of the shell ---- */
+body::after {
+    content: '';
+    position: fixed;
+    inset: 0 0 auto 0;
+    height: 2px;
+    background: linear-gradient(90deg,
+        var(--brand) 0%, var(--brand) 40%,
+        var(--healthy) 40%, var(--healthy) 60%,
+        var(--warn) 60%, var(--warn) 75%,
+        var(--danger) 75%, var(--danger) 85%,
+        transparent 85%);
+    z-index: 1000;
+    opacity: 0.7;
+    pointer-events: none;
+}

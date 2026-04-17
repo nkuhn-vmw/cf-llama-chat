@@ -1,0 +1,248 @@
+/* ============================================================================
+   Login — editorial hero
+   Two-column split on wide viewports: left = type-forward hero, right = form.
+   On narrow viewports it collapses gracefully into a single column.
+   ========================================================================== */
+
+.login-shell {
+    min-height: 100vh;
+    display: grid;
+    grid-template-columns: 1.05fr 0.95fr;
+    color: var(--ink-0);
+}
+@media (max-width: 880px) {
+    .login-shell { grid-template-columns: 1fr; }
+    .login-hero { border-right: none; border-bottom: 1px solid var(--line); padding: 48px 32px 72px; }
+}
+
+/* ---------- LEFT — editorial hero ---------- */
+.login-hero {
+    position: relative;
+    padding: 56px 64px;
+    border-right: 1px solid var(--line);
+    background:
+        radial-gradient(ellipse 60vw 40vh at 20% 10%, rgba(74, 165, 255, 0.08), transparent 55%),
+        radial-gradient(ellipse 50vw 30vh at 90% 95%, rgba(126, 229, 169, 0.04), transparent 55%);
+    display: flex;
+    flex-direction: column;
+    overflow: hidden;
+}
+
+.login-mark {
+    display: inline-flex;
+    align-items: center;
+    gap: 14px;
+}
+.login-mark .mark-box {
+    width: 44px; height: 44px;
+    border-radius: 10px;
+    background: var(--brand);
+    color: var(--brand-ink);
+    display: grid; place-items: center;
+    font-family: var(--font-display);
+    font-style: italic;
+    font-weight: 600;
+    font-size: 1.4rem;
+    box-shadow: 0 0 0 1px rgba(74,165,255,0.5), 0 10px 30px var(--brand-soft);
+}
+.login-mark .mark-name {
+    font-family: var(--font-mono);
+    font-size: 0.7rem;
+    letter-spacing: var(--track-loose);
+    text-transform: uppercase;
+    color: var(--ink-2);
+}
+.login-mark .mark-product {
+    display: block;
+    color: var(--ink-0);
+    font-family: var(--font-sans);
+    font-size: 0.95rem;
+    letter-spacing: -0.01em;
+    text-transform: none;
+    margin-top: 2px;
+}
+
+.login-heading {
+    margin-top: 20vh;
+    max-width: 620px;
+}
+.login-eyebrow {
+    margin-bottom: 24px;
+}
+.login-heading h1 {
+    font-family: var(--font-display);
+    font-weight: 400;
+    font-style: italic;
+    font-size: clamp(2.8rem, 5.6vw, 4.6rem);
+    line-height: 1.02;
+    letter-spacing: var(--track-tight);
+    color: var(--ink-0);
+    margin: 0;
+}
+.login-heading h1 .upright { font-style: normal; }
+.login-heading h1 .accent  { color: var(--brand); font-style: italic; }
+.login-heading h1 .period  { color: var(--brand); font-style: normal; }
+
+.login-heading p.lede {
+    margin-top: 28px;
+    font-family: var(--font-sans);
+    font-size: 1.02rem;
+    color: var(--ink-1);
+    line-height: 1.55;
+    max-width: 46ch;
+}
+
+/* Footer strip at the bottom of the hero — shows foundation context */
+.login-footer {
+    margin-top: auto;
+    padding-top: 48px;
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    flex-wrap: wrap;
+}
+
+/* ---------- RIGHT — form card ---------- */
+.login-pane {
+    padding: 56px 64px;
+    background: var(--surface-1);
+    display: flex;
+    flex-direction: column;
+    justify-content: center;
+    position: relative;
+}
+@media (max-width: 880px) {
+    .login-pane { padding: 48px 32px 64px; }
+}
+
+.login-card {
+    width: 100%;
+    max-width: 440px;
+    margin: 0 auto;
+}
+
+.login-card-title {
+    display: flex;
+    align-items: baseline;
+    justify-content: space-between;
+    margin-bottom: 36px;
+    padding-bottom: 20px;
+    border-bottom: 1px solid var(--line);
+}
+.login-card-title h2 {
+    font-family: var(--font-display);
+    font-weight: 400;
+    font-style: italic;
+    font-size: 1.7rem;
+    color: var(--ink-0);
+    letter-spacing: var(--track-tight);
+    margin: 0;
+}
+.login-card-title .step {
+    font-family: var(--font-mono);
+    font-size: 0.72rem;
+    letter-spacing: var(--track-loose);
+    text-transform: uppercase;
+    color: var(--ink-2);
+}
+.login-card-title .step strong { color: var(--ink-0); font-weight: 500; }
+
+.login-message {
+    padding: 12px 14px;
+    border-radius: var(--r-md);
+    font-family: var(--font-mono);
+    font-size: 0.82rem;
+    letter-spacing: 0.01em;
+    margin-bottom: 20px;
+    display: flex;
+    align-items: flex-start;
+    gap: 10px;
+}
+.login-message::before {
+    content: '';
+    flex-shrink: 0;
+    width: 8px; height: 8px;
+    margin-top: 6px;
+    border-radius: 50%;
+    background: currentColor;
+}
+.login-message.error   { color: var(--danger);  background: var(--danger-soft);  border: 1px solid rgba(240,112,145,0.25); }
+.login-message.success { color: var(--healthy); background: var(--healthy-soft); border: 1px solid rgba(126,229,169,0.25); }
+.login-message.hidden  { display: none; }
+
+.login-form {
+    display: flex;
+    flex-direction: column;
+    gap: 20px;
+}
+
+.login-divider {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    margin: 28px 0;
+    color: var(--ink-3);
+    font-family: var(--font-mono);
+    font-size: 0.7rem;
+    letter-spacing: var(--track-loose);
+    text-transform: uppercase;
+}
+.login-divider::before, .login-divider::after {
+    content: '';
+    flex: 1;
+    height: 1px;
+    background: var(--line);
+}
+
+.login-sso {
+    width: 100%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 12px;
+    padding: 14px 18px;
+    border-radius: var(--r-md);
+    background: transparent;
+    border: 1px solid var(--line-strong);
+    color: var(--ink-0);
+    font-family: var(--font-sans);
+    font-size: 0.95rem;
+    text-decoration: none;
+    transition: all var(--dur-fast) var(--ease-out);
+}
+.login-sso:hover {
+    border-color: var(--line-accent);
+    background: var(--surface-2);
+}
+.login-sso svg { width: 18px; height: 18px; color: var(--ink-1); }
+
+.login-aside {
+    margin-top: 28px;
+    padding-top: 20px;
+    border-top: 1px solid var(--line);
+    font-size: 0.88rem;
+    color: var(--ink-2);
+    text-align: center;
+}
+.login-aside a {
+    color: var(--brand);
+    text-decoration: none;
+    font-weight: 500;
+}
+.login-aside a:hover { text-decoration: underline; text-underline-offset: 3px; }
+
+/* A thin calibration strip at the very top of the screen — a decorative
+   signature element that ties the login hero to the chat shell. */
+.login-strip {
+    position: fixed;
+    inset: 0 0 auto 0;
+    height: 2px;
+    background: linear-gradient(90deg,
+        var(--brand) 0%, var(--brand) 40%,
+        var(--healthy) 40%, var(--healthy) 60%,
+        var(--warn) 60%, var(--warn) 75%,
+        var(--danger) 75%, var(--danger) 85%,
+        transparent 85%);
+    z-index: 2;
+    opacity: 0.9;
+}

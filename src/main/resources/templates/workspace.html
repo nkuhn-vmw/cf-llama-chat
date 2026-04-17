@@ -3,198 +3,221 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>My Workspace - CF Llama Chat</title>
-    <link rel="stylesheet" th:href="@{/css/style.css}">
-    <link rel="stylesheet" th:href="@{/css/admin.css}">
-    <style>
-        .admin-nav {
-            display: grid;
-            grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
-            gap: 24px;
-            margin-top: 32px;
-        }
-
-        .admin-nav-card {
-            background-color: var(--bg-secondary);
-            border: 1px solid var(--border-color);
-            border-radius: 16px;
-            padding: 24px;
-            text-decoration: none;
-            color: var(--text-primary);
-            transition: transform 0.2s, border-color 0.2s, box-shadow 0.2s;
-        }
-
-        .admin-nav-card:hover {
-            transform: translateY(-4px);
-            border-color: var(--accent-color);
-            box-shadow: 0 8px 24px rgba(0, 0, 0, 0.15);
-        }
-
-        .admin-nav-card .card-icon {
-            width: 48px;
-            height: 48px;
-            background-color: var(--bg-tertiary);
-            border-radius: 12px;
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            margin-bottom: 16px;
-        }
-
-        .admin-nav-card .card-icon svg {
-            width: 24px;
-            height: 24px;
-            color: var(--accent-color);
-        }
-
-        .admin-nav-card h3 {
-            font-size: 1.2rem;
-            font-weight: 600;
-            margin-bottom: 8px;
-        }
-
-        .admin-nav-card p {
-            font-size: 0.9rem;
-            color: var(--text-secondary);
-            line-height: 1.5;
-        }
-
-        .admin-nav-card .card-stat {
-            margin-top: 16px;
-            padding-top: 16px;
-            border-top: 1px solid var(--border-color);
-            font-size: 0.85rem;
-            color: var(--text-muted);
-        }
-
-        .admin-nav-card .card-stat strong {
-            color: var(--accent-color);
-        }
-    </style>
+    <title>Workspace · CF Llama Chat</title>
+    <link rel="stylesheet" th:href="@{/css/design-system.css}">
+    <link rel="stylesheet" th:href="@{/css/workspace.css}">
 </head>
 <body>
-    <div class="admin-container">
-        <header class="admin-header">
-            <h1>My Workspace</h1>
-            <a href="/" class="back-link">
-                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                    <line x1="19" y1="12" x2="5" y2="12"></line>
-                    <polyline points="12 19 5 12 12 5"></polyline>
-                </svg>
-                Back to Chat
-            </a>
+    <div class="ws-shell">
+        <!-- Topbar -->
+        <header class="ws-topbar">
+            <a class="ws-mark" href="/" title="Back to chat">T</a>
+            <span class="ws-breadcrumb">
+                <strong>Tanzu · Control Plane</strong> &nbsp;·&nbsp; workspace
+            </span>
+            <div class="ws-chips">
+                <span class="ds-chip" data-state="healthy">signed in</span>
+                <a class="ds-chip" data-state="muted" href="/" style="text-decoration: none;">chat</a>
+                <a class="ds-chip" data-state="muted" href="/settings.html" style="text-decoration: none;">settings</a>
+                <a class="ds-chip" data-state="muted" href="/logout" style="text-decoration: none;">sign out</a>
+            </div>
         </header>
 
-        <div class="stats-cards">
-            <div class="stat-card">
-                <div class="stat-value" id="channelCount">--</div>
-                <div class="stat-label">Channels</div>
+        <!-- Hero -->
+        <section class="ws-hero">
+            <div>
+                <div class="ds-eyebrow ds-rise">WORKSPACE · OVERVIEW</div>
+                <h1 class="ds-rise" data-delay="1" id="wsGreeting">
+                    <span class="upright">Your</span> <em>workbench</em><span class="upright">,</span>
+                    <span class="accent" id="wsGreetingName">ready</span><span class="period">.</span>
+                </h1>
+                <p class="lede ds-rise" data-delay="2">
+                    Everything scoped to you — channels, the agent-curated wiki, saved prompts,
+                    documents for retrieval, and the tools the model can reach for mid-turn.
+                </p>
+                <div class="ws-quick ds-rise" data-delay="3">
+                    <a class="ds-btn primary" href="/">Open chat →</a>
+                    <a class="ds-btn ghost" href="/workspace/help">Read the guide</a>
+                </div>
             </div>
-            <div class="stat-card">
-                <div class="stat-value" id="wikiCount">--</div>
-                <div class="stat-label">Wiki Pages</div>
+
+            <div class="ws-clock ds-rise" data-delay="2" aria-live="off">
+                <div class="time">
+                    <span id="wsTimeHours">--</span>:<span id="wsTimeMinutes">--</span><span class="sec">:<span id="wsTimeSeconds">--</span></span>
+                </div>
+                <div class="meta">
+                    <span id="wsTimeZone">UTC</span> &nbsp;·&nbsp; <span id="wsTimeDate">----</span>
+                </div>
             </div>
-            <div class="stat-card">
-                <div class="stat-value" id="promptCount">--</div>
-                <div class="stat-label">Prompts</div>
+        </section>
+
+        <!-- Metric rail -->
+        <section class="ws-rail ds-rise" data-delay="3">
+            <div class="cell">
+                <div class="label">Channels</div>
+                <div class="value" id="channelCount">—</div>
+                <div class="sub">group rooms</div>
             </div>
-            <div class="stat-card">
-                <div class="stat-value" id="documentCount">--</div>
-                <div class="stat-label">Documents</div>
+            <div class="cell" id="wikiCountCell">
+                <div class="label">Wiki pages</div>
+                <div class="value" id="wikiCount">—</div>
+                <div class="sub">agent-curated</div>
             </div>
-            <div class="stat-card">
-                <div class="stat-value" id="toolCount">--</div>
-                <div class="stat-label">Tools</div>
+            <div class="cell">
+                <div class="label">Prompts</div>
+                <div class="value" id="promptCount">—</div>
+                <div class="sub">saved presets</div>
             </div>
-        </div>
+            <div class="cell">
+                <div class="label">Documents</div>
+                <div class="value" id="documentCount">—</div>
+                <div class="sub">indexed for RAG</div>
+            </div>
+            <div class="cell">
+                <div class="label">Tools</div>
+                <div class="value" id="toolCount">—</div>
+                <div class="sub">MCP + custom</div>
+            </div>
+        </section>
 
-        <nav class="admin-nav">
-            <a href="/workspace/channels" class="admin-nav-card">
-                <div class="card-icon">
-                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                        <path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"></path>
-                        <line x1="9" y1="10" x2="15" y2="10"></line>
-                        <line x1="12" y1="7" x2="12" y2="13"></line>
-                    </svg>
-                </div>
-                <h3>Channels</h3>
-                <p>Create and manage group channels. Share messages and collaborate with other users in real-time.</p>
-                <div class="card-stat">
-                    <strong id="channelCountStat">--</strong> channels available
-                </div>
-            </a>
+        <!-- Nav cards -->
+        <section>
+            <div class="ws-section-head">
+                <h2>Surfaces <span class="aside">six places work happens</span></h2>
+                <a class="ds-arrow" href="/workspace/help">Documentation</a>
+            </div>
 
-            <a href="/workspace/wiki" class="admin-nav-card" id="wikiNavCard" style="display: none;">
-                <div class="card-icon">
-                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                        <path d="M2 3h6a4 4 0 0 1 4 4v14a3 3 0 0 0-3-3H2z"></path>
-                        <path d="M22 3h-6a4 4 0 0 0-4 4v14a3 3 0 0 1 3-3h7z"></path>
-                    </svg>
-                </div>
-                <h3>Wiki</h3>
-                <p>Your agent-curated knowledge base — facts, preferences, decisions, and concepts learned from your conversations.</p>
-                <div class="card-stat">
-                    <strong id="wikiCountStat">--</strong> pages
-                </div>
-            </a>
+            <nav class="ws-nav">
+                <a class="ws-nav-card ds-rise" data-delay="1" data-index="01" href="/workspace/channels">
+                    <div class="ws-nav-icon">
+                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6">
+                            <path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"></path>
+                            <line x1="9" y1="10" x2="15" y2="10"></line>
+                            <line x1="12" y1="7" x2="12" y2="13"></line>
+                        </svg>
+                    </div>
+                    <div>
+                        <h3>Channels</h3>
+                        <p>Persistent group rooms. Messages stream live over SSE so multiple people can track the same thread.</p>
+                    </div>
+                    <div class="foot">
+                        <span><strong id="channelCountStat">—</strong>&nbsp; channels</span>
+                        <span class="chev">→</span>
+                    </div>
+                </a>
 
-            <a href="/workspace/prompts" class="admin-nav-card">
-                <div class="card-icon">
-                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                        <path d="M4 4h16v2H4zM4 10h10v2H4zM4 16h16v2H4z"></path>
-                    </svg>
-                </div>
-                <h3>Prompts</h3>
-                <p>Create and manage prompt presets with variables. Share useful prompts with your team.</p>
-                <div class="card-stat">
-                    <strong id="promptCountStat">--</strong> prompts created
-                </div>
-            </a>
+                <a class="ws-nav-card ds-rise" data-delay="2" data-index="02" href="/workspace/wiki" id="wikiNavCard" style="display: none;">
+                    <div class="ws-nav-icon">
+                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6">
+                            <path d="M2 3h6a4 4 0 0 1 4 4v14a3 3 0 0 0-3-3H2z"></path>
+                            <path d="M22 3h-6a4 4 0 0 0-4 4v14a3 3 0 0 1 3-3h7z"></path>
+                        </svg>
+                    </div>
+                    <div>
+                        <h3>Wiki</h3>
+                        <p>Your agent-curated knowledge base — facts, preferences, decisions the model learns about you across conversations.</p>
+                    </div>
+                    <div class="foot">
+                        <span><strong id="wikiCountStat">—</strong>&nbsp; pages</span>
+                        <span class="chev">→</span>
+                    </div>
+                </a>
 
-            <a href="/workspace/tools" class="admin-nav-card">
-                <div class="card-icon">
-                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                        <path d="M14.7 6.3a1 1 0 0 0 0 1.4l1.6 1.6a1 1 0 0 0 1.4 0l3.77-3.77a6 6 0 0 1-7.94 7.94l-6.91 6.91a2.12 2.12 0 0 1-3-3l6.91-6.91a6 6 0 0 1 7.94-7.94l-3.76 3.76z"></path>
-                    </svg>
-                </div>
-                <h3>Tools</h3>
-                <p>Manage MCP and custom tools. Enable or disable individual tools that the AI can use during conversations.</p>
-                <div class="card-stat">
-                    <strong id="toolCountStat">--</strong> tools available
-                </div>
-            </a>
+                <a class="ws-nav-card ds-rise" data-delay="3" data-index="03" href="/workspace/prompts">
+                    <div class="ws-nav-icon">
+                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6">
+                            <path d="M4 4h16v2H4zM4 10h10v2H4zM4 16h16v2H4z"></path>
+                        </svg>
+                    </div>
+                    <div>
+                        <h3>Prompts</h3>
+                        <p>Parameterised templates with <span class="ds-mono" style="font-size:0.8em;color:var(--ink-2)">{{variables}}</span>. Share them, slash-invoke them from chat.</p>
+                    </div>
+                    <div class="foot">
+                        <span><strong id="promptCountStat">—</strong>&nbsp; prompts</span>
+                        <span class="chev">→</span>
+                    </div>
+                </a>
 
-            <a href="/workspace/documents" class="admin-nav-card">
-                <div class="card-icon">
-                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                        <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"></path>
-                        <polyline points="14 2 14 8 20 8"></polyline>
-                        <line x1="12" y1="18" x2="12" y2="12"></line>
-                        <line x1="9" y1="15" x2="15" y2="15"></line>
-                    </svg>
-                </div>
-                <h3>Documents</h3>
-                <p>Upload and manage documents for RAG context. Support for PDF, Word, text files, and YouTube transcripts.</p>
-                <div class="card-stat">
-                    <strong id="documentCountStat">--</strong> documents uploaded
-                </div>
+                <a class="ws-nav-card ds-rise" data-delay="4" data-index="04" href="/workspace/tools">
+                    <div class="ws-nav-icon">
+                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6">
+                            <path d="M14.7 6.3a1 1 0 0 0 0 1.4l1.6 1.6a1 1 0 0 0 1.4 0l3.77-3.77a6 6 0 0 1-7.94 7.94l-6.91 6.91a2.12 2.12 0 0 1-3-3l6.91-6.91a6 6 0 0 1 7.94-7.94l-3.76 3.76z"></path>
+                        </svg>
+                    </div>
+                    <div>
+                        <h3>Tools</h3>
+                        <p>MCP + custom tools. Toggle which ones the model can call mid-turn, or filter by server.</p>
+                    </div>
+                    <div class="foot">
+                        <span><strong id="toolCountStat">—</strong>&nbsp; available</span>
+                        <span class="chev">→</span>
+                    </div>
+                </a>
+
+                <a class="ws-nav-card ds-rise" data-delay="5" data-index="05" href="/workspace/documents">
+                    <div class="ws-nav-icon">
+                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6">
+                            <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"></path>
+                            <polyline points="14 2 14 8 20 8"></polyline>
+                            <line x1="12" y1="18" x2="12" y2="12"></line>
+                            <line x1="9" y1="15" x2="15" y2="15"></line>
+                        </svg>
+                    </div>
+                    <div>
+                        <h3>Documents</h3>
+                        <p>Upload PDFs, Word, markdown, YouTube transcripts. Indexed into pgvector for retrieval in chat.</p>
+                    </div>
+                    <div class="foot">
+                        <span><strong id="documentCountStat">—</strong>&nbsp; indexed</span>
+                        <span class="chev">→</span>
+                    </div>
+                </a>
+
+                <a class="ws-nav-card ds-rise" data-delay="5" data-index="06" href="/workspace/help">
+                    <div class="ws-nav-icon">
+                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6">
+                            <circle cx="12" cy="12" r="10"></circle>
+                            <path d="M9.09 9a3 3 0 0 1 5.83 1c0 2-3 3-3 3"></path>
+                            <line x1="12" y1="17" x2="12.01" y2="17"></line>
+                        </svg>
+                    </div>
+                    <div>
+                        <h3>Guides</h3>
+                        <p>How each surface fits together. Concise walkthroughs for channels, wiki, prompts, tools, documents.</p>
+                    </div>
+                    <div class="foot">
+                        <span>read</span>
+                        <span class="chev">→</span>
+                    </div>
+                </a>
+            </nav>
+        </section>
+
+        <!-- Quick launch -->
+        <section class="ws-launch ds-rise" data-delay="3">
+            <div>
+                <div class="eyebrow">Quick launch</div>
+                <h3>
+                    Pick up in <span class="accent">chat</span>,
+                    or start a new preset.
+                </h3>
+            </div>
+            <div class="presets">
+                <a class="preset active" href="/">continue · last conversation</a>
+                <a class="preset" href="/?thinking=low">fast · low thinking</a>
+                <a class="preset" href="/?thinking=high">deliberate · high thinking</a>
+                <a class="preset" href="/workspace/prompts">+ new prompt</a>
+            </div>
+            <a class="ds-btn primary" href="/">
+                Launch <span aria-hidden="true" style="font-family: var(--font-mono); opacity: 0.7;">↵</span>
             </a>
-            <a href="/workspace/help" class="admin-nav-card">
-                <div class="card-icon">
-                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                        <circle cx="12" cy="12" r="10"></circle>
-                        <path d="M9.09 9a3 3 0 0 1 5.83 1c0 2-3 3-3 3"></path>
-                        <line x1="12" y1="17" x2="12.01" y2="17"></line>
-                    </svg>
-                </div>
-                <h3>Help & Guides</h3>
-                <p>Learn how to use workspace features. Guides for channels, wiki, prompts, tools, and documents.</p>
-            </a>
-        </nav>
+        </section>
     </div>
 
     <script th:src="@{/js/admin-theme.js}"></script>
     <script th:src="@{/js/admin-toast.js}"></script>
     <script th:src="@{/js/workspace.js}"></script>
+    <script th:src="@{/js/workspace-live.js}"></script>
 </body>
 </html>
