@@ -9,12 +9,12 @@
     <meta name="apple-mobile-web-app-capable" content="yes">
     <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
     <!-- Design-system tokens + typography (loaded FIRST so style.css inherits them) -->
-    <link rel="stylesheet" th:href="@{/css/design-system.css}">
+    <link rel="stylesheet" th:href="@{/css/design-system.css(v=5)}">
     <link rel="stylesheet" th:href="@{/css/style.css}">
     <link rel="stylesheet" th:href="@{/vendor/github-dark.min.css}">
     <link rel="stylesheet" th:href="@{/vendor/katex.min.css}">
     <!-- Editorial overlay (loaded LAST so it can selectively re-dress the chat shell) -->
-    <link rel="stylesheet" th:href="@{/css/chat-editorial.css}">
+    <link rel="stylesheet" th:href="@{/css/chat-editorial.css(v=5)}">
     <!-- Organization favicon -->
     <link th:if="${orgTheme != null && orgTheme.faviconUrl != null}" rel="icon" th:href="${orgTheme.faviconUrl}">
     <!-- Server-side organization theme CSS variables -->
