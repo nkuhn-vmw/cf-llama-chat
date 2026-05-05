@@ -272,25 +272,101 @@ cf bind-service enterprise-chat-prod enterprise-chat-sso
 cf restage enterprise-chat-prod
 ```
 
-### Default Credentials
+### 🔐 Admin Password & Auth Secret Setup
 
-| | |
+> **TL;DR** — don't put these values in `manifest.yml` (it's in git). Either let the app generate a password on first boot, or set them with `cf set-env` after pushing. The app refuses to start on the `cloud` profile if you use a known-weak value.
+
+#### What these two variables actually do
+
+They sound similar, but they are **completely different** things:
+
+| | `APP_ADMIN_DEFAULT_PASSWORD` | `APP_AUTH_SECRET` |
+|---|---|---|
+| **Purpose** | Initial password for the bootstrap `admin` user | Invitation code for self-registration |
+| **When it's used** | **Only on first boot** — when the `users` table is empty. Ignored afterwards. | Every registration attempt, *only if* `APP_REQUIRE_INVITATION=true` |
+| **Who types it** | The `admin` user at first login | Each new user registering at `/register` |
+| **If unset** | A random 16-char password is generated and printed to `cf logs` | Self-registration is open (no gate) |
+| **Changing it later** | Does nothing — change the admin's password through the UI instead | Immediate; next registrant needs the new value |
+
+#### The weak-value guard
+
+On the `cloud` profile (auto-activated in CF), `SecurityStartupValidator` refuses to start the app if either variable matches a well-known default:
+
+| Variable | Blocked values |
 |---|---|
-| **Username** | `admin` |
-| **Password** | set via `APP_ADMIN_DEFAULT_PASSWORD`, or auto-generated on first boot |
+| `APP_ADMIN_DEFAULT_PASSWORD` | `Tanzu123`, `tanzu123`, `admin`, `password`, `changeme` |
+| `APP_AUTH_SECRET` | `changeme`, `changeme-cdc-wiki` |
 
-> ⚠️ The shipped manifests intentionally do **not** pin an admin password or
-> auth secret. On first start with none set, the app generates a random admin
-> password and prints it once to `cf logs`. Capture it and rotate:
->
-> ```bash
-> cf set-env <app> APP_ADMIN_DEFAULT_PASSWORD <strong-value>
-> cf set-env <app> APP_AUTH_SECRET         <strong-value>   # only if APP_REQUIRE_INVITATION=true
-> cf restage <app>
-> ```
->
-> On the `cloud` profile the app refuses to start if `APP_ADMIN_DEFAULT_PASSWORD`
-> or `APP_AUTH_SECRET` are set to known-weak values (`Tanzu123`, `changeme`).
+The failure is only visible in `cf logs <app> --recent` — `cf push` just reports `All instances crashed / FAILED`. Grep for `Startup refused:`:
+
+```
+ERROR c.e.c.config.SecurityStartupValidator :
+  Startup refused: APP_ADMIN_DEFAULT_PASSWORD is set to a known-weak value.
+  Rotate via `cf set-env <app> APP_ADMIN_DEFAULT_PASSWORD <strong-value>` ...
+```
+
+#### ✅ Recommended: let the app generate the password
+
+```bash
+cf push -f manifest.yml
+cf logs enterprise-chat-prod --recent | grep -A1 "Generated admin password"
+# ================================================================
+#   Generated admin password: 4f8a2e9c1d7b3a5e
+#   Change this immediately after first login!
+# ================================================================
+```
+
+Log in with `admin` + that password, then change it via the UI (profile → change password). The env var is no longer needed after this.
+
+#### ✅ Alternative: pin a strong password before first start
+
+```bash
+cf push -f manifest.yml --no-start
+cf set-env enterprise-chat-prod APP_ADMIN_DEFAULT_PASSWORD "$(openssl rand -base64 24)"
+cf start enterprise-chat-prod
+```
+
+Or, if you need to capture the value somewhere:
+
+```bash
+ADMIN_PW="$(openssl rand -base64 24)"
+echo "$ADMIN_PW" > ~/.ent-chat-admin-pw   # save somewhere safe, chmod 600
+cf set-env enterprise-chat-prod APP_ADMIN_DEFAULT_PASSWORD "$ADMIN_PW"
+cf restart enterprise-chat-prod
+```
+
+#### ✅ If you really want manifest-driven config
+
+Use CF's built-in variable substitution with a **gitignored** vars file — never commit the real value:
+
+```yaml
+# manifest.yml — committed to git
+env:
+  APP_ADMIN_DEFAULT_PASSWORD: ((admin_password))
+  APP_AUTH_SECRET: ((auth_secret))
+```
+
+```yaml
+# secrets.yml — add to .gitignore, chmod 600
+admin_password: H3re-is-a-strong-value-2026
+auth_secret: and-a-different-strong-value-xyz
+```
+
+```bash
+echo "secrets.yml" >> .gitignore
+cf push -f manifest.yml --vars-file secrets.yml
+```
+
+#### 🚫 Common mistakes
+
+| What people try | What happens | Fix |
+|---|---|---|
+| Hardcoding the password in `manifest.yml` (committed to git) | Works, but leaks the secret into git history | Use `--vars-file` or `cf set-env` |
+| Setting `APP_ADMIN_DEFAULT_PASSWORD: Tanzu123` | Validator refuses to start — "Startup refused: known-weak value" | Use a strong value |
+| Setting `APP_ADMIN_DEFAULT_PASSWORD` *after* the admin user exists | No effect — it's inert after first boot | Change the password through the UI |
+| Using unquoted password with YAML special chars (e.g. `P@ssw0rd!`) | YAML parser may misinterpret `!`/`@`/`#`/`&`/`*` | Single-quote the value: `APP_ADMIN_DEFAULT_PASSWORD: 'P@ssw0rd!'` |
+| Setting `APP_AUTH_SECRET` but forgetting `APP_REQUIRE_INVITATION=true` | Invitation code is ignored — anyone can register | Set both, or unset `APP_AUTH_SECRET` |
+| Expecting `cf push` to tell you why the app crashed | It doesn't — only says `FAILED` | Always `cf logs <app> --recent` after a crashed push |
 
 ### Service Bindings
 
@@ -336,9 +412,9 @@ cf restage enterprise-chat-prod
 | Variable | Description | Default |
 |----------|-------------|---------|
 | `SPRING_PROFILES_ACTIVE` | Active profile | `default` |
-| `APP_ADMIN_DEFAULT_PASSWORD` | First-boot admin password (random if unset) | _(unset)_ |
-| `APP_AUTH_SECRET` | Invitation code required for registration | *(empty)* |
-| `APP_REQUIRE_INVITATION` | Require invitation code | `false` |
+| `APP_ADMIN_DEFAULT_PASSWORD` | First-boot admin password (random if unset). See [Admin Password & Auth Secret Setup](#-admin-password--auth-secret-setup). | _(unset)_ |
+| `APP_AUTH_SECRET` | Invitation code for self-registration (only enforced when `APP_REQUIRE_INVITATION=true`). See [Admin Password & Auth Secret Setup](#-admin-password--auth-secret-setup). | *(empty)* |
+| `APP_REQUIRE_INVITATION` | Require invitation code to register | `false` |
 | `CHAT_PROVIDER` | Default chat provider | `openai` |
 | `EMBEDDING_MODEL` | Embedding model name | `text-embedding-3-small` |
 | `EMBEDDING_DIMENSIONS` | Embedding vector size | `512` |
